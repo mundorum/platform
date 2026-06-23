@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>noid editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --c-bg:            #f5f2ec;
+  --c-surface:       #fffef9;
+  --c-border:        rgba(60,50,30,0.12);
+  --c-border-strong: rgba(60,50,30,0.22);
+  --c-text:          #1a1610;
+  --c-muted:         #6b6050;
+  --c-accent:        #7a3e1a;
+  --c-accent-light:  #f0e8de;
+  --c-tag-char:      #4a2a6a;  --c-tag-char-bg:   #ede8f5;
+  --c-tag-place:     #1a3a5a;  --c-tag-place-bg:  #deeaf5;
+  --c-tag-trans:     #1a3a30;  --c-tag-trans-bg:  #daf5ee;
+  --c-tag-text:      #3a4a1a;  --c-tag-text-bg:   #e8eedd;
+  --c-bq-border:     #c8a86a;
+  --c-node-bg:       #fffef9;
+  --c-node-border:   rgba(60,50,30,0.28);
+  --c-node-header:   #f0e8de;
+  --c-port-pub:      #7a3e1a;
+  --c-port-sub:      #1a3a5a;
+  --font-ui:         'Outfit', sans-serif;
+  --font-doc:        'Lora', serif;
+  --font-mono:       'JetBrains Mono', monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg:            #1a1810;
+    --c-surface:       #211f17;
+    --c-border:        rgba(200,180,140,0.12);
+    --c-border-strong: rgba(200,180,140,0.22);
+    --c-text:          #ede8dc;
+    --c-muted:         #9a8e78;
+    --c-accent:        #d08050;
+    --c-accent-light:  #2a1e14;
+    --c-node-bg:       #211f17;
+    --c-node-border:   rgba(200,180,140,0.32);
+    --c-node-header:   #2a1e14;
+    --c-port-pub:      #d08050;
+    --c-port-sub:      #88b8e0;
+  }
+}
+
+html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg); color: var(--c-text); overflow: hidden; }
+
+/* ── Shell ── */
+#app {
+  display: grid;
+  grid-template-columns: 220px 1fr 0px;
+  grid-template-rows: 52px 1fr;
+  height: 100vh;
+  overflow: hidden;
+  transition: grid-template-columns 0.18s;
+}
+#app.panel-open {
+  grid-template-columns: 220px 1fr 270px;
+}
+
+/* ── Topbar ── */
+#topbar {
+  grid-column: 1 / -1;
+  background: var(--c-surface);
+  border-bottom: 0.5px solid var(--c-border-strong);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+}
+#logo {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-accent);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+#logo i { font-size: 18px; }
+#filename-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-muted);
+  background: none;
+  border: none;
+  outline: none;
+  width: 180px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+  padding: 2px 4px;
+}
+#filename-input:focus { border-bottom-color: var(--c-border-strong); color: var(--c-text); }
+.tb-sep { flex: 1; }
+.tb-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: var(--c-accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.tb-btn:hover { opacity: 0.82; }
+.tb-btn.ghost {
+  background: none;
+  color: var(--c-muted);
+  border: 0.5px solid var(--c-border-strong);
+}
+.tb-btn.ghost:hover { color: var(--c-text); opacity: 1; }
+.tb-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.view-tabs { display: flex; gap: 2px; background: var(--c-bg); border-radius: 7px; padding: 3px; flex-shrink: 0; }
+.view-tab {
+  padding: 4px 12px;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-muted);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.view-tab.active { background: var(--c-surface); color: var(--c-accent); box-shadow: 0 0.5px 2px rgba(0,0,0,0.10); }
+.view-tab:hover:not(.active) { color: var(--c-text); }
+
+/* ── Left panel: Palette ── */
+#palette {
+  background: var(--c-surface);
+  border-right: 0.5px solid var(--c-border);
+  overflow-y: auto;
+  padding: 10px 0 20px;
+  display: flex;
+  flex-direction: column;
+}
+.palette-header {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  padding: 8px 14px 6px;
+}
+.palette-group { margin-bottom: 2px; }
+.palette-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--c-muted);
+  cursor: pointer;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.palette-group-header i { font-size: 11px; transition: transform 0.15s; }
+.palette-group-header.collapsed i.chev { transform: rotate(-90deg); }
+.palette-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-muted);
+  padding: 4px 12px 4px 26px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.palette-item:hover { background: var(--c-accent-light); color: var(--c-accent); border-left-color: var(--c-accent); }
+.palette-empty { padding: 12px 14px; font-size: 12px; color: var(--c-muted); font-style: italic; }
+.palette-error { padding: 6px 14px; font-size: 11px; color: #c0392b; font-family: var(--font-mono); }
+
+/* ── Main area ── */
+#main {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-bg);
+}
+
+/* ── Graph view ── */
+#graph-view {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  cursor: default;
+}
+#graph-canvas {
+  position: relative;
+  min-width: 800px;
+  min-height: 600px;
+}
+#graph-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* ── Nodes ── */
+.gnode {
+  position: absolute;
+  width: 230px;
+  background: var(--c-node-bg);
+  border: 1px solid var(--c-node-border);
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.07);
+  cursor: default;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.gnode:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.12); border-color: var(--c-accent); }
+.gnode.selected { border-color: var(--c-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-accent) 30%, transparent); }
+
+.gnode-header {
+  background: var(--c-node-header);
+  padding: 6px 10px 5px;
+  border-bottom: 0.5px solid var(--c-node-border);
+  border-radius: 8px 8px 0 0;
+  cursor: grab;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.gnode-header:active { cursor: grabbing; }
+.gnode-id {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.gnode-type {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--c-accent);
+  background: var(--c-accent-light);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.gnode-ports { padding: 2px 0 4px; }
+
+.gnode-sub, .gnode-pub {
+  display: flex;
+  align-items: center;
+  padding: 2px 10px 2px 12px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--c-muted);
+  position: relative;
+  min-height: 26px;
+}
+.gnode-sub { padding-left: 16px; }
+.gnode-pub { padding-right: 16px; justify-content: flex-end; }
+.gnode-sub .port-dot {
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-port-sub);
+  border: 1.5px solid var(--c-surface);
+}
+.gnode-pub .port-dot {
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-port-pub);
+  border: 1.5px solid var(--c-surface);
+}
+.gnode-sub .port-label { color: var(--c-port-sub); }
+.gnode-pub .port-label { color: var(--c-port-pub); }
+.port-notice { color: var(--c-muted); font-size: 9.5px; margin: 0 3px; }
+
+.gnode-divider {
+  height: 0.5px;
+  background: var(--c-border);
+  margin: 2px 8px;
+}
+
+.gnode-empty {
+  padding: 4px 12px 6px;
+  font-size: 10.5px;
+  font-style: italic;
+  color: var(--c-muted);
+  opacity: 0.6;
+}
+
+/* graph toolbar */
+#graph-toolbar {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+}
+.graph-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--c-muted);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  transition: color 0.12s;
+}
+.graph-btn:hover { color: var(--c-accent); }
+
+/* ── JSON editor ── */
+#json-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#json-view textarea {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 28px 32px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.65;
+  background: var(--c-bg);
+  color: var(--c-text);
+  tab-size: 2;
+}
+#json-error {
+  padding: 6px 16px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: #c0392b;
+  background: #fde8e8;
+  border-top: 0.5px solid rgba(192,57,43,0.2);
+}
+
+/* ── Properties panel ── */
+#props-panel {
+  background: var(--c-surface);
+  border-left: 0.5px solid var(--c-border);
+  overflow-y: auto;
+  padding: 16px 14px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.props-section {
+  margin-bottom: 18px;
+}
+.props-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.props-label button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--c-accent);
+  font-size: 13px;
+  padding: 0;
+  line-height: 1;
+}
+.prop-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.prop-key {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-muted);
+  width: 80px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prop-val {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 4px;
+  padding: 3px 7px;
+  color: var(--c-text);
+  outline: none;
+  min-width: 0;
+}
+.prop-val:focus { border-color: var(--c-accent); }
+.prop-val-full {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: var(--c-text);
+  outline: none;
+  margin-bottom: 6px;
+}
+.prop-val-full:focus { border-color: var(--c-accent); }
+select.prop-val { padding: 3px 4px; }
+.prop-del {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--c-muted);
+  font-size: 14px;
+  padding: 0;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.prop-del:hover { color: #c0392b; }
+
+.wiring-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+.wiring-part {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 4px;
+  padding: 3px 6px;
+  color: var(--c-text);
+  outline: none;
+  min-width: 0;
+}
+.wiring-part:focus { border-color: var(--c-accent); }
+.wiring-arrow {
+  font-size: 11px;
+  color: var(--c-muted);
+  flex-shrink: 0;
+}
+
+.props-type-badge {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--c-accent);
+  background: var(--c-accent-light);
+  padding: 3px 8px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+.props-delete-btn {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: none;
+  border: 0.5px solid rgba(192,57,43,0.4);
+  border-radius: 6px;
+  color: #c0392b;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.props-delete-btn:hover { background: rgba(192,57,43,0.07); }
+
+.props-no-selection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--c-muted);
+  font-size: 12.5px;
+  padding: 24px;
+  gap: 8px;
+}
+.props-no-selection i { font-size: 28px; opacity: 0.4; }
+
+/* ── Play output modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-box {
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 10px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  width: 680px;
+  max-width: 95vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 0.5px solid var(--c-border);
+}
+.modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-text);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--c-muted);
+  line-height: 1;
+  padding: 2px;
+}
+.modal-close:hover { color: var(--c-text); }
+.modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+.output-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  margin-bottom: 6px;
+}
+.output-pre {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+  color: var(--c-text);
+  margin-bottom: 12px;
+}
+.output-pre.stderr { color: #c0392b; }
+.rc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.rc-badge.ok { background: #dff0e8; color: #1a6a3a; }
+.rc-badge.err { background: #fde8e8; color: #c0392b; }
+
+/* ── file input (hidden) ── */
+#file-input { display: none; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-border-strong); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="app" :class="{'panel-open': selectedId !== null}">
+
+  <!-- Topbar -->
+  <header id="topbar">
+    <div id="logo"><i class="ti ti-circuit-diode"></i> noid</div>
+    <input id="filename-input" type="text" v-model="filename" spellcheck="false">
+    <button class="tb-btn ghost" @click="triggerUpload"><i class="ti ti-upload"></i> Upload</button>
+    <input type="file" id="file-input" ref="fileInput" accept=".json" @change="onUpload">
+    <button class="tb-btn ghost" @click="downloadScene"><i class="ti ti-download"></i> Download</button>
+    <button class="tb-btn" @click="playScene" :disabled="playLoading || scene.components.length === 0">
+      <i class="ti" :class="playLoading ? 'ti-loader-2' : 'ti-player-play'"></i>
+      [[ playLoading ? 'Running…' : 'Play' ]]
+    </button>
+    <div class="tb-sep"></div>
+    <div class="view-tabs">
+      <button class="view-tab" :class="{active: view==='graph'}" @click="switchView('graph')">
+        <i class="ti ti-topology-star"></i> Graph
+      </button>
+      <button class="view-tab" :class="{active: view==='json'}" @click="switchView('json')">
+        <i class="ti ti-braces"></i> JSON
+      </button>
+    </div>
+  </header>
+
+  <!-- Left: Palette -->
+  <nav id="palette" aria-label="Component palette">
+    <div class="palette-header">Components</div>
+    <div v-if="catalogErrors.length" class="palette-error" v-for="err in catalogErrors" :key="err">
+      ⚠ [[ err ]]
+    </div>
+    <div v-if="catalogGroups.length === 0" class="palette-empty">
+      Loading catalog…
+    </div>
+    <div v-for="group in catalogGroups" :key="group.label" class="palette-group">
+      <div
+        class="palette-group-header"
+        :class="{collapsed: group.collapsed}"
+        @click="group.collapsed = !group.collapsed"
+      >
+        <i class="ti ti-chevron-down chev"></i>
+        [[ group.label ]]
+      </div>
+      <template v-if="!group.collapsed">
+        <button
+          v-for="comp in group.items"
+          :key="comp.id"
+          class="palette-item"
+          :title="comp.id"
+          @click="addComponent(comp.id)"
+        >
+          [[ comp.id ]]
+        </button>
+      </template>
+    </div>
+  </nav>
+
+  <!-- Main area -->
+  <main id="main">
+
+    <!-- Graph view -->
+    <div
+      id="graph-view"
+      v-show="view === 'graph'"
+      @mousemove="onMousemove"
+      @mouseup="onMouseup"
+      @mouseleave="onMouseup"
+      @click.self="selectedId = null"
+    >
+      <div id="graph-canvas" :style="canvasStyle" ref="graphCanvas">
+
+        <!-- Edges (SVG) -->
+        <svg id="graph-svg" ref="graphSvg">
+          <defs>
+            <marker id="arrow-pub" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L7,3 z" fill="var(--c-port-pub)" opacity="0.7"/>
+            </marker>
+            <marker id="arrow-sub" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L7,3 z" fill="var(--c-port-pub)" opacity="0.7"/>
+            </marker>
+          </defs>
+          <g v-for="edge in graphEdges" :key="edge.key">
+            <path
+              :d="edge.path"
+              fill="none"
+              stroke="var(--c-port-pub)"
+              stroke-width="1.5"
+              stroke-dasharray="5,3"
+              marker-end="url(#arrow-pub)"
+              opacity="0.65"
+            />
+            <rect
+              :x="edge.labelX - edge.labelW/2"
+              :y="edge.labelY - 8"
+              :width="edge.labelW"
+              height="15"
+              rx="3"
+              fill="var(--c-surface)"
+              opacity="0.9"
+            />
+            <text
+              :x="edge.labelX"
+              :y="edge.labelY + 3"
+              font-family="'JetBrains Mono', monospace"
+              font-size="9.5"
+              fill="var(--c-muted)"
+              text-anchor="middle"
+              dominant-baseline="middle"
+            >[[ edge.topic ]]</text>
+          </g>
+        </svg>
+
+        <!-- Nodes -->
+        <div
+          v-for="node in graphNodes"
+          :key="node.id"
+          class="gnode"
+          :class="{selected: selectedId === node.id}"
+          :style="{left: node.x + 'px', top: node.y + 'px'}"
+          @click.stop="selectedId = node.id"
+        >
+          <!-- Header (drag handle) -->
+          <div
+            class="gnode-header"
+            @mousedown.stop="startDrag(node.id, $event)"
+          >
+            <span class="gnode-id">[[ node.id || '(no id)' ]]</span>
+            <span class="gnode-type">[[ node.type ]]</span>
+          </div>
+          <!-- Ports -->
+          <div class="gnode-ports">
+            <!-- Subscribe ports -->
+            <template v-if="node.subPairs.length">
+              <div v-for="(p, i) in node.subPairs" :key="'s'+i" class="gnode-sub">
+                <span class="port-dot"></span>
+                <span class="port-label">[[ p.topic ]]</span>
+                <span class="port-notice">→[[ p.notice ]]</span>
+              </div>
+            </template>
+            <!-- Divider between sub and pub -->
+            <div v-if="node.subPairs.length && node.pubPairs.length" class="gnode-divider"></div>
+            <!-- Publish ports -->
+            <template v-if="node.pubPairs.length">
+              <div v-for="(p, i) in node.pubPairs" :key="'p'+i" class="gnode-pub">
+                <span class="port-notice">[[ p.notice ]]→</span>
+                <span class="port-label">[[ p.topic ]]</span>
+                <span class="port-dot"></span>
+              </div>
+            </template>
+            <div v-if="!node.subPairs.length && !node.pubPairs.length" class="gnode-empty">
+              no wiring
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Graph toolbar -->
+      <div id="graph-toolbar">
+        <button class="graph-btn" @click="autoLayout"><i class="ti ti-layout-distribute-horizontal"></i> Auto-layout</button>
+        <button class="graph-btn" @click="fitView"><i class="ti ti-maximize"></i> Fit</button>
+      </div>
+    </div>
+
+    <!-- JSON editor view -->
+    <div id="json-view" v-show="view === 'json'">
+      <textarea
+        v-model="jsonText"
+        spellcheck="false"
+        @input="onJsonInput"
+      ></textarea>
+      <div id="json-error" v-if="jsonError">[[ jsonError ]]</div>
+    </div>
+
+  </main>
+
+  <!-- Right: Properties panel -->
+  <aside id="props-panel" v-if="selectedId !== null">
+
+    <template v-if="selectedComp">
+
+      <!-- Identity -->
+      <div class="props-section">
+        <div class="props-label">Instance ID</div>
+        <input
+          class="prop-val-full"
+          type="text"
+          :value="selectedComp.id"
+          @change="onIdChange($event.target.value)"
+        >
+        <div class="props-label" style="margin-top:8px">Type</div>
+        <div class="props-type-badge">[[ selectedComp.type ]]</div>
+      </div>
+
+      <!-- Properties -->
+      <div class="props-section" v-if="selectedCatalogEntry">
+        <div class="props-label">
+          Properties
+        </div>
+        <div
+          v-for="(defVal, key) in selectedCatalogEntry.properties"
+          :key="key"
+          class="prop-row"
+        >
+          <span class="prop-key" :title="key">[[ key ]]</span>
+          <input
+            v-if="typeof defVal !== 'boolean'"
+            class="prop-val"
+            :type="typeof defVal === 'number' ? 'number' : 'text'"
+            :value="selectedComp.properties && selectedComp.properties[key] !== undefined
+                     ? selectedComp.properties[key]
+                     : defVal"
+            @change="setProp(key, $event.target.value, typeof defVal)"
+          >
+          <input
+            v-else
+            class="prop-val"
+            type="checkbox"
+            :checked="selectedComp.properties && selectedComp.properties[key] !== undefined
+                       ? selectedComp.properties[key]
+                       : defVal"
+            @change="setProp(key, $event.target.checked, 'boolean')"
+          >
+        </div>
+      </div>
+
+      <!-- Subscribe wiring -->
+      <div class="props-section">
+        <div class="props-label">
+          Subscribe (topic → notice)
+          <button @click="addSubPair"><i class="ti ti-plus"></i></button>
+        </div>
+        <div v-for="(p, i) in editSubPairs" :key="i" class="wiring-row">
+          <input class="wiring-part" v-model="p.topic" placeholder="topic/path" @input="syncSub">
+          <span class="wiring-arrow">→</span>
+          <input class="wiring-part" v-model="p.notice" placeholder="notice" @input="syncSub">
+          <button class="prop-del" @click="removeSubPair(i)"><i class="ti ti-x"></i></button>
+        </div>
+      </div>
+
+      <!-- Publish wiring -->
+      <div class="props-section">
+        <div class="props-label">
+          Publish (notice → topic)
+          <button @click="addPubPair"><i class="ti ti-plus"></i></button>
+        </div>
+        <div v-for="(p, i) in editPubPairs" :key="i" class="wiring-row">
+          <input class="wiring-part" v-model="p.notice" placeholder="notice" @input="syncPub">
+          <span class="wiring-arrow">→</span>
+          <input class="wiring-part" v-model="p.topic" placeholder="topic/path" @input="syncPub">
+          <button class="prop-del" @click="removePubPair(i)"><i class="ti ti-x"></i></button>
+        </div>
+      </div>
+
+      <!-- Delete -->
+      <button class="props-delete-btn" @click="deleteComponent">
+        <i class="ti ti-trash"></i> Delete component
+      </button>
+
+    </template>
+
+    <div class="props-no-selection" v-else>
+      <i class="ti ti-click"></i>
+      <span>Select a node to view and edit its properties.</span>
+    </div>
+
+  </aside>
+
+  <!-- Play output modal -->
+  <div class="modal-overlay" v-if="showPlayModal" @click.self="showPlayModal = false">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="ti ti-player-play"></i>
+          Play output
+          <span class="rc-badge" :class="playResult.returncode === 0 ? 'ok' : 'err'">
+            rc=[[ playResult.returncode ]]
+          </span>
+        </div>
+        <button class="modal-close" @click="showPlayModal = false"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div v-if="playResult.stdout">
+          <div class="output-section-label">stdout</div>
+          <pre class="output-pre">[[ playResult.stdout ]]</pre>
+        </div>
+        <div v-if="playResult.stderr">
+          <div class="output-section-label">stderr</div>
+          <pre class="output-pre stderr">[[ playResult.stderr ]]</pre>
+        </div>
+        <div v-if="!playResult.stdout && !playResult.stderr">
+          <span style="color: var(--c-muted); font-size:13px">(no output)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+const { createApp, ref, reactive, computed, watch, nextTick } = Vue;
+
+/* ──────────────────────────────────────────────────────────────────
+   Constants
+────────────────────────────────────────────────────────────────── */
+const NODE_W    = 230;
+const HEADER_H  = 40;   // px
+const ROW_H     = 26;   // px per port row
+const PUB_GAP   = 6;    // gap between sub and pub sections
+
+/* ──────────────────────────────────────────────────────────────────
+   Helpers
+────────────────────────────────────────────────────────────────── */
+
+/** Parse "a~b;c~d" into [{first:'a', second:'b'}, ...] */
+function splitSpec(spec) {
+  if (!spec) return [];
+  return spec.split(';').map(s => s.trim()).filter(Boolean).map(s => {
+    const [a, b] = s.split('~');
+    return { first: (a || '').trim(), second: (b || '').trim() };
+  });
+}
+
+/** Publish spec "notice~topic" */
+function parsePub(spec) {
+  return splitSpec(spec).map(p => ({ notice: p.first, topic: p.second }));
+}
+/** Subscribe spec "topic~notice" */
+function parseSub(spec) {
+  return splitSpec(spec).map(p => ({ topic: p.first, notice: p.second }));
+}
+function serializePub(pairs) {
+  return pairs.filter(p => p.notice || p.topic).map(p => `${p.notice}~${p.topic}`).join(';');
+}
+function serializeSub(pairs) {
+  return pairs.filter(p => p.topic || p.notice).map(p => `${p.topic}~${p.notice}`).join(';');
+}
+
+/** Compute the pixel y-centre of a port inside a node. */
+function portY(node, kind, idx) {
+  const subCount = node.subPairs.length;
+  const pubCount = node.pubPairs.length;
+  if (kind === 'sub') {
+    return node.y + HEADER_H + idx * ROW_H + ROW_H / 2;
+  }
+  // pub
+  const subBlock = (subCount > 0 ? subCount * ROW_H + PUB_GAP : 0);
+  return node.y + HEADER_H + subBlock + idx * ROW_H + ROW_H / 2;
+}
+
+/** Approximate string pixel width for the SVG label background. */
+function textPx(s) { return s.length * 6 + 12; }
+
+function autoPos(idx) {
+  const cols = 3;
+  return {
+    x: 40 + (idx % cols) * (NODE_W + 80),
+    y: 40 + Math.floor(idx / cols) * 200,
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Vue app
+────────────────────────────────────────────────────────────────── */
+createApp({
+  delimiters: ['[[', ']]'],
+  setup() {
+    /* ── State ── */
+    const scene    = ref({ title: 'New Scene', imports: [], components: [] });
+    const layout   = ref({});             // { [id]: {x, y} }
+    const catalog  = ref([]);
+    const catalogErrors = ref([]);
+    const filename = ref('scene.json');
+    const view     = ref('graph');
+    const selectedId = ref(null);
+
+    const jsonText  = ref('');
+    const jsonError = ref('');
+    let   _syncFromJson = false;
+
+    const playLoading    = ref(false);
+    const showPlayModal  = ref(false);
+    const playResult     = ref({ stdout: '', stderr: '', returncode: 0 });
+
+    const dragState = ref(null); // { id, startX, startY, origX, origY }
+
+    /* ── Edit pairs for the selected component ── */
+    const editSubPairs = ref([]);
+    const editPubPairs = ref([]);
+
+    /* ── Catalog fetch ── */
+    async function fetchCatalog() {
+      try {
+        const r = await fetch('/api/catalog/');
+        const data = await r.json();
+        catalog.value = data.components || [];
+        catalogErrors.value = data.errors || [];
+      } catch(e) {
+        catalogErrors.value = [`Failed to fetch catalog: ${e}`];
+      }
+    }
+    fetchCatalog();
+
+    /* ── Catalog groups ── */
+    const catalogGroups = computed(() => {
+      const map = new Map();
+      for (const comp of catalog.value) {
+        const ns = comp.id.split(':')[0];
+        if (!map.has(ns)) map.set(ns, reactive({ label: ns, collapsed: false, items: [] }));
+        map.get(ns).items.push(comp);
+      }
+      return [...map.values()];
+    });
+
+    /* ── Graph nodes ── */
+    const graphNodes = computed(() =>
+      scene.value.components.map(comp => {
+        const pos = layout.value[comp.id] || autoPos(scene.value.components.indexOf(comp));
+        return {
+          ...comp,
+          x: pos.x,
+          y: pos.y,
+          pubPairs: parsePub(comp.publish || ''),
+          subPairs: parseSub(comp.subscribe || ''),
+        };
+      })
+    );
+
+    /* ── Graph edges ── */
+    const graphEdges = computed(() => {
+      const edges = [];
+      const nodes = graphNodes.value;
+      for (const src of nodes) {
+        src.pubPairs.forEach((pub, pIdx) => {
+          for (const tgt of nodes) {
+            if (tgt.id === src.id) continue;
+            tgt.subPairs.forEach((sub, sIdx) => {
+              if (!pub.topic || pub.topic !== sub.topic) return;
+              const x1 = src.x + NODE_W;
+              const y1 = portY(src, 'pub', pIdx);
+              const x2 = tgt.x;
+              const y2 = portY(tgt, 'sub', sIdx);
+              const dx = (x2 - x1) * 0.5;
+              const path = `M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`;
+              const lx = (x1 + x2) / 2;
+              const ly = (y1 + y2) / 2;
+              edges.push({
+                key: `${src.id}::${pub.topic}::${tgt.id}::${sIdx}`,
+                path,
+                topic: pub.topic,
+                labelX: lx,
+                labelY: ly,
+                labelW: textPx(pub.topic),
+              });
+            });
+          }
+        });
+      }
+      return edges;
+    });
+
+    /* ── Canvas size ── */
+    const canvasStyle = computed(() => {
+      const nodes = graphNodes.value;
+      if (!nodes.length) return {};
+      const maxX = Math.max(...nodes.map(n => n.x + NODE_W + 60));
+      const maxY = Math.max(...nodes.map(n => n.y + 200));
+      return { width: `${maxX}px`, height: `${maxY}px` };
+    });
+
+    /* ── Selected component ── */
+    const selectedComp = computed(() =>
+      scene.value.components.find(c => c.id === selectedId.value) || null
+    );
+    const selectedCatalogEntry = computed(() =>
+      catalog.value.find(c => c.id === selectedComp.value?.type) || null
+    );
+
+    /* ── Sync edit pairs when selection changes ── */
+    watch(selectedId, id => {
+      const comp = scene.value.components.find(c => c.id === id);
+      if (!comp) { editSubPairs.value = []; editPubPairs.value = []; return; }
+      editSubPairs.value = parseSub(comp.subscribe || '');
+      editPubPairs.value = parsePub(comp.publish || '');
+    });
+
+    /* ── JSON ↔ scene sync ── */
+    watch(scene, () => {
+      if (_syncFromJson) return;
+      jsonText.value = JSON.stringify(scene.value, null, 2);
+    }, { deep: true, immediate: true });
+
+    function onJsonInput() {
+      try {
+        const parsed = JSON.parse(jsonText.value);
+        jsonError.value = '';
+        _syncFromJson = true;
+        const oldComps = scene.value.components.map(c => c.id);
+        scene.value = parsed;
+        // Auto-layout any component without a position
+        (parsed.components || []).forEach((c, i) => {
+          if (!layout.value[c.id]) layout.value[c.id] = autoPos(i);
+        });
+        nextTick(() => { _syncFromJson = false; });
+      } catch(e) {
+        jsonError.value = `JSON error: ${e.message}`;
+      }
+    }
+
+    function switchView(v) {
+      if (v === 'json') {
+        jsonText.value = JSON.stringify(scene.value, null, 2);
+      }
+      view.value = v;
+    }
+
+    /* ── Add component ── */
+    function addComponent(typeId) {
+      const entry = catalog.value.find(c => c.id === typeId);
+      const base = typeId.split(':').pop().replace(/-/g, '_');
+      const existing = scene.value.components.filter(c => c.type === typeId).length;
+      const id = `${base}_${existing + 1}`;
+      const newComp = {
+        type: typeId,
+        id,
+        properties: entry ? { ...entry.properties } : {},
+        publish:   entry?.publish   || '',
+        subscribe: entry?.subscribe || '',
+      };
+      scene.value.components.push(newComp);
+      layout.value[id] = autoPos(scene.value.components.length - 1);
+      selectedId.value = id;
+    }
+
+    /* ── Delete component ── */
+    function deleteComponent() {
+      const id = selectedId.value;
+      scene.value.components = scene.value.components.filter(c => c.id !== id);
+      delete layout.value[id];
+      selectedId.value = null;
+    }
+
+    /* ── Property editing ── */
+    function onIdChange(newId) {
+      const oldId = selectedId.value;
+      if (!newId || newId === oldId) return;
+      const comp = scene.value.components.find(c => c.id === oldId);
+      if (!comp) return;
+      comp.id = newId;
+      if (layout.value[oldId]) {
+        layout.value[newId] = layout.value[oldId];
+        delete layout.value[oldId];
+      }
+      selectedId.value = newId;
+    }
+
+    function setProp(key, rawVal, type) {
+      const comp = scene.value.components.find(c => c.id === selectedId.value);
+      if (!comp) return;
+      if (!comp.properties) comp.properties = {};
+      if (type === 'boolean') comp.properties[key] = Boolean(rawVal);
+      else if (type === 'number') comp.properties[key] = Number(rawVal);
+      else comp.properties[key] = rawVal;
+    }
+
+    /* ── Subscribe / publish wiring editing ── */
+    function syncSub() {
+      const comp = scene.value.components.find(c => c.id === selectedId.value);
+      if (comp) comp.subscribe = serializeSub(editSubPairs.value);
+    }
+    function syncPub() {
+      const comp = scene.value.components.find(c => c.id === selectedId.value);
+      if (comp) comp.publish = serializePub(editPubPairs.value);
+    }
+    function addSubPair() { editSubPairs.value.push({ topic: '', notice: '' }); syncSub(); }
+    function addPubPair() { editPubPairs.value.push({ notice: '', topic: '' }); syncPub(); }
+    function removeSubPair(i) { editSubPairs.value.splice(i, 1); syncSub(); }
+    function removePubPair(i) { editPubPairs.value.splice(i, 1); syncPub(); }
+
+    /* ── Drag ── */
+    function startDrag(id, e) {
+      e.preventDefault();
+      const pos = layout.value[id] || autoPos(scene.value.components.findIndex(c=>c.id===id));
+      dragState.value = { id, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
+    }
+    function onMousemove(e) {
+      if (!dragState.value) return;
+      const { id, startX, startY, origX, origY } = dragState.value;
+      layout.value[id] = {
+        x: Math.max(0, origX + e.clientX - startX),
+        y: Math.max(0, origY + e.clientY - startY),
+      };
+    }
+    function onMouseup() { dragState.value = null; }
+
+    /* ── Auto-layout (simple grid) ── */
+    function autoLayout() {
+      scene.value.components.forEach((comp, i) => {
+        layout.value[comp.id] = autoPos(i);
+      });
+    }
+
+    /* ── Fit view ── */
+    const graphCanvas = ref(null);
+    function fitView() {
+      const el = document.getElementById('graph-view');
+      if (el) { el.scrollLeft = 0; el.scrollTop = 0; }
+    }
+
+    /* ── Upload ── */
+    const fileInput = ref(null);
+    function triggerUpload() { fileInput.value.click(); }
+    function onUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      filename.value = file.name;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          _syncFromJson = true;
+          scene.value = parsed;
+          layout.value = {};
+          (parsed.components || []).forEach((c, i) => {
+            layout.value[c.id] = autoPos(i);
+          });
+          selectedId.value = null;
+          nextTick(() => { _syncFromJson = false; });
+        } catch(err) {
+          alert('Invalid JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+      e.target.value = '';
+    }
+
+    /* ── Download ── */
+    function downloadScene() {
+      const blob = new Blob([JSON.stringify(scene.value, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename.value.endsWith('.json') ? filename.value : filename.value + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    /* ── Play ── */
+    async function playScene() {
+      playLoading.value = true;
+      try {
+        const r = await fetch('/api/play/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scene.value),
+        });
+        playResult.value = await r.json();
+        showPlayModal.value = true;
+      } catch(e) {
+        playResult.value = { stdout: '', stderr: String(e), returncode: -1 };
+        showPlayModal.value = true;
+      } finally {
+        playLoading.value = false;
+      }
+    }
+
+    return {
+      scene, layout, catalog, catalogErrors, catalogGroups,
+      filename, view, selectedId, selectedComp, selectedCatalogEntry,
+      jsonText, jsonError, onJsonInput, switchView,
+      graphNodes, graphEdges, canvasStyle, graphCanvas,
+      editSubPairs, editPubPairs,
+      playLoading, showPlayModal, playResult,
+      fileInput,
+      addComponent, deleteComponent,
+      onIdChange, setProp,
+      syncSub, syncPub, addSubPair, addPubPair, removeSubPair, removePubPair,
+      startDrag, onMousemove, onMouseup,
+      autoLayout, fitView,
+      triggerUpload, onUpload, downloadScene, playScene,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
