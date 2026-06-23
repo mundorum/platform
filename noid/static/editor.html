@@ -57,20 +57,20 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 
 /* ── Shell ── */
 #app {
-  display: grid;
-  grid-template-columns: 220px 1fr 0px;
-  grid-template-rows: 52px 1fr;
+  display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
-  transition: grid-template-columns 0.18s;
 }
-#app.panel-open {
-  grid-template-columns: 220px 1fr 270px;
+#content-row {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
 }
 
 /* ── Topbar ── */
 #topbar {
-  grid-column: 1 / -1;
+  flex-shrink: 0;
   background: var(--c-surface);
   border-bottom: 0.5px solid var(--c-border-strong);
   display: flex;
@@ -150,6 +150,8 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 
 /* ── Left panel: Palette ── */
 #palette {
+  width: 220px;
+  flex-shrink: 0;
   background: var(--c-surface);
   border-right: 0.5px solid var(--c-border);
   overflow-y: auto;
@@ -204,6 +206,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 
 /* ── Main area ── */
 #main {
+  flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -394,6 +397,8 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 
 /* ── Properties panel ── */
 #props-panel {
+  width: 270px;
+  flex-shrink: 0;
   background: var(--c-surface);
   border-left: 0.5px solid var(--c-border);
   overflow-y: auto;
@@ -641,7 +646,7 @@ select.prop-val { padding: 3px 4px; }
 </style>
 </head>
 <body>
-<div id="app" :class="{'panel-open': selectedId !== null}">
+<div id="app">
 
   <!-- Topbar -->
   <header id="topbar">
@@ -664,6 +669,8 @@ select.prop-val { padding: 3px 4px; }
       </button>
     </div>
   </header>
+
+  <div id="content-row">
 
   <!-- Left: Palette -->
   <nav id="palette" aria-label="Component palette">
@@ -707,7 +714,7 @@ select.prop-val { padding: 3px 4px; }
       @mousemove="onMousemove"
       @mouseup="onMouseup"
       @mouseleave="onMouseup"
-      @click.self="selectedId = null"
+      @mousedown.self="selectedId = null"
     >
       <div id="graph-canvas" :style="canvasStyle" ref="graphCanvas">
 
@@ -759,13 +766,10 @@ select.prop-val { padding: 3px 4px; }
           class="gnode"
           :class="{selected: selectedId === node.id}"
           :style="{left: node.x + 'px', top: node.y + 'px'}"
-          @click.stop="selectedId = node.id"
+          @mousedown.stop="onNodeDown(node.id, $event)"
         >
           <!-- Header (drag handle) -->
-          <div
-            class="gnode-header"
-            @mousedown.stop="startDrag(node.id, $event)"
-          >
+          <div class="gnode-header">
             <span class="gnode-id">[[ node.id || '(no id)' ]]</span>
             <span class="gnode-type">[[ node.type ]]</span>
           </div>
@@ -907,6 +911,8 @@ select.prop-val { padding: 3px 4px; }
     </div>
 
   </aside>
+
+  </div><!-- /#content-row -->
 
   <!-- Play output modal -->
   <div class="modal-overlay" v-if="showPlayModal" @click.self="showPlayModal = false">
@@ -1220,9 +1226,9 @@ createApp({
     function removeSubPair(i) { editSubPairs.value.splice(i, 1); syncSub(); }
     function removePubPair(i) { editPubPairs.value.splice(i, 1); syncPub(); }
 
-    /* ── Drag ── */
-    function startDrag(id, e) {
-      e.preventDefault();
+    /* ── Node mousedown: select + begin drag (no preventDefault — that kills the click chain) ── */
+    function onNodeDown(id, e) {
+      selectedId.value = id;
       const pos = layout.value[id] || autoPos(scene.value.components.findIndex(c=>c.id===id));
       dragState.value = { id, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
     }
@@ -1318,7 +1324,7 @@ createApp({
       addComponent, deleteComponent,
       onIdChange, setProp,
       syncSub, syncPub, addSubPair, addPubPair, removeSubPair, removePubPair,
-      startDrag, onMousemove, onMouseup,
+      onNodeDown, onMousemove, onMouseup,
       autoLayout, fitView,
       triggerUpload, onUpload, downloadScene, playScene,
     };
