@@ -159,3 +159,21 @@ CodeMirror 6 instance with:
 - Backend: `pytest-django`, covering models and the mark parser.
 - Frontend: Vitest for composables and `marks.ts`; no snapshot tests.
 - No mocking of the database in backend tests — use a real test database.
+
+---
+
+## noid Sub-project
+
+`noid/` is a separate sub-system for composing and executing **n-o-id scenes**.
+It has its own servers, dependencies, and documentation. It does not share code
+with the Mundorum composition platform above.
+
+For everything noid-related read `noid/CLAUDE.md` first. The human-readable
+docs are in `noid/docs/`:
+
+| File | Contents |
+|------|----------|
+| `noid/docs/architecture.md` | Two-machine model, data flows, tech choices |
+| `noid/docs/scene-package.md` | ZIP format spec for the four scene elements |
+| `noid/docs/api.md` | Full endpoint reference for both servers |
+| `noid/docs/dev-setup.md` | Step-by-step setup and common tasks |
