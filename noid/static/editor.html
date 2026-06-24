@@ -550,92 +550,104 @@ select.prop-val { padding: 3px 4px; }
 }
 .props-no-selection i { font-size: 28px; opacity: 0.4; }
 
-/* ── Play output modal ── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.modal-box {
-  background: var(--c-surface);
-  border: 0.5px solid var(--c-border-strong);
-  border-radius: 10px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
-  width: 680px;
-  max-width: 95vw;
-  max-height: 80vh;
+
+/* ── Execution panel ── */
+#exec-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--c-border-strong);
   display: flex;
   flex-direction: column;
+  background: #181510;
+  color: #c8c0a8;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  resize: vertical;           /* browser resize handle */
   overflow: hidden;
+  min-height: 120px;
+  max-height: 60vh;
+  height: 220px;
 }
-.modal-header {
+#exec-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px 12px;
-  border-bottom: 0.5px solid var(--c-border);
+  padding: 4px 10px;
+  background: #100e0a;
+  border-bottom: 0.5px solid rgba(200,180,140,0.10);
+  flex-shrink: 0;
+  gap: 10px;
 }
-.modal-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--c-text);
+#exec-title {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: #9a8e78;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
+  flex-shrink: 0;
 }
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  color: var(--c-muted);
-  line-height: 1;
-  padding: 2px;
-}
-.modal-close:hover { color: var(--c-text); }
-.modal-body {
-  padding: 16px 18px;
-  overflow-y: auto;
-  flex: 1;
-}
-.output-section-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--c-muted);
-  margin-bottom: 6px;
-}
-.output-pre {
+#exec-title i { font-size: 13px; }
+.exec-rc {
   font-family: var(--font-mono);
-  font-size: 12px;
-  background: var(--c-bg);
-  border: 0.5px solid var(--c-border);
-  border-radius: 6px;
-  padding: 12px 14px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-height: 200px;
-  overflow-y: auto;
-  color: var(--c-text);
-  margin-bottom: 12px;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 3px;
 }
-.output-pre.stderr { color: #c0392b; }
-.rc-badge {
-  display: inline-flex;
+.exec-rc.ok  { background: rgba(26,106,58,0.3);  color: #6dd49a; }
+.exec-rc.err { background: rgba(192,57,43,0.25); color: #e07060; }
+.exec-running {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #9a8e78;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+#exec-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.exec-verbose {
+  display: flex;
   align-items: center;
   gap: 4px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  padding: 2px 8px;
-  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #9a8e78;
+  cursor: pointer;
+  user-select: none;
 }
-.rc-badge.ok { background: #dff0e8; color: #1a6a3a; }
-.rc-badge.err { background: #fde8e8; color: #c0392b; }
+.exec-verbose input { cursor: pointer; accent-color: var(--c-accent); }
+.exec-btn {
+  background: none;
+  border: none;
+  color: #6a6050;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 1px 3px;
+  line-height: 1;
+  border-radius: 3px;
+  transition: color 0.12s;
+}
+.exec-btn:hover { color: #c8c0a8; }
+#exec-output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px 10px;
+}
+#exec-output pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  line-height: 1.65;
+  color: #c8c0a8;
+}
+#exec-output pre .line-err  { color: #e07060; }
+#exec-output pre .line-log  { color: #7a9e78; }
+#exec-output pre .line-exit { color: #9a8e78; font-style: italic; }
 
 /* ── file input (hidden) ── */
 #file-input { display: none; }
@@ -818,6 +830,30 @@ select.prop-val { padding: 3px 4px; }
       <div id="json-error" v-if="jsonError">[[ jsonError ]]</div>
     </div>
 
+    <!-- Execution panel -->
+    <div id="exec-panel" v-show="showExecPanel">
+      <div id="exec-header">
+        <div id="exec-title"><i class="ti ti-terminal-2"></i> Execution</div>
+        <span v-if="playLoading" class="exec-running">
+          <i class="ti ti-loader-2"></i> running…
+        </span>
+        <span v-else-if="execDone" class="exec-rc" :class="execCode === 0 ? 'ok' : 'err'">
+          rc=[[ execCode ]]
+        </span>
+        <div id="exec-controls">
+          <label class="exec-verbose">
+            <input type="checkbox" v-model="verbosePlay"> verbose
+          </label>
+          <button class="exec-btn" title="Clear output" @click="execText = ''"><i class="ti ti-eraser"></i></button>
+          <button class="exec-btn" title="Close panel" @click="showExecPanel = false"><i class="ti ti-x"></i></button>
+        </div>
+      </div>
+      <div id="exec-output" ref="execOutput">
+        <pre v-if="execText" v-html="execHighlighted"></pre>
+        <pre v-else style="color:#6a6050; font-style:italic">(no output yet — click Play to run the scene)</pre>
+      </div>
+    </div>
+
   </main>
 
   <!-- Right: Properties panel -->
@@ -914,34 +950,6 @@ select.prop-val { padding: 3px 4px; }
 
   </div><!-- /#content-row -->
 
-  <!-- Play output modal -->
-  <div class="modal-overlay" v-if="showPlayModal" @click.self="showPlayModal = false">
-    <div class="modal-box">
-      <div class="modal-header">
-        <div class="modal-title">
-          <i class="ti ti-player-play"></i>
-          Play output
-          <span class="rc-badge" :class="playResult.returncode === 0 ? 'ok' : 'err'">
-            rc=[[ playResult.returncode ]]
-          </span>
-        </div>
-        <button class="modal-close" @click="showPlayModal = false"><i class="ti ti-x"></i></button>
-      </div>
-      <div class="modal-body">
-        <div v-if="playResult.stdout">
-          <div class="output-section-label">stdout</div>
-          <pre class="output-pre">[[ playResult.stdout ]]</pre>
-        </div>
-        <div v-if="playResult.stderr">
-          <div class="output-section-label">stderr</div>
-          <pre class="output-pre stderr">[[ playResult.stderr ]]</pre>
-        </div>
-        <div v-if="!playResult.stdout && !playResult.stderr">
-          <span style="color: var(--c-muted); font-size:13px">(no output)</span>
-        </div>
-      </div>
-    </div>
-  </div>
 
 </div>
 
@@ -1028,8 +1036,26 @@ createApp({
     let   _syncFromJson = false;
 
     const playLoading    = ref(false);
-    const showPlayModal  = ref(false);
-    const playResult     = ref({ stdout: '', stderr: '', returncode: 0 });
+    const showExecPanel  = ref(false);
+    const execText       = ref('');
+    const execDone       = ref(false);
+    const execCode       = ref(0);
+    const verbosePlay    = ref(false);
+    const execOutput     = ref(null);
+
+    /* Highlight [LOG], [ERR] and exit lines in the terminal output. */
+    const execHighlighted = computed(() => {
+      return execText.value
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .split('\n')
+        .map(l => {
+          if (/^\[(?:ERROR|WARNING|CRITICAL)\]/.test(l)) return `<span class="line-err">${l}</span>`;
+          if (/^\[(?:DEBUG|INFO)\]/.test(l))             return `<span class="line-log">${l}</span>`;
+          if (/^▶ exited/.test(l))                       return `<span class="line-exit">${l}</span>`;
+          return l;
+        })
+        .join('\n');
+    });
 
     const dragState = ref(null); // { id, startX, startY, origX, origY }
 
@@ -1294,22 +1320,42 @@ createApp({
       URL.revokeObjectURL(url);
     }
 
-    /* ── Play ── */
+    /* ── Play (streaming) ── */
     async function playScene() {
-      playLoading.value = true;
+      showExecPanel.value = true;
+      playLoading.value   = true;
+      execDone.value      = false;
+      execText.value      = '';
+
+      const url = `/api/play/stream/?verbose=${verbosePlay.value ? '1' : '0'}`;
       try {
-        const r = await fetch('/api/play/', {
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(scene.value),
         });
-        playResult.value = await r.json();
-        showPlayModal.value = true;
+        const reader  = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          execText.value += decoder.decode(value, { stream: true });
+          nextTick(() => {
+            const el = execOutput.value;
+            if (el) el.scrollTop = el.scrollHeight;
+          });
+        }
+
+        /* parse exit code from the sentinel line written by stream_scene */
+        const m = execText.value.match(/▶ exited with code (-?\d+)/);
+        execCode.value = m ? parseInt(m[1], 10) : 0;
       } catch(e) {
-        playResult.value = { stdout: '', stderr: String(e), returncode: -1 };
-        showPlayModal.value = true;
+        execText.value += `\nFetch error: ${e}\n`;
+        execCode.value = -1;
       } finally {
         playLoading.value = false;
+        execDone.value    = true;
       }
     }
 
@@ -1319,7 +1365,8 @@ createApp({
       jsonText, jsonError, onJsonInput, switchView,
       graphNodes, graphEdges, canvasStyle, graphCanvas,
       editSubPairs, editPubPairs,
-      playLoading, showPlayModal, playResult,
+      playLoading, showExecPanel, execText, execHighlighted,
+      execDone, execCode, verbosePlay, execOutput,
       fileInput,
       addComponent, deleteComponent,
       onIdChange, setProp,
