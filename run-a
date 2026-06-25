@@ -1,0 +1,3 @@
+cd noid
+source .venv/bin/activate
+uvicorn processing.main:app --reload --port 8001

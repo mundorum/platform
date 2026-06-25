@@ -1,0 +1,4 @@
+cd noid
+source .venv/bin/activate
+cd authoring
+python manage.py runserver 8000

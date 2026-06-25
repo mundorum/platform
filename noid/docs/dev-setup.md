@@ -119,20 +119,30 @@ and destroyed automatically by `pytest-django`.
 
 ```bash
 zip -r my_scene.zip scene.json components/ data/
-curl -X POST http://localhost:8000/scenes/import/ \
+curl -X POST http://localhost:8000/api/scenes/import/ \
      -F "file=@my_scene.zip"
 ```
 
 ### Download a scene package
 
 ```bash
-curl http://localhost:8000/scenes/{id}/export -o my_scene.zip
+curl http://localhost:8000/api/scenes/{id}/export/ -o my_scene.zip
 ```
 
-### Run a scene from the command line
+### Run a scene via the Authoring Machine (proxies to Processing)
 
 ```bash
-# Quick run via the scratch endpoint (no DB record)
+# Blocking — returns {stdout, stderr, returncode, run_id}
+curl -X POST http://localhost:8000/api/scenes/{id}/run/
+
+# Streaming — output lines arrive as they are produced
+curl -N -X POST http://localhost:8000/api/scenes/{id}/run/stream/
+```
+
+### Run a scene directly via the scratch endpoint (no DB record)
+
+```bash
+# Quick run via the editor scratch endpoint
 curl -X POST http://localhost:8000/api/play/ \
      -H "Content-Type: application/json" \
      -d @scene.json

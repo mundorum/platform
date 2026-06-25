@@ -11,4 +11,5 @@ def editor_html(request):
 urlpatterns = [
     path('', editor_html, name='editor'),
     path('api/', include('editor.urls')),
+    path('api/scenes/', include('scenes.urls')),
 ]

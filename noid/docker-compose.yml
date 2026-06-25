@@ -1,0 +1,35 @@
+services:
+
+  authoring:
+    build:
+      context: .
+      dockerfile: authoring/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - scene_packages:/srv/noid/scene_packages
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-noid-authoring-dev-key-change-in-production}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/authoring/authoring.db}
+      SCENE_PACKAGES_DIR: /srv/noid/scene_packages
+      PROCESSING_URL: http://processing:8001
+      PROCESSING_API_KEY: ${PROCESSING_API_KEY:-dev-key}
+      COLLECTIONS_FILE: /app/collections.yaml
+    depends_on:
+      - processing
+
+  processing:
+    build:
+      context: .
+      dockerfile: processing/Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - scene_packages:/srv/noid/scene_packages
+    environment:
+      PROCESSING_API_KEY: ${PROCESSING_API_KEY:-dev-key}
+      SCENES_DIR: /srv/noid/scene_packages
+      COLLECTIONS_FILE: /app/collections.yaml
+
+volumes:
+  scene_packages:

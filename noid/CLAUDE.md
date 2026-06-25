@@ -67,7 +67,7 @@ noid/
 │       ├── worker.py        warm SceneWorker pool
 │       └── routes/
 │           ├── deploy.py    POST/DELETE /deploy/{id}
-│           ├── run.py       POST /run/{id}  /run/{id}/stream  /run/once
+│           ├── run.py       POST /run/{id}  /run/{id}/stream  /run/once  /run/once/stream
 │           └── health.py    GET /health
 │
 ├── scene_packages/          dev scene storage (gitignored)
@@ -91,8 +91,8 @@ noid/
 | Scene CRUD + ZIP import/export | `authoring/scenes/views.py` |
 | Proxy to Processing Machine | `authoring/scenes/views.py` |
 | Scratch runner (raw JSON) | `authoring/editor/views.py` |
-| SceneRegistry singleton | `processing/app/registry.py` |
-| Warm worker pool | `processing/app/worker.py` |
+| SceneRegistry singleton | `noid_runner/registry.py` |
+| Warm worker pool | `processing/app/worker.py` (planned) |
 | FastAPI route handlers | `processing/app/routes/` |
 
 ---

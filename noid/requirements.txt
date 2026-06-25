@@ -1,4 +1,0 @@
-django>=5.0
-pyyaml>=6.0
-mundorum-noid>=0.1.1
-mundorum-noid-collections>=0.1.0

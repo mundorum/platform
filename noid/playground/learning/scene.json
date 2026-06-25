@@ -1,0 +1,27 @@
+{
+  "title": "New Scene",
+  "imports": [],
+  "components": [
+    {
+      "type": "data:text-source",
+      "id": "text_source_1",
+      "properties": {
+        "text": "O dinossauro pulou na lama.",
+        "label": "text"
+      },
+      "publish": "text~slm/text/output;done~slm/text/done",
+      "subscribe": "player/start~trigger"
+    },
+    {
+      "type": "basic:console-display",
+      "id": "console_display_1",
+      "properties": {
+        "label": "",
+        "show_topic": false,
+        "pretty": true
+      },
+      "publish": "output~player/done",
+      "subscribe": "slm/text/output~show"
+    }
+  ]
+}

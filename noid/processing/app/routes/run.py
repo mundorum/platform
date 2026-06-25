@@ -28,11 +28,36 @@ async def run_once(
         scene_store.unpack(zip_bytes, tmp)
         spec = scene_store.read_spec(tmp)
         result = await asyncio.to_thread(
-            runner.run_scene, spec, catalog.get_catalog(), timeout
+            runner.run_scene, spec, catalog.get_catalog(), timeout, tmp
         )
         return result
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+# /run/once/stream MUST be registered before /run/{scene_id}/stream
+@router.post("/once/stream")
+async def run_once_stream(
+    file: UploadFile,
+    timeout: int = Query(default=60, ge=1, le=300),
+    verbose: bool = Query(default=False),
+    _: None = Depends(require_api_key),
+):
+    """Receive a scene ZIP, stream its output ephemerally, then delete it."""
+    tmp = Path(tempfile.mkdtemp(prefix="noid_once_"))
+    zip_bytes = await file.read()
+    scene_store.unpack(zip_bytes, tmp)
+    spec = scene_store.read_spec(tmp)
+
+    def gen():
+        try:
+            yield from runner.stream_scene(
+                spec, catalog.get_catalog(), timeout, verbose, tmp
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    return StreamingResponse(gen(), media_type="text/plain; charset=utf-8")
 
 
 @router.post("/{scene_id}")
