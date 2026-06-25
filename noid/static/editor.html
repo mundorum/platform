@@ -972,10 +972,13 @@ select.prop-val { padding: 3px 4px; }
         <datalist id="pub-notices-dl">
           <option v-for="(v, n) in selectedOutputNotices" :key="n" :value="n"></option>
         </datalist>
+        <datalist id="pub-topics-dl">
+          <option value="player/done"></option>
+        </datalist>
         <div v-for="(p, i) in editPubPairs" :key="i" class="wiring-row">
           <input class="wiring-part" v-model="p.notice" placeholder="notice" list="pub-notices-dl" @input="syncPub">
           <span class="wiring-arrow">→</span>
-          <input class="wiring-part" v-model="p.topic" placeholder="topic/path" @input="syncPub">
+          <input class="wiring-part" v-model="p.topic" placeholder="topic/path" list="pub-topics-dl" @input="syncPub">
           <button class="prop-del" @click="removePubPair(i)"><i class="ti ti-x"></i></button>
         </div>
       </div>
@@ -1208,7 +1211,7 @@ createApp({
       selectedCatalogEntry.value?.output_notices || {}
     );
     const allPublishedTopics = computed(() => {
-      const topics = new Set();
+      const topics = new Set(['player/start', 'player/done']);
       for (const comp of scene.value.components) {
         for (const pair of parsePub(comp.publish || '')) {
           if (pair.topic) topics.add(pair.topic);
