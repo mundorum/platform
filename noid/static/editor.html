@@ -549,6 +549,35 @@ select.prop-val { padding: 3px 4px; }
   gap: 8px;
 }
 .props-no-selection i { font-size: 28px; opacity: 0.4; }
+.props-comp-desc {
+  font-size: 11px;
+  color: var(--c-muted);
+  line-height: 1.5;
+  margin-top: 6px;
+  font-style: italic;
+}
+.props-label-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--c-border-strong);
+  color: var(--c-muted);
+  font-size: 9px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  cursor: help;
+  flex-shrink: 0;
+  line-height: 1;
+  user-select: none;
+}
 
 
 /* ── Execution panel ── */
@@ -872,6 +901,7 @@ select.prop-val { padding: 3px 4px; }
         >
         <div class="props-label" style="margin-top:8px">Type</div>
         <div class="props-type-badge">[[ selectedComp.type ]]</div>
+        <div v-if="selectedCompDescription" class="props-comp-desc">[[ selectedCompDescription ]]</div>
       </div>
 
       <!-- Properties -->
@@ -885,6 +915,7 @@ select.prop-val { padding: 3px 4px; }
           class="prop-row"
         >
           <span class="prop-key" :title="key">[[ key ]]</span>
+          <span v-if="propDesc(key)" class="help-icon" :title="propDesc(key)">?</span>
           <input
             v-if="typeof defVal !== 'boolean'"
             class="prop-val"
@@ -909,13 +940,22 @@ select.prop-val { padding: 3px 4px; }
       <!-- Subscribe wiring -->
       <div class="props-section">
         <div class="props-label">
-          Subscribe (topic → notice)
+          <span class="props-label-text">
+            Subscribe (topic → notice)
+            <span v-if="inputNoticesTitle" class="help-icon" :title="inputNoticesTitle">?</span>
+          </span>
           <button @click="addSubPair"><i class="ti ti-plus"></i></button>
         </div>
+        <datalist id="sub-topics-dl">
+          <option v-for="t in allPublishedTopics" :key="t" :value="t"></option>
+        </datalist>
+        <datalist id="sub-notices-dl">
+          <option v-for="(v, n) in selectedInputNotices" :key="n" :value="n"></option>
+        </datalist>
         <div v-for="(p, i) in editSubPairs" :key="i" class="wiring-row">
-          <input class="wiring-part" v-model="p.topic" placeholder="topic/path" @input="syncSub">
+          <input class="wiring-part" v-model="p.topic" placeholder="topic/path" list="sub-topics-dl" @input="syncSub">
           <span class="wiring-arrow">→</span>
-          <input class="wiring-part" v-model="p.notice" placeholder="notice" @input="syncSub">
+          <input class="wiring-part" v-model="p.notice" placeholder="notice" list="sub-notices-dl" @input="syncSub">
           <button class="prop-del" @click="removeSubPair(i)"><i class="ti ti-x"></i></button>
         </div>
       </div>
@@ -923,11 +963,17 @@ select.prop-val { padding: 3px 4px; }
       <!-- Publish wiring -->
       <div class="props-section">
         <div class="props-label">
-          Publish (notice → topic)
+          <span class="props-label-text">
+            Publish (notice → topic)
+            <span v-if="outputNoticesTitle" class="help-icon" :title="outputNoticesTitle">?</span>
+          </span>
           <button @click="addPubPair"><i class="ti ti-plus"></i></button>
         </div>
+        <datalist id="pub-notices-dl">
+          <option v-for="(v, n) in selectedOutputNotices" :key="n" :value="n"></option>
+        </datalist>
         <div v-for="(p, i) in editPubPairs" :key="i" class="wiring-row">
-          <input class="wiring-part" v-model="p.notice" placeholder="notice" @input="syncPub">
+          <input class="wiring-part" v-model="p.notice" placeholder="notice" list="pub-notices-dl" @input="syncPub">
           <span class="wiring-arrow">→</span>
           <input class="wiring-part" v-model="p.topic" placeholder="topic/path" @input="syncPub">
           <button class="prop-del" @click="removePubPair(i)"><i class="ti ti-x"></i></button>
@@ -1151,6 +1197,41 @@ createApp({
       catalog.value.find(c => c.id === selectedComp.value?.type) || null
     );
 
+    /* ── Metadata helpers ── */
+    const selectedCompDescription = computed(() =>
+      selectedCatalogEntry.value?.description || ''
+    );
+    const selectedInputNotices = computed(() =>
+      selectedCatalogEntry.value?.input_notices || {}
+    );
+    const selectedOutputNotices = computed(() =>
+      selectedCatalogEntry.value?.output_notices || {}
+    );
+    const allPublishedTopics = computed(() => {
+      const topics = new Set();
+      for (const comp of scene.value.components) {
+        for (const pair of parsePub(comp.publish || '')) {
+          if (pair.topic) topics.add(pair.topic);
+        }
+      }
+      return [...topics].sort();
+    });
+    const inputNoticesTitle = computed(() => {
+      const entries = Object.entries(selectedInputNotices.value);
+      if (!entries.length) return '';
+      return entries.map(([n, v]) => v.description ? `${n}: ${v.description}` : n).join('\n');
+    });
+    const outputNoticesTitle = computed(() => {
+      const entries = Object.entries(selectedOutputNotices.value);
+      if (!entries.length) return '';
+      return entries.map(([n, v]) => v.description ? `${n}: ${v.description}` : n).join('\n');
+    });
+
+    function propDesc(key) {
+      const spec = selectedCatalogEntry.value?.properties_spec?.[key];
+      return (spec && typeof spec === 'object' && spec.description) ? spec.description : '';
+    }
+
     /* ── Sync edit pairs when selection changes ── */
     watch(selectedId, id => {
       const comp = scene.value.components.find(c => c.id === id);
@@ -1362,6 +1443,8 @@ createApp({
     return {
       scene, layout, catalog, catalogErrors, catalogGroups,
       filename, view, selectedId, selectedComp, selectedCatalogEntry,
+      selectedCompDescription, selectedInputNotices, selectedOutputNotices,
+      allPublishedTopics, inputNoticesTitle, outputNoticesTitle, propDesc,
       jsonText, jsonError, onJsonInput, switchView,
       graphNodes, graphEdges, canvasStyle, graphCanvas,
       editSubPairs, editPubPairs,

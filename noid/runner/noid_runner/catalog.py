@@ -54,6 +54,24 @@ def _prop_default(spec_val):
     return spec_val
 
 
+def _derive_name(type_id: str) -> str:
+    return type_id.split(':')[-1].replace('-', ' ').replace('_', ' ').title()
+
+
+def _normalize_input_notices(receive) -> dict:
+    """Return {notice: {description: ...}} from list or dict receive spec."""
+    if not receive:
+        return {}
+    if isinstance(receive, list):
+        return {n: {} for n in receive}
+    if isinstance(receive, dict):
+        return {
+            k: (v if isinstance(v, dict) else {})
+            for k, v in receive.items()
+        }
+    return {}
+
+
 def get_catalog() -> list[dict]:
     load_collections()
     result = []
@@ -62,9 +80,13 @@ def get_catalog() -> list[dict]:
         props_spec: dict = spec.get('properties', {})
         result.append({
             'id': type_id,
+            'name': spec.get('name') or _derive_name(type_id),
+            'description': spec.get('description') or (getattr(cls, '__doc__', '') or '').strip(),
             'module': cls.__module__,
             'properties': {k: _prop_default(v) for k, v in props_spec.items()},
             'properties_spec': props_spec,
+            'input_notices': _normalize_input_notices(spec.get('receive', [])),
+            'output_notices': spec.get('output_notices', {}),
             'receive': spec.get('receive', []),
             'publish': spec.get('publish', ''),
             'subscribe': spec.get('subscribe', ''),
