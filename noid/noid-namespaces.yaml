@@ -1,0 +1,22 @@
+version: "1"
+
+# Project-level namespace definitions for the mundorum noid platform.
+# Loaded automatically by NoidPlayer when running scenes from this directory tree.
+# Inline "namespaces" in a scene.json override entries defined here.
+# See ~/git/mundorum/noid/docs/namespaces.md for the full format reference.
+
+namespaces:
+
+  # Standard noid component collections (noid_collections Python package).
+  # Enables "noid:data.text_source" in imports and type IDs.
+  noid:
+    kind: module
+    root: "noid_collections"
+    description: "Standard noid component collections"
+
+  # Central shared resource repository — locally mounted path on both machines.
+  # Override the root via the NOID_SHARED_ROOT env var or an inline namespace in scene.json.
+  shared:
+    kind: resource
+    root: "/srv/noid/shared"
+    description: "Central shared resource repository (mounted on Authoring and Processing machines)"

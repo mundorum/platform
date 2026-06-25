@@ -5,12 +5,13 @@ collections are available.  The scene's imports list is auto-populated
 with the modules that registered the component types used in the scene.
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import threading
 from pathlib import Path
-from typing import Generator
+from typing import Generator, Optional
 
 
 def _build_imports(scene: dict, catalog: list[dict]) -> list[str]:
@@ -25,13 +26,35 @@ def _build_imports(scene: dict, catalog: list[dict]) -> list[str]:
     return list(existing | modules)
 
 
-def run_scene(scene: dict, catalog: list[dict], timeout: int = 30) -> dict:
-    """Run *scene* via NoidPlayer. Returns {stdout, stderr, returncode}."""
+def _subprocess_env(extra: Optional[dict] = None) -> dict:
+    """Build a subprocess environment, forwarding NOID_NAMESPACES if set."""
+    env = os.environ.copy()
+    if extra:
+        env.update(extra)
+    return env
+
+
+def run_scene(
+    scene: dict,
+    catalog: list[dict],
+    timeout: int = 30,
+    scene_dir: Optional[Path] = None,
+) -> dict:
+    """
+    Run *scene* via NoidPlayer. Returns {stdout, stderr, returncode}.
+
+    *scene_dir* should be the on-disk scene package directory when available.
+    The temp scene file is written there (so relative imports and data paths
+    resolve correctly) and the subprocess CWD is set to that directory.
+    """
     runnable = dict(scene)
     runnable['imports'] = _build_imports(scene, catalog)
 
+    # Write the temp file inside scene_dir so _scene_dir resolves correctly
+    tmp_parent = scene_dir if scene_dir is not None else None
     with tempfile.NamedTemporaryFile(
-        mode='w', suffix='.json', delete=False, encoding='utf-8'
+        mode='w', suffix='.json', delete=False, encoding='utf-8',
+        dir=tmp_parent,
     ) as fh:
         json.dump(runnable, fh, indent=2)
         scene_path = fh.name
@@ -46,6 +69,8 @@ def run_scene(scene: dict, catalog: list[dict], timeout: int = 30) -> dict:
             capture_output=True,
             text=True,
             timeout=timeout + 10,
+            cwd=str(scene_dir) if scene_dir is not None else None,
+            env=_subprocess_env(),
         )
         return {
             'stdout': proc.stdout,
@@ -65,6 +90,7 @@ def stream_scene(
     catalog: list[dict],
     timeout: int = 60,
     verbose: bool = False,
+    scene_dir: Optional[Path] = None,
 ) -> Generator[str, None, None]:
     """
     Yield output lines from the scene as they are produced.
@@ -72,12 +98,17 @@ def stream_scene(
     stderr is merged into stdout so the caller sees one ordered stream.
     Python is started with -u (unbuffered) so lines arrive immediately.
     A background timer kills the process after *timeout* seconds.
+
+    *scene_dir* sets the subprocess CWD and the temp file location so that
+    relative imports and data paths inside the scene resolve correctly.
     """
     runnable = dict(scene)
     runnable['imports'] = _build_imports(scene, catalog)
 
+    tmp_parent = scene_dir if scene_dir is not None else None
     with tempfile.NamedTemporaryFile(
-        mode='w', suffix='.json', delete=False, encoding='utf-8'
+        mode='w', suffix='.json', delete=False, encoding='utf-8',
+        dir=tmp_parent,
     ) as fh:
         json.dump(runnable, fh, indent=2)
         scene_path = fh.name
@@ -101,6 +132,8 @@ def stream_scene(
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        cwd=str(scene_dir) if scene_dir is not None else None,
+        env=_subprocess_env(),
     )
     timer = threading.Timer(timeout + 5, proc.kill)
     timer.start()

@@ -1,111 +1,92 @@
-# Scene Package Format
+# Scene Package — Platform Extensions
 
-A **scene package** is the canonical unit of storage and transfer for a complete
-noid scene. On disk it is a directory under `scene_packages/{scene_id}/`. Over
-the network it is a ZIP archive with the same internal layout. The `noid_runner`
-module `scene_store.py` owns all pack/unpack logic; both servers use it.
+The canonical scene package format (on-disk directory structure, `scene.json`
+spec, `components/`, and `data/`) is defined in the core noid framework:
 
----
+> **[~/git/mundorum/noid/docs/scene-package.md](../../../../noid/docs/scene-package.md)**
 
-## Directory structure
-
-```
-{scene_id}/
-├── scene.json            required — scene specification
-├── components/           optional — scene-specific Python components
-│   ├── __init__.py
-│   └── *.py
-└── data/                 optional — data sources
-    └── **/*
-```
-
----
-
-## scene.json
-
-The scene specification. This is the JSON format accepted by `NoidPlayer.play()`
-with one addition: paths that reference data files (e.g. `"path": "data/story.txt"`)
-are relative to the scene package root. The runner resolves them to absolute
-paths before execution.
-
-Minimal example:
-
-```json
-{
-  "components": [
-    {
-      "id": "src",
-      "type": "text_source",
-      "properties": { "path": "data/story.txt" }
-    },
-    {
-      "id": "disp",
-      "type": "console_display",
-      "properties": {}
-    }
-  ],
-  "connections": [
-    { "from": "src.text", "to": "disp.receive" }
-  ]
-}
-```
-
-The `imports` field is auto-populated by `noid_runner/runner.py` from the
-component catalog; you do not need to set it manually.
-
----
-
-## components/
-
-Python source files that define scene-specific noid components. Rules:
-
-- `__init__.py` is required if the directory is present.
-- Each file self-registers using `@Noid.component(spec)`, exactly like any
-  collection module.
-- Files are loaded via `importlib` by `SceneRegistry` when the scene is first
-  accessed. The scene's `components/` directory is temporarily added to
-  `sys.path` (scoped via a context manager to avoid collisions with other scenes
-  or global packages).
-- `SceneRegistry` checks file mtimes and reloads components if any file changes.
-
----
-
-## data/
-
-Any files consumed by the scene's components as data sources: plain text, CSV,
-images, PDFs, SQLite databases, etc. Sub-directories are allowed.
-
-`SceneRegistry` indexes the `data/` directory at scene load time and makes the
-index available to the runner so that relative paths in `scene.json` can be
-resolved to absolute paths without requiring components to know where the scene
-package lives on disk.
+This document covers the platform-specific extensions: ZIP packaging for network
+transfer, the API endpoints that accept/emit ZIPs, and the runner's scene-directory
+wiring that fixes relative path resolution.
 
 ---
 
 ## ZIP package layout
 
-The ZIP contains the scene files directly (no top-level scene-id wrapper
-directory):
+The ZIP contains scene files with no top-level wrapper directory:
 
 ```
 scene.json
-components/__init__.py
-components/my_retriever.py
-data/story.txt
-data/images/hero.png
+components/my_logic.py
+data/input.csv
+data/docs/manual.pdf
 ```
 
-The `scene_store.py` `pack(scene_id)` function writes this layout; `unpack(zip_path, scene_id)` extracts it into `scene_packages/{scene_id}/`.
+`noid_runner/scene_store.py` owns all pack/unpack logic:
+
+```python
+from noid_runner.scene_store import pack, unpack, read_spec
+
+zip_bytes = pack(scene_dir)            # Path → bytes
+unpack(zip_bytes, target_dir)          # bytes + Path → None
+spec = read_spec(scene_dir)            # Path → dict
+```
+
+Both the Authoring and Processing servers use these functions; no server has
+its own ZIP code.
 
 ---
 
-## API: full-package operations (Authoring Machine)
+## API: full-package operations
+
+### Authoring Machine (Django)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/scenes/import/` | Upload a ZIP; creates DB record and unpacks to disk |
 | `GET` | `/scenes/{id}/export` | Pack and stream the full ZIP for download |
-| `DELETE` | `/scenes/{id}/` | Delete DB record + all files (spec, components, data) |
+| `DELETE` | `/scenes/{id}/` | Delete DB record + all files |
 
-Individual file operations (for the editor's file panel) use separate endpoints:
-see `docs/api.md`.
+### Processing Machine (FastAPI)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/deploy/{scene_id}` | Upload a ZIP; unpack and register in SceneRegistry |
+| `DELETE` | `/deploy/{scene_id}` | Evict from SceneRegistry and delete files |
+| `POST` | `/run/once` | Upload a ZIP, run ephemerally, return output |
+| `POST` | `/run/{scene_id}` | Run a deployed scene, return complete output |
+| `POST` | `/run/{scene_id}/stream` | Run a deployed scene, stream output line by line |
+
+See `docs/api.md` for full request/response shapes.
+
+---
+
+## Runner scene-directory wiring
+
+The runner subprocess receives the scene's on-disk directory via the `scene_dir`
+parameter of `run_scene()` and `stream_scene()`. This fixes two path problems:
+
+1. **Temp file location** — the temp `.json` is written into `scene_dir` so
+   `NoidPlayer` sets `_scene_dir` to the scene package root (not `/tmp/`).
+2. **Subprocess CWD** — `cwd=scene_dir` means relative paths in component code
+   and data files resolve against the scene package root.
+
+```python
+# Processing Machine route: pass scene_dir from the registry
+spec = scene_store.read_spec(scene_dir)
+result = await asyncio.to_thread(
+    runner.run_scene, spec, catalog.get_catalog(), timeout, scene_dir
+)
+```
+
+---
+
+## Namespace support
+
+The platform defines project-level namespaces in `noid/noid-namespaces.yaml`.
+`NoidPlayer` discovers this file by walking up from the scene directory, so
+scenes deployed anywhere under `noid/` inherit both the `noid:` module namespace
+and the `shared:` resource namespace automatically.
+
+See [~/git/mundorum/noid/docs/namespaces.md](../../../../noid/docs/namespaces.md)
+for the namespace file format and resolution rules.

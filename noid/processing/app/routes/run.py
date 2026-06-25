@@ -50,7 +50,7 @@ async def run_deployed_scene(
         )
     spec = scene_store.read_spec(scene_dir)
     result = await asyncio.to_thread(
-        runner.run_scene, spec, catalog.get_catalog(), timeout
+        runner.run_scene, spec, catalog.get_catalog(), timeout, scene_dir
     )
     return result
 
@@ -72,6 +72,8 @@ async def stream_deployed_scene(
     spec = scene_store.read_spec(scene_dir)
 
     def gen():
-        yield from runner.stream_scene(spec, catalog.get_catalog(), timeout, verbose)
+        yield from runner.stream_scene(
+            spec, catalog.get_catalog(), timeout, verbose, scene_dir
+        )
 
     return StreamingResponse(gen(), media_type="text/plain; charset=utf-8")

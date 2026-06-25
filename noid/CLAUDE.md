@@ -17,15 +17,20 @@ before making any structural change.
 2. **Shared package**: `runner/noid_runner/` is pure Python (no web framework
    imports). Both servers install it via `pip install -e runner/`.
 3. **Scene package**: a directory (and ZIP for transfer) with exactly four
-   resource types: `scene.json`, `components/`, `data/`. See
-   `docs/scene-package.md` for the full spec.
-4. **`collections.yaml`** at `noid/` root. Both servers read it; path set via
+   resource types: `scene.json`, `components/`, `data/`. The canonical on-disk
+   format is defined in `~/git/mundorum/noid/docs/scene-package.md`; ZIP and
+   API extensions are in `docs/scene-package.md`.
+4. **Namespace system**: `noid-namespaces.yaml` at `noid/` root defines `noid:`
+   (module, `noid_collections`) and `shared:` (resource, `/srv/noid/shared`).
+   NoidPlayer discovers this file by walking up from the scene directory.
+   See `~/git/mundorum/noid/docs/namespaces.md` for the format.
+5. **`collections.yaml`** at `noid/` root. Both servers read it; path set via
    `COLLECTIONS_FILE` env var.
-5. **`scene_packages/`** at `noid/` root in development. Each production machine
+6. **`scene_packages/`** at `noid/` root in development. Each production machine
    mounts its own volume.
-6. **Docker build context** is always `noid/` (not a sub-directory) so both
+7. **Docker build context** is always `noid/` (not a sub-directory) so both
    Dockerfiles can `COPY runner/`. See `docker-compose.yml`.
-7. **ZIP API**: `POST /scenes/import/` and `GET /scenes/{id}/export` handle a
+8. **ZIP API**: `POST /scenes/import/` and `GET /scenes/{id}/export` handle a
    full scene package (spec + components + data) as a single ZIP. `DELETE
    /scenes/{id}/` removes everything — DB record, component files, data files.
 
