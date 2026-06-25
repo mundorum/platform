@@ -92,7 +92,7 @@ noid/
 | Proxy to Processing Machine | `authoring/scenes/views.py` |
 | Scratch runner (raw JSON) | `authoring/editor/views.py` |
 | SceneRegistry singleton | `noid_runner/registry.py` |
-| Warm worker pool | `processing/app/worker.py` (planned) |
+| Warm worker pool | `processing/app/worker.py` |
 | FastAPI route handlers | `processing/app/routes/` |
 
 ---

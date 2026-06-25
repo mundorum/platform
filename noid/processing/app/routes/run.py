@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from noid_runner import catalog, registry, runner, scene_store
 from ..auth import require_api_key
+from ..worker import pool as worker_pool
 
 router = APIRouter(prefix="/run", tags=["run"])
 
@@ -66,18 +67,29 @@ async def run_deployed_scene(
     timeout: int = Query(default=60, ge=1, le=300),
     _: None = Depends(require_api_key),
 ):
-    """Run a deployed scene and return the complete output."""
+    """
+    Run a deployed scene and return the complete output.
+
+    Uses the warm worker process (pre-imported modules) when available,
+    falling back to a fresh subprocess if the worker is not ready.
+    """
     scene_dir = registry.get(scene_id)
     if scene_dir is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Scene {scene_id!r} is not deployed",
         )
+
+    # Try the warm worker first (skips module import overhead)
+    result = await asyncio.to_thread(worker_pool.run, scene_id, timeout)
+    if result is not None:
+        return result
+
+    # Fall back to a cold subprocess (e.g. worker evicted between requests)
     spec = scene_store.read_spec(scene_dir)
-    result = await asyncio.to_thread(
+    return await asyncio.to_thread(
         runner.run_scene, spec, catalog.get_catalog(), timeout, scene_dir
     )
-    return result
 
 
 @router.post("/{scene_id}/stream")
