@@ -1196,7 +1196,7 @@ createApp({
 
     async function apiFetch(url, options = {}) {
       const headers = { ...(options.headers || {}) };
-      if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`;
+      if (auth.token) headers['Authorization'] = `Token ${auth.token}`;
       const response = await fetch(url, { ...options, headers });
       if (response.status === 401) {
         signOut();
@@ -1235,6 +1235,25 @@ createApp({
     }
 
     async function initAuth() {
+      // Consume token or error passed back by the Google redirect callback
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('auth_token');
+      const urlError = params.get('auth_error');
+      if (urlToken) {
+        auth.token = urlToken;
+        localStorage.setItem('noid_token', urlToken);
+        history.replaceState(null, '', '/');
+      }
+      if (urlError) {
+        const messages = {
+          missing_credential: 'Sign-in failed: no credential received.',
+          invalid_token:      'Sign-in failed: invalid Google token.',
+          not_authorized:     'Access denied. Contact a manager to get access.',
+        };
+        loginError.value = messages[urlError] || 'Sign-in failed.';
+        history.replaceState(null, '', '/');
+      }
+
       // Fetch public config to get the Google Client ID
       let googleClientId = '';
       try {
@@ -1249,7 +1268,7 @@ createApp({
       if (auth.token) {
         try {
           const r = await fetch('/auth/me/', {
-            headers: { 'Authorization': `Bearer ${auth.token}` },
+            headers: { 'Authorization': `Token ${auth.token}` },
           });
           if (r.ok) {
             auth.user = await r.json();
@@ -1264,7 +1283,7 @@ createApp({
         }
       }
 
-      // Initialise Google Identity Services
+      // Initialise Google Identity Services (redirect mode — no popup, no third-party cookies)
       if (!googleClientId) return;
       const gsiReady = () => new Promise(resolve => {
         if (window.google?.accounts?.id) { resolve(); return; }
@@ -1275,8 +1294,9 @@ createApp({
       await gsiReady();
 
       google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback:  handleGoogleCredential,
+        client_id:  googleClientId,
+        ux_mode:    'redirect',
+        login_uri:  `${window.location.origin}/auth/google/callback/`,
       });
       google.accounts.id.renderButton(
         document.getElementById('google-signin-btn'),

@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.shortcuts import redirect
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -94,6 +95,65 @@ class GoogleAuthView(APIView):
                 'role': profile.role,
             },
         })
+
+
+class GoogleCallbackView(APIView):
+    """Handles the form POST that Google sends in ux_mode='redirect'."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        credential = request.data.get('credential') or request.POST.get('credential')
+        if not credential:
+            return redirect('/?auth_error=missing_credential')
+
+        try:
+            id_info = id_token.verify_oauth2_token(
+                credential,
+                google_requests.Request(),
+                settings.GOOGLE_CLIENT_ID,
+            )
+        except ValueError:
+            return redirect('/?auth_error=invalid_token')
+
+        email = id_info['email']
+        google_id = id_info['sub']
+        given_name = id_info.get('given_name', '')
+        family_name = id_info.get('family_name', '')
+        picture = id_info.get('picture', '')
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            try:
+                preauth = PreAuthorization.objects.get(email=email)
+            except PreAuthorization.DoesNotExist:
+                return redirect('/?auth_error=not_authorized')
+
+            user = User.objects.create_user(
+                username=email,
+                email=email,
+                first_name=given_name,
+                last_name=family_name,
+            )
+            user.set_unusable_password()
+            user.is_staff = preauth.role == 'manager'
+            user.save()
+
+            Profile.objects.create(
+                user=user,
+                role=preauth.role,
+                google_id=google_id,
+                picture_url=picture,
+            )
+            preauth.delete()
+        else:
+            profile = user.profile
+            profile.google_id = google_id
+            profile.picture_url = picture
+            profile.save(update_fields=['google_id', 'picture_url'])
+
+        auth_token, _ = Token.objects.get_or_create(user=user)
+        return redirect(f'/?auth_token={auth_token.key}')
 
 
 class ProfileView(APIView):
