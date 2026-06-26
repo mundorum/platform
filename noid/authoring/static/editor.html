@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://accounts.google.com/gsi/client" async></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -684,10 +685,102 @@ select.prop-val { padding: 3px 4px; }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--c-border-strong); border-radius: 3px; }
+
+/* ── Login overlay ── */
+#login-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--c-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.login-card {
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 12px;
+  padding: 44px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+}
+.login-brand {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--c-accent);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.login-brand i { font-size: 28px; }
+.login-tagline {
+  font-size: 13px;
+  color: var(--c-muted);
+  margin-top: -4px;
+}
+.login-desc {
+  font-size: 12px;
+  color: var(--c-muted);
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+.login-error {
+  font-size: 11.5px;
+  color: #c0392b;
+  font-family: var(--font-mono);
+  background: rgba(192,57,43,0.07);
+  border: 0.5px solid rgba(192,57,43,0.25);
+  padding: 8px 12px;
+  border-radius: 6px;
+  width: 100%;
+  text-align: left;
+}
+
+/* ── Topbar user badge ── */
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--c-border-strong);
+  flex-shrink: 0;
+}
+.user-name {
+  font-size: 12px;
+  color: var(--c-muted);
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 </style>
 </head>
 <body>
 <div id="app">
+
+  <!-- Login overlay — shown until authenticated -->
+  <div id="login-overlay" v-show="!auth.token">
+    <div class="login-card">
+      <div class="login-brand"><i class="ti ti-circuit-diode"></i> noid</div>
+      <p class="login-tagline">Scene authoring environment</p>
+      <p class="login-desc">Sign in with a pre-authorized Google account.</p>
+      <div id="google-signin-btn"></div>
+      <p class="login-error" v-if="loginError">[[ loginError ]]</p>
+    </div>
+  </div>
 
   <!-- Topbar -->
   <header id="topbar">
@@ -708,6 +801,11 @@ select.prop-val { padding: 3px 4px; }
       <button class="view-tab" :class="{active: view==='json'}" @click="switchView('json')">
         <i class="ti ti-braces"></i> JSON
       </button>
+    </div>
+    <div class="user-badge" v-if="auth.user">
+      <img class="user-avatar" :src="auth.user.picture" :alt="auth.user.name" referrerpolicy="no-referrer">
+      <span class="user-name">[[ auth.user.name ]]</span>
+      <button class="tb-btn ghost" @click="signOut" title="Sign out"><i class="ti ti-logout"></i></button>
     </div>
   </header>
 
@@ -1004,7 +1102,7 @@ select.prop-val { padding: 3px 4px; }
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script>
-const { createApp, ref, reactive, computed, watch, nextTick } = Vue;
+const { createApp, ref, reactive, computed, watch, nextTick, onMounted } = Vue;
 
 /* ──────────────────────────────────────────────────────────────────
    Constants
@@ -1092,6 +1190,102 @@ createApp({
     const verbosePlay    = ref(false);
     const execOutput     = ref(null);
 
+    /* ── Auth ── */
+    const auth       = reactive({ token: localStorage.getItem('noid_token'), user: null });
+    const loginError = ref('');
+
+    async function apiFetch(url, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`;
+      const response = await fetch(url, { ...options, headers });
+      if (response.status === 401) {
+        signOut();
+        throw new Error('Session expired — please sign in again.');
+      }
+      return response;
+    }
+
+    function signOut() {
+      auth.token = null;
+      auth.user  = null;
+      localStorage.removeItem('noid_token');
+      if (window.google?.accounts?.id) google.accounts.id.disableAutoSelect();
+    }
+
+    async function handleGoogleCredential(credentialResponse) {
+      loginError.value = '';
+      try {
+        const r = await fetch('/auth/google/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: credentialResponse.credential }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          loginError.value = data.detail || data.error || 'Sign-in failed.';
+          return;
+        }
+        auth.token = data.token;
+        auth.user  = data.user;
+        localStorage.setItem('noid_token', data.token);
+        fetchCatalog();
+      } catch (e) {
+        loginError.value = `Sign-in error: ${e.message}`;
+      }
+    }
+
+    async function initAuth() {
+      // Fetch public config to get the Google Client ID
+      let googleClientId = '';
+      try {
+        const r = await fetch('/auth/config/');
+        const config = await r.json();
+        googleClientId = config.google_client_id || '';
+      } catch (e) {
+        console.error('Failed to fetch auth config:', e);
+      }
+
+      // Validate any stored token
+      if (auth.token) {
+        try {
+          const r = await fetch('/auth/me/', {
+            headers: { 'Authorization': `Bearer ${auth.token}` },
+          });
+          if (r.ok) {
+            auth.user = await r.json();
+            fetchCatalog();
+          } else {
+            auth.token = null;
+            localStorage.removeItem('noid_token');
+          }
+        } catch (e) {
+          auth.token = null;
+          localStorage.removeItem('noid_token');
+        }
+      }
+
+      // Initialise Google Identity Services
+      if (!googleClientId) return;
+      const gsiReady = () => new Promise(resolve => {
+        if (window.google?.accounts?.id) { resolve(); return; }
+        const t = setInterval(() => {
+          if (window.google?.accounts?.id) { clearInterval(t); resolve(); }
+        }, 100);
+      });
+      await gsiReady();
+
+      google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback:  handleGoogleCredential,
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('google-signin-btn'),
+        { theme: 'outline', size: 'large', shape: 'rectangular', width: 280 },
+      );
+    }
+
+    onMounted(initAuth);
+
     /* Highlight [LOG], [ERR] and exit lines in the terminal output. */
     const execHighlighted = computed(() => {
       return execText.value
@@ -1115,7 +1309,7 @@ createApp({
     /* ── Catalog fetch ── */
     async function fetchCatalog() {
       try {
-        const r = await fetch('/api/catalog/');
+        const r = await apiFetch('/api/catalog/');
         const data = await r.json();
         catalog.value = data.components || [];
         catalogErrors.value = data.errors || [];
@@ -1123,7 +1317,6 @@ createApp({
         catalogErrors.value = [`Failed to fetch catalog: ${e}`];
       }
     }
-    fetchCatalog();
 
     /* ── Catalog groups ── */
     const catalogGroups = computed(() => {
@@ -1413,7 +1606,7 @@ createApp({
 
       const url = `/api/play/stream/?verbose=${verbosePlay.value ? '1' : '0'}`;
       try {
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(scene.value),
@@ -1444,6 +1637,7 @@ createApp({
     }
 
     return {
+      auth, loginError, signOut,
       scene, layout, catalog, catalogErrors, catalogGroups,
       filename, view, selectedId, selectedComp, selectedCatalogEntry,
       selectedCompDescription, selectedInputNotices, selectedOutputNotices,
