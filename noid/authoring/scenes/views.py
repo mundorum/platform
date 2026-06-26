@@ -19,6 +19,18 @@ from .models import Scene, SceneRun
 from .serializers import SceneRunSerializer, SceneSerializer
 
 
+def _enabled_modules() -> list[str]:
+    """Return the flat list of module paths from all enabled ComponentCollections."""
+    try:
+        from libraries.models import ComponentCollection
+        modules: list[str] = []
+        for col in ComponentCollection.objects.filter(enabled=True):
+            modules.extend(col.modules)
+        return modules
+    except Exception:
+        return []
+
+
 class SceneViewSet(viewsets.ModelViewSet):
     queryset = Scene.objects.all()
     serializer_class = SceneSerializer
@@ -112,6 +124,7 @@ class SceneViewSet(viewsets.ModelViewSet):
             resp = http_client.post(
                 f'{settings.PROCESSING_URL}/run/once',
                 files={'file': (f'{scene.id}.zip', zip_bytes, 'application/zip')},
+                data={'modules': json.dumps(_enabled_modules())},
                 headers={'Authorization': f'Bearer {settings.PROCESSING_API_KEY}'},
                 params={'timeout': timeout},
                 timeout=timeout + 30,
@@ -154,6 +167,7 @@ class SceneViewSet(viewsets.ModelViewSet):
             resp = http_client.post(
                 f'{settings.PROCESSING_URL}/run/once/stream',
                 files={'file': (f'{scene.id}.zip', zip_bytes, 'application/zip')},
+                data={'modules': json.dumps(_enabled_modules())},
                 headers={'Authorization': f'Bearer {settings.PROCESSING_API_KEY}'},
                 params={'timeout': timeout},
                 stream=True,

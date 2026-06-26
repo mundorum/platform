@@ -72,6 +72,53 @@ def _normalize_input_notices(receive) -> dict:
     return {}
 
 
+def load_modules(modules: list[str]) -> list[str]:
+    """Import a flat list of module paths.  Returns a list of error strings.
+
+    Idempotent: Python's import machinery caches already-loaded modules, so
+    calling this with the same paths repeatedly is safe and fast.
+    This is the preferred alternative to load_collections() when the module
+    list comes from a database or deploy payload rather than collections.yaml.
+    """
+    errors: list[str] = []
+    for module_path in modules:
+        try:
+            importlib.import_module(module_path)
+        except ImportError as exc:
+            errors.append(f'ImportError {module_path}: {exc}')
+        except Exception as exc:
+            errors.append(f'Error loading {module_path}: {exc}')
+    return errors
+
+
+def build_catalog() -> list[dict]:
+    """Return the catalog from currently registered Noid subclasses.
+
+    Unlike get_catalog(), this does NOT trigger load_collections() — the
+    caller is responsible for importing the required modules first.
+    """
+    result = []
+    for type_id, cls in Noid._oid_reg.items():
+        spec: dict = getattr(cls, '_spec', {})
+        props_spec: dict = spec.get('properties', {})
+        result.append({
+            'id': type_id,
+            'name': spec.get('name') or _derive_name(type_id),
+            'description': spec.get('description') or (getattr(cls, '__doc__', '') or '').strip(),
+            'module': cls.__module__,
+            'properties': {k: _prop_default(v) for k, v in props_spec.items()},
+            'properties_spec': props_spec,
+            'input_notices': _normalize_input_notices(spec.get('receive', [])),
+            'output_notices': spec.get('output_notices', {}),
+            'receive': spec.get('receive', []),
+            'publish': spec.get('publish', ''),
+            'subscribe': spec.get('subscribe', ''),
+            'provide': spec.get('provide', []),
+            'connect': spec.get('connect', ''),
+        })
+    return sorted(result, key=lambda x: x['id'])
+
+
 def get_catalog() -> list[dict]:
     load_collections()
     result = []

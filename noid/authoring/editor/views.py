@@ -6,18 +6,38 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
-from .catalog import get_catalog, get_load_errors
+from noid_runner.catalog import load_modules, build_catalog, get_load_errors
+
 from .runner import run_scene, stream_scene
 
 
+def _load_enabled_modules() -> tuple[list[dict], list[str]]:
+    """Import all enabled ComponentCollection modules and return (catalog, errors).
+
+    Falls back to the legacy collections.yaml loader if the libraries table does
+    not exist yet (e.g. before the first migration).
+    """
+    try:
+        from libraries.models import ComponentCollection
+        modules: list[str] = []
+        for col in ComponentCollection.objects.filter(enabled=True):
+            modules.extend(col.modules)
+        errors = load_modules(modules)
+    except Exception:
+        # Table missing (pre-migration) or DB unavailable — fall back to YAML.
+        from noid_runner.catalog import load_collections
+        load_collections()
+        errors = get_load_errors()
+
+    return build_catalog(), errors
+
+
 class CatalogView(View):
-    """Return the full component catalog built from collections.yaml."""
+    """Return the full component catalog built from enabled ComponentCollections."""
 
     def get(self, _request):
-        return JsonResponse({
-            'components': get_catalog(),
-            'errors': get_load_errors(),
-        })
+        catalog, errors = _load_enabled_modules()
+        return JsonResponse({'components': catalog, 'errors': errors})
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -30,8 +50,9 @@ class PlayView(View):
         except json.JSONDecodeError as exc:
             return JsonResponse({'error': f'Invalid JSON: {exc}'}, status=400)
 
+        catalog, _ = _load_enabled_modules()
         timeout = min(int(request.GET.get('timeout', 30)), 300)
-        result = run_scene(scene, get_catalog(), timeout=timeout)
+        result = run_scene(scene, catalog, timeout=timeout)
         return JsonResponse(result)
 
 
@@ -47,10 +68,11 @@ class PlayStreamView(View):
                 yield f'Error parsing scene JSON: {exc}\n'
             return StreamingHttpResponse(_err(), content_type='text/plain; charset=utf-8')
 
+        catalog, _ = _load_enabled_modules()
         timeout = min(int(request.GET.get('timeout', 60)), 300)
         verbose = request.GET.get('verbose', '1') == '1'
 
         return StreamingHttpResponse(
-            stream_scene(scene, get_catalog(), timeout=timeout, verbose=verbose),
+            stream_scene(scene, catalog, timeout=timeout, verbose=verbose),
             content_type='text/plain; charset=utf-8',
         )

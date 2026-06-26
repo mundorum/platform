@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'accounts',
     'editor',
     'scenes',
+    'libraries',
 ]
 
 MIDDLEWARE = [

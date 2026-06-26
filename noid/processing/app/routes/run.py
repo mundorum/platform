@@ -1,9 +1,10 @@
 import asyncio
+import json
 import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from noid_runner import catalog, registry, runner, scene_store
@@ -16,9 +17,25 @@ router = APIRouter(prefix="/run", tags=["run"])
 # takes priority over the parameterised route.
 
 
+def _merge_modules(spec: dict, modules_json: str) -> dict:
+    """Return a copy of *spec* with extra modules merged into spec['imports'].
+
+    *modules_json* is a JSON-encoded list of module paths sent by the Authoring
+    Machine.  These represent the enabled ComponentCollection modules so that
+    the Processing Machine does not need to load collections.yaml itself.
+    """
+    try:
+        extra: list[str] = json.loads(modules_json) if modules_json else []
+    except (json.JSONDecodeError, ValueError):
+        extra = []
+    merged = list(set(spec.get('imports', [])) | set(extra))
+    return {**spec, 'imports': merged}
+
+
 @router.post("/once")
 async def run_once(
     file: UploadFile,
+    modules: str = Form(default='[]'),
     timeout: int = Query(default=60, ge=1, le=300),
     _: None = Depends(require_api_key),
 ):
@@ -27,7 +44,7 @@ async def run_once(
     try:
         zip_bytes = await file.read()
         scene_store.unpack(zip_bytes, tmp)
-        spec = scene_store.read_spec(tmp)
+        spec = _merge_modules(scene_store.read_spec(tmp), modules)
         result = await asyncio.to_thread(
             runner.run_scene, spec, catalog.get_catalog(), timeout, tmp
         )
@@ -40,6 +57,7 @@ async def run_once(
 @router.post("/once/stream")
 async def run_once_stream(
     file: UploadFile,
+    modules: str = Form(default='[]'),
     timeout: int = Query(default=60, ge=1, le=300),
     verbose: bool = Query(default=False),
     _: None = Depends(require_api_key),
@@ -48,7 +66,7 @@ async def run_once_stream(
     tmp = Path(tempfile.mkdtemp(prefix="noid_once_"))
     zip_bytes = await file.read()
     scene_store.unpack(zip_bytes, tmp)
-    spec = scene_store.read_spec(tmp)
+    spec = _merge_modules(scene_store.read_spec(tmp), modules)
 
     def gen():
         try:

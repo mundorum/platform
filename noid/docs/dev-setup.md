@@ -38,6 +38,9 @@ cp .env.example .env
 
 # Create the authoring database schema
 python authoring/manage.py migrate
+
+# Add the first manager in the database
+python manage.py seed_initial_manager
 ```
 
 ---

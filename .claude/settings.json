@@ -1,7 +1,6 @@
 {
   "additionalDirectories": [
     "~/git/mundorum/noid",
-    "~/git/mundorum/noid-collections",
-    "~/git/mundorum/harena-manager"
+    "~/git/mundorum/noid-collections"
   ]
 }

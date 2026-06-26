@@ -15,4 +15,5 @@ urlpatterns = [
     path('auth/', include('accounts.urls')),
     path('api/', include('editor.urls')),
     path('api/scenes/', include('scenes.urls')),
+    path('api/libraries/', include('libraries.urls')),
 ]

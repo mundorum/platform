@@ -743,6 +743,224 @@ select.prop-val { padding: 3px 4px; }
   text-align: left;
 }
 
+/* ── Libraries modal ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(26,22,16,0.55);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-card {
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 12px;
+  width: min(720px, 94vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  overflow: hidden;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px 14px;
+  border-bottom: 0.5px solid var(--c-border);
+  flex-shrink: 0;
+}
+.modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-accent);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.modal-title i { font-size: 18px; }
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--c-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.12s;
+}
+.modal-close:hover { color: var(--c-text); }
+.modal-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 16px 20px;
+}
+.lib-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--c-bg);
+  border-radius: 7px;
+  padding: 3px;
+  margin-bottom: 14px;
+  width: fit-content;
+}
+.lib-tab {
+  padding: 4px 14px;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-muted);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.lib-tab.active { background: var(--c-surface); color: var(--c-accent); box-shadow: 0 0.5px 2px rgba(0,0,0,0.10); }
+.lib-table { width: 100%; border-collapse: collapse; }
+.lib-table th {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  text-align: left;
+  padding: 4px 8px 8px;
+  border-bottom: 0.5px solid var(--c-border);
+}
+.lib-table td {
+  padding: 8px 8px;
+  border-bottom: 0.5px solid var(--c-border);
+  font-size: 12.5px;
+  vertical-align: middle;
+}
+.lib-table tr:last-child td { border-bottom: none; }
+.lib-table tr:hover td { background: var(--c-accent-light); }
+.lib-name { font-weight: 500; color: var(--c-text); }
+.lib-pkg  { font-family: var(--font-mono); font-size: 11px; color: var(--c-muted); }
+.lib-mods { font-family: var(--font-mono); font-size: 11px; color: var(--c-muted); }
+.lib-toggle {
+  appearance: none;
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--c-border-strong);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.18s;
+  flex-shrink: 0;
+  border: none;
+  outline: none;
+}
+.lib-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.18s;
+}
+.lib-toggle:checked { background: var(--c-accent); }
+.lib-toggle:checked::after { left: 16px; }
+.lib-del {
+  background: none;
+  border: none;
+  color: var(--c-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.12s;
+}
+.lib-del:hover { color: #c0392b; }
+.lib-empty {
+  padding: 28px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--c-muted);
+  font-style: italic;
+}
+.modal-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  margin-bottom: 10px;
+  margin-top: 18px;
+}
+.modal-section-title:first-child { margin-top: 0; }
+.lib-form { display: flex; flex-direction: column; gap: 10px; }
+.lib-form-row { display: flex; gap: 8px; align-items: flex-end; }
+.lib-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.lib-field label { font-size: 10.5px; font-weight: 600; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.lib-input {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  padding: 6px 10px;
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  color: var(--c-text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.lib-input:focus { border-color: var(--c-accent); }
+.lib-input.mono { font-family: var(--font-mono); font-size: 12px; }
+.lib-add-btn {
+  padding: 6px 16px;
+  background: var(--c-accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  align-self: flex-end;
+}
+.lib-add-btn:hover { opacity: 0.82; }
+.lib-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.lib-avail-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--c-border);
+  border-radius: 7px;
+  margin-bottom: 6px;
+  background: var(--c-bg);
+}
+.lib-avail-info { flex: 1; min-width: 0; }
+.lib-avail-name { font-size: 12.5px; font-weight: 500; color: var(--c-text); }
+.lib-avail-desc { font-size: 11.5px; color: var(--c-muted); margin-top: 1px; }
+.lib-avail-extra { font-family: var(--font-mono); font-size: 10.5px; color: var(--c-accent); background: var(--c-accent-light); padding: 1px 6px; border-radius: 4px; flex-shrink: 0; }
+.lib-avail-add {
+  background: none;
+  border: 0.5px solid var(--c-accent);
+  color: var(--c-accent);
+  border-radius: 5px;
+  font-size: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: background 0.12s, color 0.12s;
+}
+.lib-avail-add:hover { background: var(--c-accent); color: #fff; }
+.lib-avail-add:disabled { opacity: 0.4; cursor: not-allowed; }
+.lib-status { font-size: 11.5px; color: var(--c-muted); margin-top: 6px; font-family: var(--font-mono); }
+.lib-status.ok { color: #2e7d32; }
+.lib-status.err { color: #c0392b; }
+
 /* ── Topbar user badge ── */
 .user-badge {
   display: flex;
@@ -782,6 +1000,123 @@ select.prop-val { padding: 3px 4px; }
     </div>
   </div>
 
+  <!-- Libraries modal -->
+  <div class="modal-backdrop" v-if="showLibraries">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title"><i class="ti ti-packages"></i> Component Libraries</div>
+        <button class="modal-close" @click="showLibraries = false"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Tabs -->
+        <div class="lib-tabs">
+          <button class="lib-tab" :class="{active: libTab==='installed'}" @click="libTab='installed'">
+            <i class="ti ti-list"></i> Installed
+          </button>
+          <button class="lib-tab" :class="{active: libTab==='available'}" @click="libTab='available'; fetchAvailable()">
+            <i class="ti ti-cloud-download"></i> Available
+          </button>
+          <button class="lib-tab" :class="{active: libTab==='add'}" @click="libTab='add'">
+            <i class="ti ti-plus"></i> Add custom
+          </button>
+        </div>
+
+        <!-- Installed tab -->
+        <template v-if="libTab === 'installed'">
+          <div class="modal-section-title">Enabled collections drive the component palette and are sent to the Processing Machine on every run.</div>
+          <div v-if="libraries.length === 0" class="lib-empty">No collections registered yet. Use the Available or Add custom tab.</div>
+          <table v-else class="lib-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>pip package</th>
+                <th>Modules</th>
+                <th>On</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="lib in libraries" :key="lib.id">
+                <td class="lib-name">[[ lib.name ]]</td>
+                <td class="lib-pkg">[[ lib.pip_package || '—' ]]</td>
+                <td class="lib-mods">[[ lib.modules.length ]] module[[ lib.modules.length !== 1 ? 's' : '' ]]</td>
+                <td>
+                  <input type="checkbox" class="lib-toggle" :checked="lib.enabled"
+                    @change="toggleLibrary(lib, $event.target.checked)">
+                </td>
+                <td>
+                  <button class="lib-del" title="Delete" @click="deleteLibrary(lib)">
+                    <i class="ti ti-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="libStatus" class="lib-status" :class="libStatusOk ? 'ok' : 'err'">[[ libStatus ]]</div>
+        </template>
+
+        <!-- Available tab -->
+        <template v-if="libTab === 'available'">
+          <div class="modal-section-title">Collections provided by <span style="font-family:var(--font-mono)">mundorum-noid-collections</span>. Click Add to register them.</div>
+          <div v-if="availableCollections.length === 0" class="lib-empty">
+            <span v-if="availableLoading">Loading…</span>
+            <span v-else>Package not installed or no manifest found.</span>
+          </div>
+          <div v-for="avail in availableCollections" :key="avail.name" class="lib-avail-item">
+            <div class="lib-avail-info">
+              <div class="lib-avail-name">[[ avail.name ]]</div>
+              <div class="lib-avail-desc">[[ avail.description ]]</div>
+            </div>
+            <span v-if="avail.pip_extra" class="lib-avail-extra">[lm]</span>
+            <span v-else class="lib-avail-extra" style="background:var(--c-tag-text-bg);color:var(--c-tag-text)">base</span>
+            <button class="lib-avail-add"
+              :disabled="isAlreadyInstalled(avail.name)"
+              @click="addFromManifest(avail)">
+              [[ isAlreadyInstalled(avail.name) ? 'Added' : 'Add' ]]
+            </button>
+          </div>
+          <div v-if="libStatus" class="lib-status" :class="libStatusOk ? 'ok' : 'err'">[[ libStatus ]]</div>
+        </template>
+
+        <!-- Add custom tab -->
+        <template v-if="libTab === 'add'">
+          <div class="modal-section-title">Register a custom Python collection.</div>
+          <div class="lib-form">
+            <div class="lib-form-row">
+              <div class="lib-field">
+                <label>Name</label>
+                <input class="lib-input" v-model="newLib.name" placeholder="My Collection">
+              </div>
+              <div class="lib-field">
+                <label>pip package (optional)</label>
+                <input class="lib-input mono" v-model="newLib.pip_package" placeholder="my-noid-pkg[extra]">
+              </div>
+            </div>
+            <div class="lib-field">
+              <label>Module paths — one per line</label>
+              <textarea class="lib-input mono" v-model="newLib.modulesText" rows="4"
+                placeholder="my_package.components.foo&#10;my_package.components.bar"
+                style="resize:vertical;line-height:1.6"></textarea>
+            </div>
+            <div class="lib-field">
+              <label>Description (optional)</label>
+              <input class="lib-input" v-model="newLib.description" placeholder="Short description">
+            </div>
+            <div class="lib-form-row" style="justify-content:flex-end">
+              <button class="lib-add-btn" :disabled="!newLib.name.trim() || !newLib.modulesText.trim() || libSaving"
+                @click="saveNewLibrary">
+                <i class="ti ti-plus"></i> [[ libSaving ? 'Saving…' : 'Add collection' ]]
+              </button>
+            </div>
+            <div v-if="libStatus" class="lib-status" :class="libStatusOk ? 'ok' : 'err'">[[ libStatus ]]</div>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Topbar -->
   <header id="topbar">
     <div id="logo"><i class="ti ti-circuit-diode"></i> noid</div>
@@ -789,6 +1124,7 @@ select.prop-val { padding: 3px 4px; }
     <button class="tb-btn ghost" @click="triggerUpload"><i class="ti ti-upload"></i> Upload</button>
     <input type="file" id="file-input" ref="fileInput" accept=".json" @change="onUpload">
     <button class="tb-btn ghost" @click="downloadScene"><i class="ti ti-download"></i> Download</button>
+    <button class="tb-btn ghost" @click="openLibraries"><i class="ti ti-packages"></i> Libraries</button>
     <button class="tb-btn" @click="playScene" :disabled="playLoading || scene.components.length === 0">
       <i class="ti" :class="playLoading ? 'ti-loader-2' : 'ti-player-play'"></i>
       [[ playLoading ? 'Running…' : 'Play' ]]
@@ -1338,6 +1674,146 @@ createApp({
       }
     }
 
+    /* ── Libraries modal ── */
+    const showLibraries     = ref(false);
+    const libTab            = ref('installed');
+    const libraries         = ref([]);
+    const availableCollections = ref([]);
+    const availableLoading  = ref(false);
+    const libStatus         = ref('');
+    const libStatusOk       = ref(true);
+    const libSaving         = ref(false);
+    const newLib = reactive({ name: '', pip_package: '', modulesText: '', description: '' });
+
+    function _libStatus(msg, ok = true) {
+      libStatus.value = msg;
+      libStatusOk.value = ok;
+      if (ok) setTimeout(() => { if (libStatus.value === msg) libStatus.value = ''; }, 3000);
+    }
+
+    async function fetchLibraries() {
+      try {
+        const r = await apiFetch('/api/libraries/');
+        libraries.value = await r.json();
+      } catch(e) {
+        _libStatus(`Failed to load libraries: ${e}`, false);
+      }
+    }
+
+    async function fetchAvailable() {
+      if (availableLoading.value) return;
+      availableLoading.value = true;
+      try {
+        const r = await apiFetch('/api/libraries/available/');
+        availableCollections.value = await r.json();
+      } catch(e) {
+        availableCollections.value = [];
+      } finally {
+        availableLoading.value = false;
+      }
+    }
+
+    function isAlreadyInstalled(name) {
+      return libraries.value.some(l => l.name === name);
+    }
+
+    async function toggleLibrary(lib, enabled) {
+      try {
+        const r = await apiFetch(`/api/libraries/${lib.id}/`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+        lib.enabled = enabled;
+        _libStatus(enabled ? `${lib.name} enabled` : `${lib.name} disabled`);
+        fetchCatalog();
+      } catch(e) {
+        _libStatus(`Failed: ${e}`, false);
+      }
+    }
+
+    async function deleteLibrary(lib) {
+      if (!confirm(`Delete "${lib.name}"?`)) return;
+      try {
+        const r = await apiFetch(`/api/libraries/${lib.id}/`, { method: 'DELETE' });
+        if (!r.ok) throw new Error(await r.text());
+        libraries.value = libraries.value.filter(l => l.id !== lib.id);
+        _libStatus(`${lib.name} deleted`);
+        fetchCatalog();
+      } catch(e) {
+        _libStatus(`Failed: ${e}`, false);
+      }
+    }
+
+    async function addFromManifest(avail) {
+      libSaving.value = true;
+      try {
+        const payload = {
+          name: avail.name,
+          pip_package: avail.pip_package
+            ? `mundorum-noid-collections[${avail.pip_extra}]`
+            : 'mundorum-noid-collections',
+          modules: avail.modules,
+          description: avail.description || '',
+          enabled: true,
+        };
+        const r = await apiFetch('/api/libraries/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) throw new Error(await r.text());
+        const created = await r.json();
+        libraries.value.push(created);
+        _libStatus(`${avail.name} added`);
+        fetchCatalog();
+      } catch(e) {
+        _libStatus(`Failed: ${e}`, false);
+      } finally {
+        libSaving.value = false;
+      }
+    }
+
+    async function saveNewLibrary() {
+      libSaving.value = true;
+      libStatus.value = '';
+      try {
+        const modules = newLib.modulesText
+          .split('\n').map(s => s.trim()).filter(Boolean);
+        const payload = {
+          name: newLib.name.trim(),
+          pip_package: newLib.pip_package.trim(),
+          modules,
+          description: newLib.description.trim(),
+          enabled: true,
+        };
+        const r = await apiFetch('/api/libraries/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) throw new Error(await r.text());
+        const created = await r.json();
+        libraries.value.push(created);
+        newLib.name = ''; newLib.pip_package = ''; newLib.modulesText = ''; newLib.description = '';
+        libTab.value = 'installed';
+        _libStatus(`${created.name} added`);
+        fetchCatalog();
+      } catch(e) {
+        _libStatus(`Failed: ${e}`, false);
+      } finally {
+        libSaving.value = false;
+      }
+    }
+
+    function openLibraries() {
+      showLibraries.value = true;
+      libTab.value = 'installed';
+      libStatus.value = '';
+      fetchLibraries();
+    }
+
     /* ── Catalog groups ── */
     const catalogGroups = computed(() => {
       const map = new Map();
@@ -1658,6 +2134,10 @@ createApp({
 
     return {
       auth, loginError, signOut,
+      showLibraries, libTab, libraries, availableCollections, availableLoading,
+      libStatus, libStatusOk, libSaving, newLib,
+      openLibraries, fetchAvailable, isAlreadyInstalled,
+      toggleLibrary, deleteLibrary, addFromManifest, saveNewLibrary,
       scene, layout, catalog, catalogErrors, catalogGroups,
       filename, view, selectedId, selectedComp, selectedCatalogEntry,
       selectedCompDescription, selectedInputNotices, selectedOutputNotices,
