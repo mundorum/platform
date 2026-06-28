@@ -9,7 +9,7 @@
         "text": "O dinossauro pulou na lama.",
         "label": "text"
       },
-      "publish": "text~slm/text/output;done~slm/text/done",
+      "publish": "text~text/output",
       "subscribe": "player/start~trigger"
     },
     {
@@ -21,7 +21,7 @@
         "pretty": true
       },
       "publish": "output~player/done",
-      "subscribe": "slm/text/output~show"
+      "subscribe": "text/output~show"
     }
   ]
 }

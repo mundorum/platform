@@ -743,6 +743,145 @@ select.prop-val { padding: 3px 4px; }
   text-align: left;
 }
 
+/* ── Resources modal ── */
+.res-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.res-chip-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.res-chip {
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 0.5px solid var(--c-border-strong);
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  color: var(--c-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+.res-chip.active { background: var(--c-accent); color: #fff; border-color: var(--c-accent); }
+.res-chip:hover:not(.active) { border-color: var(--c-accent); color: var(--c-accent); }
+.res-search {
+  flex: 1;
+  min-width: 160px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  padding: 5px 10px;
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  color: var(--c-text);
+  outline: none;
+}
+.res-search:focus { border-color: var(--c-accent); }
+.res-grid { display: flex; flex-direction: column; gap: 4px; }
+.res-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--c-border);
+  border-radius: 7px;
+  background: var(--c-bg);
+  transition: border-color 0.12s;
+}
+.res-row:hover { border-color: var(--c-border-strong); }
+.res-icon {
+  width: 32px; height: 32px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.res-icon.pdf    { background:#fde8e8; color:#c0392b; }
+.res-icon.image  { background:#e8f5e9; color:#388e3c; }
+.res-icon.csv    { background:#e3f2fd; color:#1976d2; }
+.res-icon.python { background:#ede8f5; color:#7b1fa2; }
+.res-icon.text   { background:#fff8e1; color:#f57f17; }
+.res-icon.other  { background:var(--c-accent-light); color:var(--c-accent); }
+.res-info { flex:1; min-width:0; }
+.res-name {
+  font-size: 12.5px; font-weight: 500; color: var(--c-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.res-addr {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--c-accent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+}
+.res-meta {
+  font-size: 10.5px; color: var(--c-muted); margin-top: 2px;
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.res-tag-pill {
+  background: var(--c-accent-light); color: var(--c-accent);
+  padding: 0 5px; border-radius: 4px; font-size: 10px;
+}
+.res-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.res-act-btn {
+  background: none;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 5px;
+  padding: 4px 7px;
+  color: var(--c-muted);
+  cursor: pointer;
+  font-size: 13px;
+  transition: color 0.12s, border-color 0.12s;
+  line-height: 1;
+}
+.res-act-btn:hover        { color: var(--c-accent); border-color: var(--c-accent); }
+.res-act-btn.danger:hover { color: #c0392b; border-color: #c0392b; }
+.res-act-btn.copied       { color: #2e7d32; border-color: #2e7d32; }
+.res-empty { padding: 36px 0; text-align: center; font-size: 13px; color: var(--c-muted); font-style: italic; }
+.upload-drop {
+  border: 1.5px dashed var(--c-border-strong);
+  border-radius: 10px;
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  color: var(--c-muted);
+  font-size: 13px;
+  margin-bottom: 14px;
+  background: var(--c-bg);
+}
+.upload-drop.dragover { border-color: var(--c-accent); background: var(--c-accent-light); }
+.upload-drop i { font-size: 28px; display: block; margin-bottom: 6px; color: var(--c-accent); }
+.upload-drop .drop-sub { font-size: 11.5px; margin-top: 4px; }
+.upload-form { display: flex; flex-direction: column; gap: 10px; }
+.upload-row { display: flex; gap: 8px; }
+.upload-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.upload-field label { font-size: 10.5px; font-weight: 600; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.upload-input {
+  font-family: var(--font-ui); font-size: 12.5px;
+  padding: 6px 10px;
+  background: var(--c-bg); border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px; color: var(--c-text); outline: none;
+  transition: border-color 0.15s;
+}
+.upload-input:focus { border-color: var(--c-accent); }
+.upload-input.mono { font-family: var(--font-mono); font-size: 12px; }
+.upload-addr-preview {
+  font-family: var(--font-mono); font-size: 11px; color: var(--c-accent);
+  padding: 3px 6px; background: var(--c-accent-light); border-radius: 4px;
+  margin-top: 2px; word-break: break-all;
+}
+.upload-submit {
+  padding: 8px 20px; background: var(--c-accent); color: #fff;
+  border: none; border-radius: 6px;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: opacity 0.15s; align-self: flex-end;
+  display: flex; align-items: center; gap: 6px;
+}
+.upload-submit:hover { opacity: 0.85; }
+.upload-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+.res-status     { font-size: 11.5px; color: var(--c-muted); margin-top: 6px; font-family: var(--font-mono); }
+.res-status.ok  { color: #2e7d32; }
+.res-status.err { color: #c0392b; }
+
 /* ── Libraries modal ── */
 .modal-backdrop {
   position: fixed;
@@ -1000,6 +1139,167 @@ select.prop-val { padding: 3px 4px; }
     </div>
   </div>
 
+  <!-- Resources modal -->
+  <div class="modal-backdrop" v-if="showResources">
+    <div class="modal-card" style="width:min(800px,96vw)">
+      <div class="modal-header">
+        <div class="modal-title"><i class="ti ti-files"></i> Resources</div>
+        <button class="modal-close" @click="showResources=false"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Tabs -->
+        <div class="lib-tabs">
+          <button class="lib-tab" :class="{active:resTab==='browse'}" @click="resTab='browse';fetchResources()">
+            <i class="ti ti-list-search"></i> Browse
+          </button>
+          <button class="lib-tab" :class="{active:resTab==='upload'}" @click="resTab='upload';resStatus=''">
+            <i class="ti ti-upload"></i> Upload
+          </button>
+        </div>
+
+        <!-- ── Browse tab ─────────────────────────────────────────────── -->
+        <template v-if="resTab==='browse'">
+          <div class="res-filter-row">
+            <!-- scope chips -->
+            <div class="res-chip-group">
+              <button class="res-chip" :class="{active:resFilterScope==null}"
+                @click="resFilterScope=null;fetchResources()">All</button>
+              <button class="res-chip" :class="{active:resFilterScope==='shared'}"
+                @click="resFilterScope='shared';fetchResources()">Shared</button>
+              <button class="res-chip" :class="{active:resFilterScope==='scene'}"
+                @click="resFilterScope='scene';fetchResources()">Scene</button>
+            </div>
+            <!-- type chips -->
+            <div class="res-chip-group">
+              <button v-for="t in resTypes" :key="t.v" class="res-chip"
+                :class="{active:resFilterType===t.v}"
+                @click="resFilterType=(resFilterType===t.v?null:t.v);fetchResources()">
+                [[ t.l ]]
+              </button>
+            </div>
+            <!-- search -->
+            <input class="res-search" v-model="resSearch"
+              placeholder="search by name or slug…"
+              @input="fetchResources()">
+          </div>
+
+          <div v-if="resLoading" class="res-empty">Loading…</div>
+          <div v-else-if="resources.length===0" class="res-empty">No resources found.</div>
+          <div v-else class="res-grid">
+            <div v-for="r in resources" :key="r.id" class="res-row">
+              <div class="res-icon" :class="r.resource_type">
+                <i class="ti" :class="resTypeIcon(r.resource_type)"></i>
+              </div>
+              <div class="res-info">
+                <div class="res-name">[[ r.display_name ]]</div>
+                <div class="res-addr">[[ r.address ]]</div>
+                <div class="res-meta">
+                  <span>[[ r.size_human ]]</span>
+                  <span>[[ r.scope ]]</span>
+                  <span v-for="tag in r.tags" :key="tag" class="res-tag-pill">[[ tag ]]</span>
+                </div>
+              </div>
+              <div class="res-actions">
+                <button class="res-act-btn" :class="{copied:resCopiedId===r.id}"
+                  :title="resCopiedId===r.id ? 'Copied!' : 'Copy address'"
+                  @click="copyAddress(r)">
+                  <i class="ti" :class="resCopiedId===r.id ? 'ti-check' : 'ti-copy'"></i>
+                </button>
+                <a class="res-act-btn" :href="`/api/resources/${r.id}/download/`"
+                  :download="r.display_name" title="Download">
+                  <i class="ti ti-download"></i>
+                </a>
+                <button class="res-act-btn danger" title="Delete" @click="deleteResource(r)">
+                  <i class="ti ti-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-if="resStatus" class="res-status" :class="resStatusOk?'ok':'err'">[[ resStatus ]]</div>
+        </template>
+
+        <!-- ── Upload tab ─────────────────────────────────────────────── -->
+        <template v-if="resTab==='upload'">
+          <!-- Drop zone -->
+          <div class="upload-drop"
+            :class="{dragover:resDragover}"
+            @click="$refs.resFileInput.click()"
+            @dragover.prevent="resDragover=true"
+            @dragleave="resDragover=false"
+            @drop.prevent="onResDrop($event)">
+            <i class="ti ti-cloud-upload"></i>
+            <span v-if="!resUpload.file">Drop a file here or click to browse</span>
+            <span v-else>[[ resUpload.file.name ]]</span>
+            <div class="drop-sub">Images, PDFs, CSVs, text files, Python scripts, …</div>
+          </div>
+          <input type="file" ref="resFileInput" style="display:none"
+            @change="onResFileChange($event)">
+
+          <div class="upload-form" v-if="resUpload.file">
+            <!-- scope + scene -->
+            <div class="upload-row">
+              <div class="upload-field">
+                <label>Scope</label>
+                <select class="upload-input" v-model="resUpload.scope"
+                  @change="resUpload.scene_id=''">
+                  <option value="shared">Shared — available to all scenes</option>
+                  <option value="scene">Scene — stored inside a specific scene</option>
+                </select>
+              </div>
+              <div class="upload-field" v-if="resUpload.scope==='scene'">
+                <label>Scene</label>
+                <select class="upload-input" v-model="resUpload.scene_id">
+                  <option value="">— select a scene —</option>
+                  <option v-for="s in sceneList" :key="s.id" :value="s.id">[[ s.title ]]</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- slug + display name -->
+            <div class="upload-row">
+              <div class="upload-field" style="flex:2">
+                <label>Slug path</label>
+                <input class="upload-input mono" v-model="resUpload.slug"
+                  placeholder="datasets/census-2024"
+                  @input="resStatus=''">
+                <div class="upload-addr-preview" v-if="resUpload.slug">
+                  [[ resUpload.scope ]]:[[ resUpload.slug ]][[ resUpload.ext ]]
+                </div>
+              </div>
+              <div class="upload-field" style="flex:2">
+                <label>Display name</label>
+                <input class="upload-input" v-model="resUpload.display_name">
+              </div>
+            </div>
+
+            <!-- tags -->
+            <div class="upload-field">
+              <label>Tags (comma-separated)</label>
+              <input class="upload-input" v-model="resUpload.tagsText"
+                placeholder="pdf, report, 2024">
+            </div>
+
+            <!-- description -->
+            <div class="upload-field">
+              <label>Description</label>
+              <input class="upload-input" v-model="resUpload.description">
+            </div>
+
+            <button class="upload-submit"
+              :disabled="!resUpload.slug.trim()||resUploading||(resUpload.scope==='scene'&&!resUpload.scene_id)"
+              @click="submitUpload">
+              <i class="ti" :class="resUploading?'ti-loader-2':'ti-upload'"></i>
+              [[ resUploading ? 'Uploading…' : 'Upload' ]]
+            </button>
+            <div v-if="resStatus" class="res-status" :class="resStatusOk?'ok':'err'">[[ resStatus ]]</div>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Libraries modal -->
   <div class="modal-backdrop" v-if="showLibraries">
     <div class="modal-card">
@@ -1124,6 +1424,7 @@ select.prop-val { padding: 3px 4px; }
     <button class="tb-btn ghost" @click="triggerUpload"><i class="ti ti-upload"></i> Upload</button>
     <input type="file" id="file-input" ref="fileInput" accept=".json" @change="onUpload">
     <button class="tb-btn ghost" @click="downloadScene"><i class="ti ti-download"></i> Download</button>
+    <button class="tb-btn ghost" @click="openResources"><i class="ti ti-files"></i> Resources</button>
     <button class="tb-btn ghost" @click="openLibraries"><i class="ti ti-packages"></i> Libraries</button>
     <button class="tb-btn" @click="playScene" :disabled="playLoading || scene.components.length === 0">
       <i class="ti" :class="playLoading ? 'ti-loader-2' : 'ti-player-play'"></i>
@@ -1674,6 +1975,155 @@ createApp({
       }
     }
 
+    /* ── Resources modal ── */
+    const showResources   = ref(false);
+    const resTab          = ref('browse');
+    const resources       = ref([]);
+    const resLoading      = ref(false);
+    const resStatus       = ref('');
+    const resStatusOk     = ref(true);
+    const resCopiedId     = ref(null);
+    const resDragover     = ref(false);
+    const resUploading    = ref(false);
+    const resFilterScope  = ref(null);
+    const resFilterType   = ref(null);
+    const resSearch       = ref('');
+    const sceneList       = ref([]);
+
+    const resTypes = [
+      { v: 'pdf',    l: 'PDF' },
+      { v: 'image',  l: 'Image' },
+      { v: 'csv',    l: 'CSV' },
+      { v: 'python', l: 'Python' },
+      { v: 'text',   l: 'Text' },
+      { v: 'other',  l: 'Other' },
+    ];
+
+    const resTypeIcon = (t) => ({
+      pdf:    'ti-file-type-pdf',
+      image:  'ti-photo',
+      csv:    'ti-table',
+      python: 'ti-brand-python',
+      text:   'ti-file-text',
+      other:  'ti-file',
+    }[t] || 'ti-file');
+
+    const resUpload = reactive({
+      file: null, ext: '', slug: '', display_name: '',
+      scope: 'shared', scene_id: '', tagsText: '', description: '',
+    });
+
+    function _resSlugify(name) {
+      return name.toLowerCase()
+        .replace(/[_\s]+/g, '-')
+        .replace(/[^a-z0-9/\-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    function _resStatus(msg, ok = true) {
+      resStatus.value = msg;
+      resStatusOk.value = ok;
+      if (ok) setTimeout(() => { if (resStatus.value === msg) resStatus.value = ''; }, 3500);
+    }
+
+    function _setResFile(file) {
+      if (!file) return;
+      resUpload.file = file;
+      const m = file.name.match(/(\.[a-zA-Z0-9]+)$/);
+      resUpload.ext  = m ? m[1].toLowerCase() : '';
+      const bare = m ? file.name.slice(0, -m[1].length) : file.name;
+      resUpload.slug  = _resSlugify(bare);
+      resUpload.display_name = file.name;
+    }
+
+    function onResFileChange(e) { _setResFile(e.target.files[0]); }
+    function onResDrop(e) {
+      resDragover.value = false;
+      _setResFile(e.dataTransfer.files[0]);
+    }
+
+    async function fetchResources() {
+      resLoading.value = true;
+      try {
+        const params = new URLSearchParams();
+        if (resFilterScope.value) params.set('scope', resFilterScope.value);
+        if (resFilterType.value)  params.set('type',  resFilterType.value);
+        if (resSearch.value)      params.set('search', resSearch.value);
+        const r = await apiFetch(`/api/resources/?${params}`);
+        resources.value = await r.json();
+      } catch(e) {
+        _resStatus(`Failed to load resources: ${e}`, false);
+      } finally {
+        resLoading.value = false;
+      }
+    }
+
+    async function fetchSceneList() {
+      try {
+        const r = await apiFetch('/api/scenes/');
+        sceneList.value = await r.json();
+      } catch(_) { sceneList.value = []; }
+    }
+
+    async function copyAddress(r) {
+      await navigator.clipboard.writeText(r.address).catch(() => {});
+      resCopiedId.value = r.id;
+      setTimeout(() => { resCopiedId.value = null; }, 1800);
+    }
+
+    async function deleteResource(r) {
+      if (!confirm(`Delete "${r.display_name}"?\nThis will remove the file from disk.`)) return;
+      try {
+        const resp = await apiFetch(`/api/resources/${r.id}/`, { method: 'DELETE' });
+        if (!resp.ok) throw new Error(await resp.text());
+        resources.value = resources.value.filter(x => x.id !== r.id);
+        _resStatus(`${r.display_name} deleted`);
+      } catch(e) { _resStatus(`Delete failed: ${e}`, false); }
+    }
+
+    async function submitUpload() {
+      resUploading.value = true;
+      resStatus.value = '';
+      try {
+        const tags = resUpload.tagsText.split(',').map(s => s.trim()).filter(Boolean);
+        const fd = new FormData();
+        fd.append('file',         resUpload.file);
+        fd.append('scope',        resUpload.scope);
+        fd.append('slug',         resUpload.slug.trim());
+        fd.append('display_name', resUpload.display_name.trim());
+        fd.append('tags',         JSON.stringify(tags));
+        fd.append('description',  resUpload.description.trim());
+        if (resUpload.scope === 'scene' && resUpload.scene_id)
+          fd.append('scene_id', resUpload.scene_id);
+
+        const headers = {};
+        if (auth.token) headers['Authorization'] = `Token ${auth.token}`;
+        const resp = await fetch('/api/resources/', { method: 'POST', headers, body: fd });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.error || resp.statusText);
+        }
+        const created = await resp.json();
+        _resStatus(`Uploaded: ${created.address}`);
+        // reset form
+        resUpload.file = null; resUpload.slug = ''; resUpload.display_name = '';
+        resUpload.tagsText = ''; resUpload.description = ''; resUpload.scene_id = '';
+        // switch to browse and refresh
+        resTab.value = 'browse';
+        fetchResources();
+      } catch(e) { _resStatus(`Upload failed: ${e}`, false); }
+      finally { resUploading.value = false; }
+    }
+
+    function openResources() {
+      showResources.value = true;
+      resTab.value = 'browse';
+      resStatus.value = '';
+      fetchResources();
+      fetchSceneList();
+    }
+
     /* ── Libraries modal ── */
     const showLibraries     = ref(false);
     const libTab            = ref('installed');
@@ -2134,6 +2584,11 @@ createApp({
 
     return {
       auth, loginError, signOut,
+      showResources, resTab, resources, resLoading, resStatus, resStatusOk,
+      resCopiedId, resDragover, resUploading, resFilterScope, resFilterType,
+      resSearch, resTypes, resTypeIcon, resUpload, sceneList,
+      openResources, fetchResources, copyAddress, deleteResource,
+      onResFileChange, onResDrop, submitUpload,
       showLibraries, libTab, libraries, availableCollections, availableLoading,
       libStatus, libStatusOk, libSaving, newLib,
       openLibraries, fetchAvailable, isAlreadyInstalled,

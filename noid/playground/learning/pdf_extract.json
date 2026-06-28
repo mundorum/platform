@@ -1,0 +1,42 @@
+{
+  "title": "New Scene",
+  "imports": [],
+  "components": [
+    {
+      "type": "pdf:ocr",
+      "id": "ocr_1",
+      "properties": {
+        "input_file": "shared:books/ulisses-james-joyce.pdf",
+        "output_file": "shared:books/ulisses-james-joyce.pdf",
+        "language": "eng",
+        "deskew": true,
+        "rotate_pages": true,
+        "force_ocr": true
+      },
+      "publish": "done~pdf/ocr/done",
+      "subscribe": "player/start~ocr"
+    },
+    {
+      "type": "pdf:extractor-pymupdf",
+      "id": "extractor_pymupdf_1",
+      "properties": {
+        "input_file": "",
+        "output_mode": "complete"
+      },
+      "publish": "text~pdf/text",
+      "subscribe": "pdf/ocr/done~extract"
+    },
+    {
+      "type": "data:file-writer",
+      "id": "file_writer_1",
+      "properties": {
+        "output_file": "shared:books/ulisses-james-joyce.pdf",
+        "encoding": "utf-8",
+        "append": false,
+        "page_separator": "\n\n"
+      },
+      "publish": "written~player/done",
+      "subscribe": "pdf/text~"
+    }
+  ]
+}

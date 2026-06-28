@@ -16,4 +16,5 @@ urlpatterns = [
     path('api/', include('editor.urls')),
     path('api/scenes/', include('scenes.urls')),
     path('api/libraries/', include('libraries.urls')),
+    path('api/resources/', include('resources.urls')),
 ]

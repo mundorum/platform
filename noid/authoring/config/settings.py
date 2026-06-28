@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'editor',
     'scenes',
     'libraries',
+    'resources',
 ]
 
 MIDDLEWARE = [
@@ -106,6 +107,12 @@ INITIAL_MANAGER_EMAIL = os.environ.get('INITIAL_MANAGER_EMAIL', '')
 SCENE_PACKAGES_DIR = os.environ.get(
     'SCENE_PACKAGES_DIR',
     str(BASE_DIR.parent / 'scene_packages'),
+)
+
+# ── shared resource store ─────────────────────────────────────────────────────
+SHARED_RESOURCES_DIR = os.environ.get(
+    'SHARED_RESOURCES_DIR',
+    str(BASE_DIR.parent / 'shared_resources'),
 )
 
 # ── processing machine ────────────────────────────────────────────────────────
