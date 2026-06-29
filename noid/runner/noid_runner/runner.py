@@ -37,7 +37,7 @@ def _subprocess_env(extra: Optional[dict] = None) -> dict:
 def run_scene(
     scene: dict,
     catalog: list[dict],
-    timeout: int = 30,
+    timeout: Optional[int] = 30,
     scene_dir: Optional[Path] = None,
 ) -> dict:
     """
@@ -59,16 +59,18 @@ def run_scene(
         json.dump(runnable, fh, indent=2)
         scene_path = fh.name
 
+    timeout_arg = 'None' if timeout is None else repr(timeout)
     script = (
         "from noid.core.player import NoidPlayer; "
-        f"NoidPlayer.play(r'{scene_path}', timeout={timeout})"
+        f"NoidPlayer.play(r'{scene_path}', timeout={timeout_arg})"
     )
+    proc_timeout = None if timeout is None else timeout + 10
     try:
         proc = subprocess.run(
             [sys.executable, '-c', script],
             capture_output=True,
             text=True,
-            timeout=timeout + 10,
+            timeout=proc_timeout,
             cwd=str(scene_dir) if scene_dir is not None else None,
             env=_subprocess_env(),
         )
@@ -88,7 +90,7 @@ def run_scene(
 def stream_scene(
     scene: dict,
     catalog: list[dict],
-    timeout: int = 60,
+    timeout: Optional[int] = 60,
     verbose: bool = False,
     scene_dir: Optional[Path] = None,
 ) -> Generator[str, None, None]:
@@ -121,10 +123,11 @@ def stream_scene(
         "); "
         if verbose else ""
     )
+    timeout_arg = 'None' if timeout is None else repr(timeout)
     script = (
         f"{log_init}"
         "from noid.core.player import NoidPlayer; "
-        f"NoidPlayer.play(r'{scene_path}', timeout={timeout})"
+        f"NoidPlayer.play(r'{scene_path}', timeout={timeout_arg})"
     )
     proc = subprocess.Popen(
         [sys.executable, '-u', '-c', script],
@@ -135,13 +138,15 @@ def stream_scene(
         cwd=str(scene_dir) if scene_dir is not None else None,
         env=_subprocess_env(),
     )
-    timer = threading.Timer(timeout + 5, proc.kill)
-    timer.start()
+    timer = threading.Timer(timeout + 5, proc.kill) if timeout is not None else None
+    if timer is not None:
+        timer.start()
     try:
         for line in proc.stdout:
             yield line
         proc.wait()
         yield f'\n▶ exited with code {proc.returncode}\n'
     finally:
-        timer.cancel()
+        if timer is not None:
+            timer.cancel()
         Path(scene_path).unlink(missing_ok=True)

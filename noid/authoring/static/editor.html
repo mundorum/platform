@@ -679,6 +679,86 @@ select.prop-val { padding: 3px 4px; }
 #exec-output pre .line-log  { color: #7a9e78; }
 #exec-output pre .line-exit { color: #9a8e78; font-style: italic; }
 
+/* ── Timeout control (topbar) ── */
+#timeout-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--c-muted);
+}
+#timeout-ctrl > i { font-size: 13px; }
+#timeout-select {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--c-muted);
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 5px;
+  padding: 3px 5px;
+  cursor: pointer;
+  outline: none;
+  max-width: 90px;
+}
+#timeout-select:focus { border-color: var(--c-accent); color: var(--c-text); }
+.timeout-hms {
+  width: 3ch;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-text);
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 4px;
+  padding: 2px 2px;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.timeout-hms::-webkit-inner-spin-button { display: none; }
+.timeout-hms:focus { border-color: var(--c-accent); }
+.timeout-hms-sep { font-size: 11px; color: var(--c-muted); font-family: var(--font-ui); }
+
+/* ── Pre-flight warning ── */
+#play-warning {
+  padding: 10px 14px;
+  background: rgba(120, 80, 10, 0.10);
+  border-bottom: 0.5px solid rgba(200,160,60,0.20);
+  flex-shrink: 0;
+}
+.pw-title {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #c8a84a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.pw-list {
+  margin: 0 0 10px 16px;
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #9a8e78;
+  line-height: 1.8;
+}
+.pw-actions { display: flex; gap: 6px; }
+.pw-btn {
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 0.5px solid rgba(200,160,60,0.35);
+  transition: background 0.12s, color 0.12s;
+}
+.pw-btn.cancel  { background: none; color: #9a8e78; }
+.pw-btn.cancel:hover { color: #c8c0a8; }
+.pw-btn.proceed { background: rgba(120,80,10,0.22); color: #c8a84a; }
+.pw-btn.proceed:hover { background: rgba(120,80,10,0.36); }
+
 /* ── file input (hidden) ── */
 #file-input { display: none; }
 
@@ -1426,6 +1506,24 @@ select.prop-val { padding: 3px 4px; }
     <button class="tb-btn ghost" @click="downloadScene"><i class="ti ti-download"></i> Download</button>
     <button class="tb-btn ghost" @click="openResources"><i class="ti ti-files"></i> Resources</button>
     <button class="tb-btn ghost" @click="openLibraries"><i class="ti ti-packages"></i> Libraries</button>
+    <div id="timeout-ctrl" title="Run timeout">
+      <i class="ti ti-clock"></i>
+      <select id="timeout-select" v-model="timeoutMode" @change="onTimeoutModeChange">
+        <option value="short">1 min</option>
+        <option value="medium">10 min</option>
+        <option value="long">1 h</option>
+        <option value="none">No limit</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <template v-if="timeoutMode === 'custom'">
+        <input type="number" class="timeout-hms" v-model.number="timeoutH" min="0" max="99" @change="onTimeoutHmsChange" title="Hours">
+        <span class="timeout-hms-sep">h</span>
+        <input type="number" class="timeout-hms" v-model.number="timeoutM" min="0" max="59" @change="onTimeoutHmsChange" title="Minutes">
+        <span class="timeout-hms-sep">m</span>
+        <input type="number" class="timeout-hms" v-model.number="timeoutS" min="0" max="59" @change="onTimeoutHmsChange" title="Seconds">
+        <span class="timeout-hms-sep">s</span>
+      </template>
+    </div>
     <button class="tb-btn" @click="playScene" :disabled="playLoading || scene.components.length === 0">
       <i class="ti" :class="playLoading ? 'ti-loader-2' : 'ti-player-play'"></i>
       [[ playLoading ? 'Running…' : 'Play' ]]
@@ -1610,6 +1708,17 @@ select.prop-val { padding: 3px 4px; }
           </label>
           <button class="exec-btn" title="Clear output" @click="execText = ''"><i class="ti ti-eraser"></i></button>
           <button class="exec-btn" title="Close panel" @click="showExecPanel = false"><i class="ti ti-x"></i></button>
+        </div>
+      </div>
+      <!-- Pre-flight warning -->
+      <div id="play-warning" v-if="showPlayWarning">
+        <div class="pw-title"><i class="ti ti-alert-triangle"></i> Scene may not run as expected</div>
+        <ul class="pw-list">
+          <li v-for="w in playWarnings" :key="w">[[ w ]]</li>
+        </ul>
+        <div class="pw-actions">
+          <button class="pw-btn cancel" @click="showPlayWarning = false">Cancel</button>
+          <button class="pw-btn proceed" @click="proceedPlay">Run anyway</button>
         </div>
       </div>
       <div id="exec-output" ref="execOutput">
@@ -1807,7 +1916,7 @@ createApp({
   delimiters: ['[[', ']]'],
   setup() {
     /* ── State ── */
-    const scene    = ref({ title: 'New Scene', imports: [], components: [] });
+    const scene    = ref({ title: 'New Scene', imports: [], components: [], timeout: 'medium' });
     const layout   = ref({});             // { [id]: {x, y} }
     const catalog  = ref([]);
     const catalogErrors = ref([]);
@@ -1826,6 +1935,16 @@ createApp({
     const execCode       = ref(0);
     const verbosePlay    = ref(false);
     const execOutput     = ref(null);
+
+    /* ── Timeout UI state ── */
+    const timeoutMode = ref('medium');   // 'short'|'medium'|'long'|'none'|'custom'
+    const timeoutH    = ref(0);
+    const timeoutM    = ref(0);
+    const timeoutS    = ref(0);
+
+    /* ── Pre-flight warning ── */
+    const showPlayWarning = ref(false);
+    const playWarnings    = ref([]);
 
     /* ── Auth ── */
     const auth       = reactive({ token: localStorage.getItem('noid_token'), user: null });
@@ -2543,12 +2662,66 @@ createApp({
       URL.revokeObjectURL(url);
     }
 
+    /* ── Timeout helpers ── */
+    let _syncingTimeout = false;
+
+    function syncTimeoutToScene() {
+      _syncingTimeout = true;
+      if (timeoutMode.value === 'none') {
+        scene.value.timeout = null;
+      } else if (timeoutMode.value === 'custom') {
+        const secs = timeoutH.value * 3600 + timeoutM.value * 60 + timeoutS.value;
+        scene.value.timeout = secs > 0 ? secs : null;
+      } else {
+        scene.value.timeout = timeoutMode.value;
+      }
+      nextTick(() => { _syncingTimeout = false; });
+    }
+
+    function syncTimeoutFromScene() {
+      const t = scene.value.timeout;
+      if (t === null || t === undefined || t === 'none') {
+        timeoutMode.value = 'none';
+        timeoutH.value = 0; timeoutM.value = 0; timeoutS.value = 0;
+      } else if (t === 'short' || t === 'medium' || t === 'long') {
+        timeoutMode.value = t;
+        timeoutH.value = 0; timeoutM.value = 0; timeoutS.value = 0;
+      } else if (typeof t === 'number' && t > 0) {
+        timeoutMode.value = 'custom';
+        timeoutH.value = Math.floor(t / 3600);
+        timeoutM.value = Math.floor((t % 3600) / 60);
+        timeoutS.value = t % 60;
+      } else {
+        timeoutMode.value = 'medium';
+        timeoutH.value = 0; timeoutM.value = 0; timeoutS.value = 0;
+      }
+    }
+
+    watch(() => scene.value.timeout, () => {
+      if (!_syncingTimeout) syncTimeoutFromScene();
+    });
+
+    function onTimeoutModeChange() { syncTimeoutToScene(); }
+    function onTimeoutHmsChange()  { syncTimeoutToScene(); }
+
+    /* ── Pre-flight check ── */
+    function getPlayWarnings() {
+      const comps = scene.value.components || [];
+      const hasStart = comps.some(c => (c.subscribe || '').includes('player/start~'));
+      const hasDone  = comps.some(c => (c.publish   || '').includes('~player/done'));
+      const w = [];
+      if (!hasStart) w.push('No component subscribes to player/start — the scene will not start automatically.');
+      if (!hasDone)  w.push('No component publishes player/done — it will run until the timeout elapses.');
+      return w;
+    }
+
     /* ── Play (streaming) ── */
-    async function playScene() {
-      showExecPanel.value = true;
-      playLoading.value   = true;
-      execDone.value      = false;
-      execText.value      = '';
+    async function _doPlayScene() {
+      showExecPanel.value   = true;
+      showPlayWarning.value = false;
+      playLoading.value     = true;
+      execDone.value        = false;
+      execText.value        = '';
 
       const url = `/api/play/stream/?verbose=${verbosePlay.value ? '1' : '0'}`;
       try {
@@ -2582,6 +2755,19 @@ createApp({
       }
     }
 
+    function playScene() {
+      const warnings = getPlayWarnings();
+      if (warnings.length > 0) {
+        playWarnings.value    = warnings;
+        showPlayWarning.value = true;
+        showExecPanel.value   = true;
+        return;
+      }
+      _doPlayScene();
+    }
+
+    function proceedPlay() { _doPlayScene(); }
+
     return {
       auth, loginError, signOut,
       showResources, resTab, resources, resLoading, resStatus, resStatusOk,
@@ -2602,6 +2788,9 @@ createApp({
       editSubPairs, editPubPairs,
       playLoading, showExecPanel, execText, execHighlighted,
       execDone, execCode, verbosePlay, execOutput,
+      timeoutMode, timeoutH, timeoutM, timeoutS,
+      onTimeoutModeChange, onTimeoutHmsChange,
+      showPlayWarning, playWarnings, proceedPlay,
       fileInput,
       addComponent, deleteComponent,
       onIdChange, setProp,

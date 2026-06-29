@@ -1,5 +1,6 @@
 """Django views for the noid scene editor API."""
 import json
+from typing import Optional
 
 from django.conf import settings as django_settings
 from django.http import JsonResponse, StreamingHttpResponse
@@ -10,6 +11,24 @@ from django.views.decorators.csrf import csrf_exempt
 from noid_runner.catalog import load_modules, build_catalog, get_load_errors
 
 from .runner import run_scene, stream_scene
+
+
+_TIMEOUT_PRESETS: dict[str, int] = {'short': 60, 'medium': 600, 'long': 3600}
+
+
+def _resolve_timeout(value) -> Optional[int]:
+    """Resolve a scene timeout field to seconds, or None for no timeout.
+
+    Accepts preset strings ('short', 'medium', 'long', 'none'), None, or an
+    integer/float number of seconds.  Falls back to 600 s for unrecognised values.
+    """
+    if value is None or value == 'none':
+        return None
+    if isinstance(value, str):
+        return _TIMEOUT_PRESETS.get(value, 600)
+    if isinstance(value, (int, float)) and value > 0:
+        return int(value)
+    return 600
 
 
 def _inject_namespaces(scene: dict) -> dict:
@@ -70,7 +89,7 @@ class PlayView(View):
             return JsonResponse({'error': f'Invalid JSON: {exc}'}, status=400)
 
         catalog, _ = _load_enabled_modules()
-        timeout = min(int(request.GET.get('timeout', 30)), 300)
+        timeout = _resolve_timeout(scene.get('timeout'))
         result = run_scene(_inject_namespaces(scene), catalog, timeout=timeout)
         return JsonResponse(result)
 
@@ -88,7 +107,7 @@ class PlayStreamView(View):
             return StreamingHttpResponse(_err(), content_type='text/plain; charset=utf-8')
 
         catalog, _ = _load_enabled_modules()
-        timeout = min(int(request.GET.get('timeout', 600)), 3600)
+        timeout = _resolve_timeout(scene.get('timeout'))
         verbose = request.GET.get('verbose', '1') == '1'
 
         return StreamingHttpResponse(
