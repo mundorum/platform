@@ -1,4 +1,6 @@
+import hashlib
 import json
+import mimetypes
 import re
 import shutil
 import uuid
@@ -35,12 +37,126 @@ def _enabled_modules() -> list[str]:
         return []
 
 
+# ── post-run resource scanner ─────────────────────────────────────────────────
+
+_SCAN_SLUG_UNSAFE = re.compile(r'[^a-z0-9/\-]')
+_SCAN_MULTI_DASH  = re.compile(r'-{2,}')
+
+
+def _scan_normalize_slug(name: str) -> str:
+    s = name.lower().replace('_', '-').replace(' ', '-')
+    s = _SCAN_SLUG_UNSAFE.sub('', s)
+    s = _SCAN_MULTI_DASH.sub('-', s)
+    return s.strip('-/')
+
+
+def _scan_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, 'rb') as fh:
+        for chunk in iter(lambda: fh.read(65536), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _scan_detect_type(mime: str, ext: str) -> str:
+    from resources.models import Resource
+    ext = ext.lower()
+    if ext == '.pdf' or mime == 'application/pdf':
+        return Resource.TYPE_PDF
+    if mime.startswith('image/'):
+        return Resource.TYPE_IMAGE
+    if ext in ('.csv', '.tsv') or mime in ('text/csv', 'application/vnd.ms-excel'):
+        return Resource.TYPE_CSV
+    if ext == '.py' or mime in ('text/x-python', 'application/x-python'):
+        return Resource.TYPE_PYTHON
+    if mime.startswith('text/') or ext in ('.txt', '.md', '.rst'):
+        return Resource.TYPE_TEXT
+    return Resource.TYPE_OTHER
+
+
+def _scan_new_resources(scene: 'Scene | None', user) -> int:
+    """Scan scene data dir and shared dir for files not yet in Resource DB.
+
+    Creates Resource records for any newly discovered files.
+    Returns the count of new records created.
+    """
+    from resources.models import Resource
+
+    dirs_to_scan: list[tuple[Path, str, 'Scene | None']] = []
+
+    if scene and scene.package_dir:
+        data_dir = Path(scene.package_dir) / 'data'
+        if data_dir.exists():
+            dirs_to_scan.append((data_dir, Resource.SCOPE_SCENE, scene))
+
+    shared_root = Path(settings.SHARED_RESOURCES_DIR)
+    if shared_root.exists():
+        dirs_to_scan.append((shared_root, Resource.SCOPE_SHARED, None))
+
+    if not dirs_to_scan:
+        return 0
+
+    known_paths = set(Resource.objects.values_list('storage_path', flat=True))
+    owner = user if (user and hasattr(user, 'is_authenticated') and user.is_authenticated) else None
+    created = 0
+
+    for root_dir, scope, scene_obj in dirs_to_scan:
+        for file_path in root_dir.rglob('*'):
+            if not file_path.is_file():
+                continue
+            abs_path = str(file_path)
+            if abs_path in known_paths:
+                continue
+
+            ext   = file_path.suffix.lower()
+            bare  = file_path.stem
+            rel_parts = list(file_path.relative_to(root_dir).parts[:-1])
+            slug_parts = rel_parts + [bare]
+            slug = '/'.join(_scan_normalize_slug(p) for p in slug_parts if p)
+            if not slug:
+                slug = _scan_normalize_slug(bare) or 'file'
+
+            mime  = mimetypes.guess_type(abs_path)[0] or ''
+            rtype = _scan_detect_type(mime, ext)
+            size  = file_path.stat().st_size
+            sha   = _scan_sha256(file_path)
+
+            base_slug = slug
+            for suffix in range(200):
+                candidate = base_slug if suffix == 0 else f'{base_slug}-{suffix}'
+                try:
+                    Resource.objects.create(
+                        slug=candidate,
+                        extension=ext,
+                        scope=scope,
+                        scene=scene_obj,
+                        display_name=file_path.name,
+                        resource_type=rtype,
+                        mime_type=mime,
+                        storage_path=abs_path,
+                        size_bytes=size,
+                        sha256=sha,
+                        created_by=owner,
+                    )
+                    known_paths.add(abs_path)
+                    created += 1
+                    break
+                except Exception:
+                    continue
+
+    return created
+
+
+# ── Scene viewset ─────────────────────────────────────────────────────────────
+
 class SceneViewSet(viewsets.ModelViewSet):
     queryset = Scene.objects.all()
     serializer_class = SceneSerializer
 
     def perform_create(self, serializer):
-        scene = serializer.save()
+        scene = serializer.save(
+            owner=self.request.user if self.request.user.is_authenticated else None,
+        )
         _sync_package(scene)
 
     def perform_update(self, serializer):
@@ -51,6 +167,40 @@ class SceneViewSet(viewsets.ModelViewSet):
         if instance.package_dir:
             shutil.rmtree(instance.package_dir, ignore_errors=True)
         instance.delete()
+
+    # ── user / public scene lists ─────────────────────────────────────────────
+
+    @action(detail=False, methods=['get'])
+    def mine(self, request):
+        """GET /api/scenes/mine/ — scenes owned by the current user."""
+        if not request.user.is_authenticated:
+            return Response([])
+        qs = Scene.objects.filter(owner=request.user).order_by('-updated_at')
+        return Response(SceneSerializer(qs, many=True).data)
+
+    @action(detail=False, methods=['get'])
+    def public(self, request):
+        """GET /api/scenes/public/ — all publicly published scenes."""
+        qs = Scene.objects.filter(is_public=True).select_related('owner').order_by('-updated_at')
+        return Response(SceneSerializer(qs, many=True).data)
+
+    # ── publish / unpublish ───────────────────────────────────────────────────
+
+    @action(detail=True, methods=['post'])
+    def publish(self, request, pk=None):
+        """POST /api/scenes/{id}/publish/ — make a scene visible in the public gallery."""
+        scene = self.get_object()
+        scene.is_public = True
+        scene.save(update_fields=['is_public'])
+        return Response(SceneSerializer(scene).data)
+
+    @action(detail=True, methods=['post'])
+    def unpublish(self, request, pk=None):
+        """POST /api/scenes/{id}/unpublish/ — remove a scene from the public gallery."""
+        scene = self.get_object()
+        scene.is_public = False
+        scene.save(update_fields=['is_public'])
+        return Response(SceneSerializer(scene).data)
 
     # ── ZIP import/export ─────────────────────────────────────────────────────
 
@@ -84,6 +234,7 @@ class SceneViewSet(viewsets.ModelViewSet):
             title=spec.get('title', 'Imported Scene'),
             spec=spec,
             package_dir=str(target),
+            owner=request.user if request.user.is_authenticated else None,
         )
         return Response(SceneSerializer(scene).data, status=http_status.HTTP_201_CREATED)
 
@@ -152,7 +303,8 @@ class SceneViewSet(viewsets.ModelViewSet):
         run_record.finished_at = timezone.now()
         run_record.save()
 
-        return Response({**result, 'run_id': str(run_record.id)})
+        new_resources = _scan_new_resources(scene, request.user)
+        return Response({**result, 'run_id': str(run_record.id), 'new_resources': new_resources})
 
     @action(detail=True, methods=['post'], url_path='run/stream')
     def run_stream(self, request, pk=None):
@@ -173,6 +325,9 @@ class SceneViewSet(viewsets.ModelViewSet):
             status=SceneRun.Status.RUNNING,
             started_at=timezone.now(),
         )
+
+        # Capture before the generator closure.
+        user = request.user
 
         try:
             proc_timeout = None if timeout is None else timeout + 30
@@ -212,6 +367,7 @@ class SceneViewSet(viewsets.ModelViewSet):
                         SceneRun.Status.DONE if rc == 0 else SceneRun.Status.FAILED
                     )
                 run_record.save()
+                _scan_new_resources(scene, user)
 
         return StreamingHttpResponse(generate(), content_type='text/plain; charset=utf-8')
 

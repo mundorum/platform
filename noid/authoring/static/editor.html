@@ -1695,10 +1695,91 @@ select.prop-val { padding: 3px 4px; }
     </div>
   </div>
 
+  <!-- Scenes modal -->
+  <div class="modal-backdrop" v-if="showScenesModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title"><i class="ti ti-layout-list"></i> Scenes</div>
+        <button class="modal-close" @click="showScenesModal=false"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="lib-tabs">
+          <button class="lib-tab" :class="{active:scenesTab==='my'}" @click="scenesTab='my';fetchMyScenes()">
+            <i class="ti ti-user"></i> My Scenes
+          </button>
+          <button class="lib-tab" :class="{active:scenesTab==='public'}" @click="scenesTab='public';fetchPublicScenes()">
+            <i class="ti ti-world"></i> Public
+          </button>
+        </div>
+
+        <!-- My Scenes tab -->
+        <template v-if="scenesTab==='my'">
+          <div style="margin-bottom:12px">
+            <button class="lib-add-btn" @click="newScene();showScenesModal=false">
+              <i class="ti ti-plus"></i> New Scene
+            </button>
+          </div>
+          <div v-if="myScenesLoading" class="lib-empty">Loading…</div>
+          <div v-else-if="myScenes.length===0" class="lib-empty">No saved scenes yet. Click <strong>New Scene</strong> or upload a JSON file.</div>
+          <div v-else class="res-grid">
+            <div v-for="s in myScenes" :key="s.id" class="res-row">
+              <div class="res-icon other"><i class="ti ti-circuit-diode"></i></div>
+              <div class="res-info">
+                <div class="res-name">[[ s.title ]]</div>
+                <div class="res-meta">
+                  <span>[[ fmtDate(s.updated_at) ]]</span>
+                  <span v-if="s.id===savedSceneId" class="res-tag-pill">current</span>
+                  <span v-if="s.is_public" class="res-tag-pill" style="background:var(--c-tag-place-bg);color:var(--c-tag-place)">public</span>
+                </div>
+              </div>
+              <div class="res-actions">
+                <button class="res-act-btn" title="Open this scene" @click="loadScene(s,true);showScenesModal=false">
+                  <i class="ti ti-folder-open"></i>
+                </button>
+                <button class="res-act-btn" :title="s.is_public?'Make private':'Publish to gallery'" @click="togglePublish(s)">
+                  <i class="ti" :class="s.is_public?'ti-eye-off':'ti-world'"></i>
+                </button>
+                <button class="res-act-btn danger" title="Delete" @click="deleteMyScene(s)">
+                  <i class="ti ti-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Public tab -->
+        <template v-if="scenesTab==='public'">
+          <div v-if="publicScenesLoading" class="lib-empty">Loading…</div>
+          <div v-else-if="publicScenes.length===0" class="lib-empty">No public scenes have been published yet.</div>
+          <div v-else class="res-grid">
+            <div v-for="s in publicScenes" :key="s.id" class="res-row">
+              <div class="res-icon other"><i class="ti ti-circuit-diode"></i></div>
+              <div class="res-info">
+                <div class="res-name">[[ s.title ]]</div>
+                <div class="res-meta">
+                  <span v-if="s.owner_name">[[ s.owner_name ]]</span>
+                  <span>[[ fmtDate(s.updated_at) ]]</span>
+                </div>
+              </div>
+              <div class="res-actions">
+                <button class="res-act-btn" title="Open a copy of this scene" @click="loadScene(s,false);showScenesModal=false">
+                  <i class="ti ti-copy"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Topbar -->
   <header id="topbar">
     <div id="logo"><i class="ti ti-circuit-diode"></i> noid</div>
     <input id="filename-input" type="text" v-model="filename" spellcheck="false">
+    <button class="tb-btn" @click="newScene" title="Save current scene and start a new one"><i class="ti ti-plus"></i> New Scene</button>
+    <button class="tb-btn ghost" @click="openScenesModal"><i class="ti ti-layout-list"></i> Scenes</button>
     <button class="tb-btn ghost" @click="triggerUpload"><i class="ti ti-upload"></i> Upload</button>
     <input type="file" id="file-input" ref="fileInput" accept=".json" @change="onUpload">
     <button class="tb-btn ghost" @click="downloadScene"><i class="ti ti-download"></i> Download</button>
@@ -2227,6 +2308,7 @@ createApp({
         auth.user  = data.user;
         localStorage.setItem('noid_token', data.token);
         fetchCatalog();
+        loadLastScene();
       } catch (e) {
         loginError.value = `Sign-in error: ${e.message}`;
       }
@@ -2271,6 +2353,7 @@ createApp({
           if (r.ok) {
             auth.user = await r.json();
             fetchCatalog();
+            loadLastScene();
           } else {
             auth.token = null;
             localStorage.removeItem('noid_token');
@@ -2481,6 +2564,10 @@ createApp({
       showResources.value = true;
       resTab.value = 'browse';
       resStatus.value = '';
+      // Pre-fill scene_id for the upload form when a scene is loaded
+      if (savedSceneId.value && !resUpload.scene_id) {
+        resUpload.scene_id = savedSceneId.value;
+      }
       fetchResources();
       fetchSceneList();
     }
@@ -2623,6 +2710,147 @@ createApp({
       libTab.value = 'installed';
       libStatus.value = '';
       fetchLibraries();
+    }
+
+    /* ── Scenes modal ── */
+    const savedSceneId        = ref(null);
+    const showScenesModal     = ref(false);
+    const scenesTab           = ref('my');
+    const myScenes            = ref([]);
+    const publicScenes        = ref([]);
+    const myScenesLoading     = ref(false);
+    const publicScenesLoading = ref(false);
+    const scenesSaving        = ref(false);
+
+    async function saveCurrentScene() {
+      if (!auth.token) return null;
+      scenesSaving.value = true;
+      try {
+        const payload = {
+          title:  scene.value.title || 'Untitled Scene',
+          spec:   scene.value,
+          layout: layout.value,
+        };
+        let resp;
+        if (savedSceneId.value) {
+          resp = await apiFetch(`/api/scenes/${savedSceneId.value}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        } else {
+          resp = await apiFetch('/api/scenes/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        }
+        if (resp && resp.ok) {
+          const data = await resp.json();
+          savedSceneId.value = data.id;
+          return data;
+        }
+      } catch(e) {
+        console.error('Save scene failed:', e);
+      } finally {
+        scenesSaving.value = false;
+      }
+      return null;
+    }
+
+    function _applySceneData(data) {
+      const spec        = data.spec    || {};
+      const savedLayout = data.layout  || {};
+      _syncFromJson = true;
+      scene.value = spec.title ? spec : { ...spec, title: data.title };
+      layout.value = {};
+      (spec.components || []).forEach((c, i) => {
+        layout.value[c.id] = savedLayout[c.id] || autoPos(i);
+      });
+      selectedId.value = null;
+      nextTick(() => { _syncFromJson = false; });
+    }
+
+    function loadScene(data, asOwned = true) {
+      savedSceneId.value = asOwned ? data.id : null;
+      _applySceneData(data);
+    }
+
+    async function loadLastScene() {
+      try {
+        const r = await apiFetch('/api/scenes/mine/');
+        if (!r.ok) return;
+        const scenes = await r.json();
+        if (scenes.length > 0) loadScene(scenes[0], true);
+      } catch(e) { /* no saved scenes */ }
+    }
+
+    async function newScene() {
+      if (scene.value.components.length > 0 || savedSceneId.value) {
+        await saveCurrentScene();
+      }
+      savedSceneId.value = null;
+      _syncFromJson = true;
+      scene.value = { title: 'New Scene', imports: [], components: [], timeout: 'medium' };
+      layout.value = {};
+      selectedId.value = null;
+      nextTick(() => { _syncFromJson = false; });
+    }
+
+    async function fetchMyScenes() {
+      myScenesLoading.value = true;
+      try {
+        const r = await apiFetch('/api/scenes/mine/');
+        myScenes.value = r.ok ? await r.json() : [];
+      } catch(e) { myScenes.value = []; }
+      finally { myScenesLoading.value = false; }
+    }
+
+    async function fetchPublicScenes() {
+      publicScenesLoading.value = true;
+      try {
+        const r = await apiFetch('/api/scenes/public/');
+        publicScenes.value = r.ok ? await r.json() : [];
+      } catch(e) { publicScenes.value = []; }
+      finally { publicScenesLoading.value = false; }
+    }
+
+    async function openScenesModal() {
+      showScenesModal.value = true;
+      scenesTab.value = 'my';
+      await fetchMyScenes();
+    }
+
+    async function togglePublish(s) {
+      const action = s.is_public ? 'unpublish' : 'publish';
+      try {
+        const r = await apiFetch(`/api/scenes/${s.id}/${action}/`, { method: 'POST' });
+        if (r.ok) s.is_public = !s.is_public;
+      } catch(e) { console.error('Publish toggle failed:', e); }
+    }
+
+    async function deleteMyScene(s) {
+      if (!confirm(`Delete "${s.title}"?\nThis will also remove its files from disk.`)) return;
+      try {
+        const r = await apiFetch(`/api/scenes/${s.id}/`, { method: 'DELETE' });
+        if (r.ok) {
+          myScenes.value = myScenes.value.filter(x => x.id !== s.id);
+          if (savedSceneId.value === s.id) {
+            savedSceneId.value = null;
+            _syncFromJson = true;
+            scene.value = { title: 'New Scene', imports: [], components: [], timeout: 'medium' };
+            layout.value = {};
+            selectedId.value = null;
+            nextTick(() => { _syncFromJson = false; });
+          }
+        }
+      } catch(e) { console.error('Delete scene failed:', e); }
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
     /* ── Execution Monitor ── */
@@ -2957,7 +3185,11 @@ createApp({
             layout.value[c.id] = autoPos(i);
           });
           selectedId.value = null;
-          nextTick(() => { _syncFromJson = false; });
+          savedSceneId.value = null;  // uploaded file is a new scene
+          nextTick(() => {
+            _syncFromJson = false;
+            saveCurrentScene();       // add to user's registry
+          });
         } catch(err) {
           alert('Invalid JSON: ' + err.message);
         }
@@ -3085,6 +3317,8 @@ createApp({
         slot.done    = true;
         // Refresh badge once the run record is written to DB.
         fetchRuns();
+        // Refresh resources list to show any files produced by the run.
+        if (showResources.value) fetchResources();
       }
     }
 
@@ -3112,6 +3346,10 @@ createApp({
       libStatus, libStatusOk, libSaving, newLib,
       openLibraries, fetchAvailable, isAlreadyInstalled,
       toggleLibrary, deleteLibrary, addFromManifest, saveNewLibrary,
+      savedSceneId, showScenesModal, scenesTab, myScenes, publicScenes,
+      myScenesLoading, publicScenesLoading, scenesSaving,
+      openScenesModal, newScene, fetchMyScenes, fetchPublicScenes,
+      loadScene, togglePublish, deleteMyScene, fmtDate,
       showMonitor, monitorRuns, monitorLoading, activeRunCount,
       openMonitor, closeMonitor, fetchRuns, cancelRun, dismissRun,
       fmtDatetime, runDuration,
