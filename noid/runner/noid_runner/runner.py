@@ -11,7 +11,7 @@ import sys
 import tempfile
 import threading
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Callable, Generator, Optional
 
 
 def _build_imports(scene: dict, catalog: list[dict]) -> list[str]:
@@ -93,6 +93,7 @@ def stream_scene(
     timeout: Optional[int] = 60,
     verbose: bool = False,
     scene_dir: Optional[Path] = None,
+    on_start: Optional[Callable[[subprocess.Popen], None]] = None,
 ) -> Generator[str, None, None]:
     """
     Yield output lines from the scene as they are produced.
@@ -138,6 +139,8 @@ def stream_scene(
         cwd=str(scene_dir) if scene_dir is not None else None,
         env=_subprocess_env(),
     )
+    if on_start is not None:
+        on_start(proc)
     timer = threading.Timer(timeout + 5, proc.kill) if timeout is not None else None
     if timer is not None:
         timer.start()

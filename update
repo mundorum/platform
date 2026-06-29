@@ -1,1 +1,3 @@
 pip install --upgrade mundorum-noid mundorum-noid-collections
+cd noid/authoring
+python manage.py migrate

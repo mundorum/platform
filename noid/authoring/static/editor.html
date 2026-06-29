@@ -597,6 +597,48 @@ select.prop-val { padding: 3px 4px; }
   max-height: 60vh;
   height: 220px;
 }
+#exec-tabs {
+  display: flex;
+  overflow-x: auto;
+  background: #0e0c09;
+  flex-shrink: 0;
+  border-bottom: 0.5px solid rgba(200,180,140,0.10);
+}
+#exec-tabs::-webkit-scrollbar { height: 3px; }
+#exec-tabs::-webkit-scrollbar-thumb { background: rgba(200,180,140,0.2); }
+.exec-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #6a6050;
+  background: transparent;
+  border: none;
+  border-right: 0.5px solid rgba(200,180,140,0.08);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 160px;
+}
+.exec-tab:hover { color: #a09078; background: rgba(200,180,140,0.05); }
+.exec-tab.active { color: #c8c0a8; background: #181510; }
+.exec-tab.loading .ti-loader-2 { animation: spin 1.2s linear infinite; }
+.exec-tab .ti { font-size: 11px; }
+.exec-tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+.exec-tab-close {
+  flex-shrink: 0;
+  opacity: 0.4;
+  line-height: 1;
+  font-size: 10px;
+}
+.exec-tab:hover .exec-tab-close { opacity: 0.8; }
+.exec-tab-close:hover { opacity: 1 !important; color: #e07060; }
 #exec-header {
   display: flex;
   align-items: center;
@@ -1180,6 +1222,111 @@ select.prop-val { padding: 3px 4px; }
 .lib-status.ok { color: #2e7d32; }
 .lib-status.err { color: #c0392b; }
 
+/* ── Monitor modal ── */
+.runs-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--c-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  margin-left: 2px;
+}
+.run-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 0.5px solid var(--c-border);
+}
+.run-item:last-child { border-bottom: none; }
+.run-status-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.run-status-icon.running  { color: var(--c-accent); animation: spin 1.2s linear infinite; }
+.run-status-icon.done     { color: #2e7d32; }
+.run-status-icon.failed   { color: #c0392b; }
+.run-status-icon.interrupted { color: #b8860b; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.run-info { flex: 1; min-width: 0; }
+.run-title {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--c-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.run-meta {
+  font-size: 11px;
+  color: var(--c-muted);
+  margin-top: 3px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.run-status-label {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  display: inline-block;
+  margin-bottom: 4px;
+}
+.run-status-label.running     { background: var(--c-accent-light); color: var(--c-accent); }
+.run-status-label.done        { background: #e8f5e9; color: #2e7d32; }
+.run-status-label.failed      { background: #fde8e8; color: #c0392b; }
+.run-status-label.interrupted { background: #fef9e7; color: #b8860b; }
+.run-actions { display: flex; gap: 6px; flex-shrink: 0; margin-top: 1px; }
+.run-btn {
+  background: none;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 5px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--c-muted);
+  cursor: pointer;
+  padding: 2px 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.12s, border-color 0.12s;
+}
+.run-btn.cancel:hover  { color: #c0392b; border-color: #c0392b; }
+.run-btn.dismiss:hover { color: var(--c-muted); background: var(--c-bg); }
+.monitor-empty {
+  padding: 36px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--c-muted);
+  font-style: italic;
+}
+.monitor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.monitor-refresh {
+  background: none;
+  border: none;
+  color: var(--c-muted);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.12s;
+}
+.monitor-refresh:hover { color: var(--c-text); }
+
 /* ── Topbar user badge ── */
 .user-badge {
   display: flex;
@@ -1497,6 +1644,57 @@ select.prop-val { padding: 3px 4px; }
     </div>
   </div>
 
+  <!-- Monitor modal -->
+  <div class="modal-backdrop" v-if="showMonitor">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title"><i class="ti ti-activity"></i> Execution Monitor</div>
+        <div class="monitor-header-actions">
+          <button class="monitor-refresh" @click="fetchRuns" title="Refresh"><i class="ti ti-refresh"></i></button>
+          <button class="modal-close" @click="closeMonitor"><i class="ti ti-x"></i></button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div v-if="monitorLoading && monitorRuns.length === 0" class="monitor-empty">Loading…</div>
+        <div v-else-if="monitorRuns.length === 0" class="monitor-empty">No runs yet — click <strong>Play</strong> to start one.</div>
+        <div v-else>
+          <div class="run-item" v-for="run in monitorRuns" :key="run.run_id">
+            <i class="ti run-status-icon"
+               :class="[
+                 run.status === 'running'     ? 'ti-loader-2 running'     : '',
+                 run.status === 'done'        ? 'ti-circle-check done'     : '',
+                 run.status === 'failed'      ? 'ti-circle-x failed'       : '',
+                 run.status === 'interrupted' ? 'ti-alert-circle interrupted' : '',
+               ]"></i>
+            <div class="run-info">
+              <span class="run-status-label" :class="run.status">[[ run.status ]]</span>
+              <div class="run-title">[[ run.scene_title ]]</div>
+              <div class="run-meta">
+                <span v-if="run.started_at">started [[ fmtDatetime(run.started_at) ]]</span>
+                <span v-if="run.finished_at || run.status === 'running'">duration [[ runDuration(run) ]]</span>
+                <span v-if="run.returncode !== null">rc=[[ run.returncode ]]</span>
+              </div>
+            </div>
+            <div class="run-actions">
+              <button
+                v-if="run.status === 'running'"
+                class="run-btn cancel"
+                @click="cancelRun(run.run_id)"
+                title="Interrupt this run"
+              ><i class="ti ti-player-stop"></i> Stop</button>
+              <button
+                v-else
+                class="run-btn dismiss"
+                @click="dismissRun(run.run_id)"
+                title="Remove from list"
+              ><i class="ti ti-trash"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Topbar -->
   <header id="topbar">
     <div id="logo"><i class="ti ti-circuit-diode"></i> noid</div>
@@ -1506,6 +1704,10 @@ select.prop-val { padding: 3px 4px; }
     <button class="tb-btn ghost" @click="downloadScene"><i class="ti ti-download"></i> Download</button>
     <button class="tb-btn ghost" @click="openResources"><i class="ti ti-files"></i> Resources</button>
     <button class="tb-btn ghost" @click="openLibraries"><i class="ti ti-packages"></i> Libraries</button>
+    <button class="tb-btn ghost" @click="openMonitor">
+      <i class="ti ti-activity"></i> Runs
+      <span class="runs-badge" v-if="activeRunCount > 0">[[ activeRunCount ]]</span>
+    </button>
     <div id="timeout-ctrl" title="Run timeout">
       <i class="ti ti-clock"></i>
       <select id="timeout-select" v-model="timeoutMode" @change="onTimeoutModeChange">
@@ -1524,9 +1726,11 @@ select.prop-val { padding: 3px 4px; }
         <span class="timeout-hms-sep">s</span>
       </template>
     </div>
-    <button class="tb-btn" @click="playScene" :disabled="playLoading || scene.components.length === 0">
-      <i class="ti" :class="playLoading ? 'ti-loader-2' : 'ti-player-play'"></i>
-      [[ playLoading ? 'Running…' : 'Play' ]]
+    <button class="tb-btn" @click="playScene" :disabled="scene.components.length === 0">
+      <i class="ti ti-player-play"></i> Play
+      <span v-if="playSlots.some(s => s.loading)" class="runs-badge">
+        [[ playSlots.filter(s => s.loading).length ]]
+      </span>
     </button>
     <div class="tb-sep"></div>
     <div class="view-tabs">
@@ -1694,6 +1898,23 @@ select.prop-val { padding: 3px 4px; }
 
     <!-- Execution panel -->
     <div id="exec-panel" v-show="showExecPanel">
+      <!-- Tab bar: one tab per run -->
+      <div id="exec-tabs" v-if="playSlots.length > 0">
+        <button
+          v-for="(slot, i) in playSlots"
+          :key="slot.id"
+          class="exec-tab"
+          :class="{ active: i === activeSlotIdx, loading: slot.loading }"
+          @click="activeSlotIdx = i"
+          :title="slot.title"
+        >
+          <i class="ti ti-loader-2" v-if="slot.loading"></i>
+          <i class="ti ti-circle-check" v-else-if="slot.done && slot.code === 0"></i>
+          <i class="ti ti-circle-x" v-else-if="slot.done"></i>
+          <span class="exec-tab-title">[[ slot.title ]]</span>
+          <span class="exec-tab-close" @click.stop="closeSlot(i)" title="Close"><i class="ti ti-x"></i></span>
+        </button>
+      </div>
       <div id="exec-header">
         <div id="exec-title"><i class="ti ti-terminal-2"></i> Execution</div>
         <span v-if="playLoading" class="exec-running">
@@ -1706,7 +1927,7 @@ select.prop-val { padding: 3px 4px; }
           <label class="exec-verbose">
             <input type="checkbox" v-model="verbosePlay"> verbose
           </label>
-          <button class="exec-btn" title="Clear output" @click="execText = ''"><i class="ti ti-eraser"></i></button>
+          <button class="exec-btn" title="Clear output" @click="clearActiveSlot"><i class="ti ti-eraser"></i></button>
           <button class="exec-btn" title="Close panel" @click="showExecPanel = false"><i class="ti ti-x"></i></button>
         </div>
       </div>
@@ -1928,13 +2149,34 @@ createApp({
     const jsonError = ref('');
     let   _syncFromJson = false;
 
-    const playLoading    = ref(false);
     const showExecPanel  = ref(false);
-    const execText       = ref('');
-    const execDone       = ref(false);
-    const execCode       = ref(0);
     const verbosePlay    = ref(false);
     const execOutput     = ref(null);
+
+    /* ── Per-run output slots ── */
+    const playSlots     = ref([]);   // [{ id, title, text, code, done, loading }]
+    const activeSlotIdx = ref(0);
+
+    const playLoading = computed(() => playSlots.value[activeSlotIdx.value]?.loading ?? false);
+    const execText    = computed(() => playSlots.value[activeSlotIdx.value]?.text    ?? '');
+    const execDone    = computed(() => playSlots.value[activeSlotIdx.value]?.done    ?? false);
+    const execCode    = computed(() => playSlots.value[activeSlotIdx.value]?.code    ?? null);
+
+    function _activeSlot() { return playSlots.value[activeSlotIdx.value] ?? null; }
+
+    function clearActiveSlot() {
+      const s = _activeSlot();
+      if (s) s.text = '';
+    }
+
+    function closeSlot(i) {
+      playSlots.value.splice(i, 1);
+      if (playSlots.value.length === 0) {
+        showExecPanel.value = false;
+        return;
+      }
+      activeSlotIdx.value = Math.min(activeSlotIdx.value, playSlots.value.length - 1);
+    }
 
     /* ── Timeout UI state ── */
     const timeoutMode = ref('medium');   // 'short'|'medium'|'long'|'none'|'custom'
@@ -2383,6 +2625,79 @@ createApp({
       fetchLibraries();
     }
 
+    /* ── Execution Monitor ── */
+    const showMonitor    = ref(false);
+    const monitorRuns    = ref([]);
+    const monitorLoading = ref(false);
+    let _monitorPollTimer = null;
+
+    const activeRunCount = computed(() =>
+      monitorRuns.value.filter(r => r.status === 'running').length
+    );
+
+    async function fetchRuns() {
+      monitorLoading.value = true;
+      try {
+        const resp = await apiFetch('/api/scenes/runs/');
+        if (resp.ok) monitorRuns.value = await resp.json();
+      } finally {
+        monitorLoading.value = false;
+      }
+    }
+
+    function _startMonitorPoll() {
+      if (_monitorPollTimer) return;
+      _monitorPollTimer = setInterval(async () => {
+        if (!showMonitor.value) { _stopMonitorPoll(); return; }
+        await fetchRuns();
+        if (activeRunCount.value === 0) _stopMonitorPoll();
+      }, 3000);
+    }
+
+    function _stopMonitorPoll() {
+      clearInterval(_monitorPollTimer);
+      _monitorPollTimer = null;
+    }
+
+    async function openMonitor() {
+      showMonitor.value = true;
+      await fetchRuns();
+      if (activeRunCount.value > 0) _startMonitorPoll();
+    }
+
+    function closeMonitor() {
+      showMonitor.value = false;
+      _stopMonitorPoll();
+    }
+
+    async function cancelRun(runId) {
+      await apiFetch(`/api/scenes/runs/${runId}/cancel/`, { method: 'POST' });
+      await fetchRuns();
+      if (activeRunCount.value > 0) _startMonitorPoll();
+      else _stopMonitorPoll();
+    }
+
+    async function dismissRun(runId) {
+      await apiFetch(`/api/scenes/runs/${runId}/dismiss/`, { method: 'POST' });
+      monitorRuns.value = monitorRuns.value.filter(r => r.run_id !== runId);
+    }
+
+    function fmtDatetime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function runDuration(run) {
+      if (!run.started_at) return '';
+      const start = new Date(run.started_at);
+      const end   = run.finished_at ? new Date(run.finished_at) : new Date();
+      const secs  = Math.max(0, Math.floor((end - start) / 1000));
+      if (secs < 60)   return `${secs}s`;
+      if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+      return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
+    }
+
     /* ── Catalog groups ── */
     const catalogGroups = computed(() => {
       const map = new Map();
@@ -2719,9 +3034,22 @@ createApp({
     async function _doPlayScene() {
       showExecPanel.value   = true;
       showPlayWarning.value = false;
-      playLoading.value     = true;
-      execDone.value        = false;
-      execText.value        = '';
+
+      // Create a new output slot for this run and make it active.
+      const slot = {
+        id:      `slot-${Date.now()}`,
+        title:   (scene.value?.title || 'Scratch Run').trim() || 'Scratch Run',
+        text:    '',
+        code:    null,
+        done:    false,
+        loading: true,
+      };
+      playSlots.value.push(slot);
+      const slotIndex = playSlots.value.length - 1;
+      activeSlotIdx.value = slotIndex;
+
+      // Delay so the server creates the SceneRun record before the badge refresh.
+      setTimeout(() => fetchRuns(), 800);
 
       const url = `/api/play/stream/?verbose=${verbosePlay.value ? '1' : '0'}`;
       try {
@@ -2736,22 +3064,27 @@ createApp({
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          execText.value += decoder.decode(value, { stream: true });
-          nextTick(() => {
-            const el = execOutput.value;
-            if (el) el.scrollTop = el.scrollHeight;
-          });
+          slot.text += decoder.decode(value, { stream: true });
+          // Auto-scroll only when this slot is the one being viewed.
+          if (activeSlotIdx.value === slotIndex) {
+            nextTick(() => {
+              const el = execOutput.value;
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+          }
         }
 
         /* parse exit code from the sentinel line written by stream_scene */
-        const m = execText.value.match(/▶ exited with code (-?\d+)/);
-        execCode.value = m ? parseInt(m[1], 10) : 0;
+        const m = slot.text.match(/▶ exited with code (-?\d+)/);
+        slot.code = m ? parseInt(m[1], 10) : 0;
       } catch(e) {
-        execText.value += `\nFetch error: ${e}\n`;
-        execCode.value = -1;
+        slot.text += `\nFetch error: ${e}\n`;
+        slot.code = -1;
       } finally {
-        playLoading.value = false;
-        execDone.value    = true;
+        slot.loading = false;
+        slot.done    = true;
+        // Refresh badge once the run record is written to DB.
+        fetchRuns();
       }
     }
 
@@ -2779,6 +3112,9 @@ createApp({
       libStatus, libStatusOk, libSaving, newLib,
       openLibraries, fetchAvailable, isAlreadyInstalled,
       toggleLibrary, deleteLibrary, addFromManifest, saveNewLibrary,
+      showMonitor, monitorRuns, monitorLoading, activeRunCount,
+      openMonitor, closeMonitor, fetchRuns, cancelRun, dismissRun,
+      fmtDatetime, runDuration,
       scene, layout, catalog, catalogErrors, catalogGroups,
       filename, view, selectedId, selectedComp, selectedCatalogEntry,
       selectedCompDescription, selectedInputNotices, selectedOutputNotices,
@@ -2786,6 +3122,7 @@ createApp({
       jsonText, jsonError, onJsonInput, switchView,
       graphNodes, graphEdges, canvasStyle, graphCanvas,
       editSubPairs, editPubPairs,
+      playSlots, activeSlotIdx, closeSlot, clearActiveSlot,
       playLoading, showExecPanel, execText, execHighlighted,
       execDone, execCode, verbosePlay, execOutput,
       timeoutMode, timeoutH, timeoutM, timeoutS,

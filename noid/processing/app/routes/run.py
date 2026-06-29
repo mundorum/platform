@@ -1,8 +1,11 @@
 import asyncio
 import json
 import shutil
+import subprocess
 import tempfile
+import threading
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -12,6 +15,11 @@ from ..auth import require_api_key
 from ..worker import pool as worker_pool
 
 router = APIRouter(prefix="/run", tags=["run"])
+
+# Registry of subprocesses keyed by run_id (str UUID).
+# Protected by a lock because stream generators run in worker threads.
+_active_lock = threading.Lock()
+_active_runs: dict[str, subprocess.Popen] = {}
 
 # /run/once MUST be registered before /run/{scene_id} so the literal path
 # takes priority over the parameterised route.
@@ -60,6 +68,7 @@ async def run_once_stream(
     modules: str = Form(default='[]'),
     timeout: int = Query(default=60, ge=1, le=300),
     verbose: bool = Query(default=False),
+    run_id: Optional[str] = Query(default=None),
     _: None = Depends(require_api_key),
 ):
     """Receive a scene ZIP, stream its output ephemerally, then delete it."""
@@ -68,15 +77,49 @@ async def run_once_stream(
     scene_store.unpack(zip_bytes, tmp)
     spec = _merge_modules(scene_store.read_spec(tmp), modules)
 
+    def on_start(proc: subprocess.Popen) -> None:
+        if run_id:
+            with _active_lock:
+                _active_runs[run_id] = proc
+
     def gen():
         try:
             yield from runner.stream_scene(
-                spec, catalog.get_catalog(), timeout, verbose, tmp
+                spec, catalog.get_catalog(), timeout, verbose, tmp,
+                on_start=on_start,
             )
         finally:
+            if run_id:
+                with _active_lock:
+                    _active_runs.pop(run_id, None)
             shutil.rmtree(tmp, ignore_errors=True)
 
     return StreamingResponse(gen(), media_type="text/plain; charset=utf-8")
+
+
+@router.delete("/once/{run_id}")
+async def cancel_once(
+    run_id: str,
+    _: None = Depends(require_api_key),
+):
+    """Kill an active ephemeral run by its run_id. Returns {cancelled: bool}."""
+    with _active_lock:
+        proc = _active_runs.pop(run_id, None)
+    if proc is not None:
+        proc.kill()
+        return {"cancelled": True, "run_id": run_id}
+    return {"cancelled": False, "run_id": run_id}
+
+
+@router.get("/once/{run_id}/active")
+async def check_once_active(
+    run_id: str,
+    _: None = Depends(require_api_key),
+):
+    """Return whether an ephemeral run is still executing."""
+    with _active_lock:
+        active = run_id in _active_runs
+    return {"active": active, "run_id": run_id}
 
 
 @router.post("/{scene_id}")

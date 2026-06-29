@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -12,11 +13,14 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from noid_runner import scene_store
 
 from .models import Scene, SceneRun
 from .serializers import SceneRunSerializer, SceneSerializer
+
+_OUTPUT_CAP = 200_000  # max bytes stored in SceneRun.output
 
 
 def _enabled_modules() -> list[str]:
@@ -112,7 +116,7 @@ class SceneViewSet(viewsets.ModelViewSet):
             )
 
         zip_bytes = scene_store.pack(pkg)
-        timeout = int(request.data.get('timeout', 60))
+        timeout = _scene_timeout(scene)
 
         run_record = SceneRun.objects.create(
             scene=scene,
@@ -120,14 +124,15 @@ class SceneViewSet(viewsets.ModelViewSet):
             started_at=timezone.now(),
         )
 
+        proc_timeout = None if timeout is None else timeout + 30
         try:
             resp = http_client.post(
                 f'{settings.PROCESSING_URL}/run/once',
                 files={'file': (f'{scene.id}.zip', zip_bytes, 'application/zip')},
                 data={'modules': json.dumps(_enabled_modules())},
                 headers={'Authorization': f'Bearer {settings.PROCESSING_API_KEY}'},
-                params={'timeout': timeout},
-                timeout=timeout + 30,
+                params=_timeout_params(timeout, str(run_record.run_id)),
+                timeout=proc_timeout,
             )
             resp.raise_for_status()
             result = resp.json()
@@ -161,26 +166,52 @@ class SceneViewSet(viewsets.ModelViewSet):
             )
 
         zip_bytes = scene_store.pack(pkg)
-        timeout = int(request.data.get('timeout', 60))
+        timeout = _scene_timeout(scene)
+
+        run_record = SceneRun.objects.create(
+            scene=scene,
+            status=SceneRun.Status.RUNNING,
+            started_at=timezone.now(),
+        )
 
         try:
+            proc_timeout = None if timeout is None else timeout + 30
             resp = http_client.post(
                 f'{settings.PROCESSING_URL}/run/once/stream',
                 files={'file': (f'{scene.id}.zip', zip_bytes, 'application/zip')},
                 data={'modules': json.dumps(_enabled_modules())},
                 headers={'Authorization': f'Bearer {settings.PROCESSING_API_KEY}'},
-                params={'timeout': timeout},
+                params=_timeout_params(timeout, str(run_record.run_id)),
                 stream=True,
-                timeout=timeout + 30,
+                timeout=proc_timeout,
             )
             resp.raise_for_status()
         except http_client.RequestException as exc:
+            run_record.status = SceneRun.Status.FAILED
+            run_record.output = str(exc)
+            run_record.finished_at = timezone.now()
+            run_record.save()
             return Response({'error': str(exc)}, status=http_status.HTTP_502_BAD_GATEWAY)
 
         def generate():
-            for chunk in resp.iter_content(chunk_size=None):
-                if chunk:
-                    yield chunk
+            chunks: list[str] = []
+            try:
+                for chunk in resp.iter_content(chunk_size=None):
+                    if chunk:
+                        chunks.append(chunk.decode('utf-8', errors='replace'))
+                        yield chunk
+            finally:
+                full = ''.join(chunks)
+                m = re.search(r'▶ exited with code (-?\d+)', full)
+                rc = int(m.group(1)) if m else None
+                run_record.output = full[-_OUTPUT_CAP:]
+                run_record.returncode = rc
+                run_record.finished_at = timezone.now()
+                if run_record.status == SceneRun.Status.RUNNING:
+                    run_record.status = (
+                        SceneRun.Status.DONE if rc == 0 else SceneRun.Status.FAILED
+                    )
+                run_record.save()
 
         return StreamingHttpResponse(generate(), content_type='text/plain; charset=utf-8')
 
@@ -194,7 +225,97 @@ class SceneViewSet(viewsets.ModelViewSet):
         return Response(SceneRunSerializer(qs, many=True).data)
 
 
+# ── Run monitoring views ──────────────────────────────────────────────────────
+
+class RunListView(APIView):
+    """GET /api/runs/ — list all non-dismissed runs for the monitoring panel."""
+
+    def get(self, request):
+        qs = (
+            SceneRun.objects
+            .filter(dismissed_at__isnull=True)
+            .select_related('scene')
+            .order_by('-created_at')[:200]
+        )
+        return Response(SceneRunSerializer(qs, many=True).data)
+
+
+class RunCancelView(APIView):
+    """POST /api/scenes/runs/{run_id}/cancel/ — interrupt a running scene."""
+
+    def post(self, request, run_id):
+        try:
+            run = SceneRun.objects.get(run_id=run_id)
+        except SceneRun.DoesNotExist:
+            return Response({'error': 'Run not found'}, status=http_status.HTTP_404_NOT_FOUND)
+
+        if run.status != SceneRun.Status.RUNNING:
+            return Response({'error': 'Run is not in running state'}, status=http_status.HTTP_409_CONFLICT)
+
+        if run.scene_id is None:
+            # Scratch run — process lives on this server; kill via local registry.
+            from editor.views import kill_local_run
+            kill_local_run(run_id)
+        else:
+            # Managed run — process lives on the Processing Machine.
+            try:
+                http_client.delete(
+                    f'{settings.PROCESSING_URL}/run/once/{run_id}',
+                    headers={'Authorization': f'Bearer {settings.PROCESSING_API_KEY}'},
+                    timeout=10,
+                )
+            except http_client.RequestException:
+                pass  # Processing may have already finished; still mark as interrupted
+
+        run.status = SceneRun.Status.INTERRUPTED
+        run.finished_at = timezone.now()
+        run.save()
+        return Response(SceneRunSerializer(run).data)
+
+
+class RunDismissView(APIView):
+    """POST /api/runs/{run_id}/dismiss/ — hide a finished run from the panel."""
+
+    def post(self, request, run_id):
+        try:
+            run = SceneRun.objects.get(run_id=run_id)
+        except SceneRun.DoesNotExist:
+            return Response({'error': 'Run not found'}, status=http_status.HTTP_404_NOT_FOUND)
+
+        if run.status == SceneRun.Status.RUNNING:
+            return Response(
+                {'error': 'Cannot dismiss a running scene — cancel it first'},
+                status=http_status.HTTP_409_CONFLICT,
+            )
+
+        run.dismissed_at = timezone.now()
+        run.save()
+        return Response(SceneRunSerializer(run).data)
+
+
 # ── helpers ───────────────────────────────────────────────────────────────────
+
+_TIMEOUT_PRESETS: dict[str, int] = {'short': 60, 'medium': 600, 'long': 3600}
+
+
+def _scene_timeout(scene: Scene) -> int | None:
+    """Resolve the scene spec's timeout field to seconds (or None for no limit)."""
+    val = scene.spec.get('timeout') if scene.spec else None
+    if val is None or val == 'none':
+        return None
+    if isinstance(val, str):
+        return _TIMEOUT_PRESETS.get(val, 600)
+    if isinstance(val, (int, float)) and val > 0:
+        return int(val)
+    return 600
+
+
+def _timeout_params(timeout: int | None, run_id: str) -> dict:
+    params: dict = {'run_id': run_id}
+    if timeout is not None:
+        params['timeout'] = timeout
+    return params
+
 
 def _package_dir(scene_id: str) -> Path:
     return Path(settings.SCENE_PACKAGES_DIR) / scene_id

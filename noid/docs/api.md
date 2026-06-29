@@ -8,39 +8,70 @@
 
 | Method | Path | Body | Response |
 |--------|------|------|----------|
-| `POST` | `/scenes/` | JSON spec | `{id, name, created_at, …}` |
-| `POST` | `/scenes/import/` | ZIP (multipart) | `{id, …}` |
-| `GET` | `/scenes/` | — | list of scene summaries |
-| `GET` | `/scenes/{id}/` | — | spec + component list + data file list |
-| `PUT` | `/scenes/{id}/` | JSON spec | updated metadata |
-| `GET` | `/scenes/{id}/export` | — | ZIP download (Content-Disposition: attachment) |
-| `DELETE` | `/scenes/{id}/` | — | 204 — removes DB record, components/, data/ |
-
-### Fine-grained file management
-
-Used by the editor's file panel to upload or remove individual files without
-replacing the entire package.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/scenes/{id}/components/` | Upload a single `.py` file |
-| `DELETE` | `/scenes/{id}/components/{file}` | Delete one component file |
-| `POST` | `/scenes/{id}/data/` | Upload a single data source file |
-| `DELETE` | `/scenes/{id}/data/{file}` | Delete one data source file |
-| `GET` | `/scenes/{id}/data/` | List data files (name, size, mtime) |
+| `POST` | `/api/scenes/` | JSON spec | `{id, title, created_at, …}` |
+| `POST` | `/api/scenes/import/` | ZIP (multipart) | `{id, …}` |
+| `GET` | `/api/scenes/` | — | list of scene summaries |
+| `GET` | `/api/scenes/{id}/` | — | scene record |
+| `PUT` | `/api/scenes/{id}/` | JSON spec | updated record |
+| `GET` | `/api/scenes/{id}/export/` | — | ZIP download (`Content-Disposition: attachment`) |
+| `DELETE` | `/api/scenes/{id}/` | — | 204 — removes DB record and all package files |
 
 ### Execution (proxy to Processing Machine)
 
 Authoring forwards these requests to Processing and passes the response back.
-SceneRun records are written to the DB on completion.
+`SceneRun` records are written to the DB for both endpoints.
 
-| Method | Path | Params | Description |
-|--------|------|--------|-------------|
-| `POST` | `/scenes/{id}/play` | `?timeout=30` | Run; block until done; return `{stdout, stderr, returncode}` |
-| `POST` | `/scenes/{id}/play/stream` | `?timeout=60&verbose=1` | Stream output lines (chunked transfer) |
-| `POST` | `/scenes/{id}/schedule` | JSON `{run_at}` | Enqueue for later execution |
-| `GET` | `/scenes/{id}/runs/` | — | Run history (paginated) |
-| `GET` | `/scenes/{id}/runs/{run_id}/` | — | Individual run result |
+| Method | Path | Body | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/scenes/{id}/run/` | — | Run scene; block until done; return `{stdout, stderr, returncode, run_id}` |
+| `POST` | `/api/scenes/{id}/run/stream/` | — | Stream output lines (chunked transfer); creates and updates a `SceneRun` record |
+
+Both endpoints resolve the timeout from the scene's `timeout` field (see
+[Scene JSON — timeout field](#scene-json--timeout-field)).
+
+### Run history
+
+| Method | Path | Body | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/scenes/{id}/runs/` | — | 50 most recent runs for a specific scene |
+| `GET` | `/api/scenes/runs/` | — | All non-dismissed runs across all scenes (monitoring panel) |
+
+### Run lifecycle — cancel and dismiss
+
+Once a run is created it moves through the following states:
+
+```
+pending → running → done
+                 → failed
+                 → interrupted   (via cancel)
+```
+
+Finished, failed, and interrupted runs persist until the user dismisses them.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/scenes/runs/{run_id}/cancel/` | Interrupt a `running` scene — signals Processing to kill the subprocess, sets status to `interrupted` |
+| `POST` | `/api/scenes/runs/{run_id}/dismiss/` | Mark a finished/failed/interrupted run as dismissed so it no longer appears in the monitoring panel |
+
+`run_id` is the UUID from the `SceneRun.run_id` field (not `SceneRun.id`).
+
+#### SceneRun object
+
+```json
+{
+  "id":           "uuid",
+  "run_id":       "uuid",
+  "scene":        "uuid",
+  "scene_title":  "My Scene",
+  "status":       "running | done | failed | interrupted",
+  "output":       "…last 200 KB of output…",
+  "returncode":   0,
+  "started_at":   "2025-06-29T10:23:45Z",
+  "finished_at":  "2025-06-29T10:24:12Z",
+  "dismissed_at": null,
+  "created_at":   "2025-06-29T10:23:44Z"
+}
+```
 
 ### Editor (scratch runner — backward-compatible)
 
@@ -62,24 +93,64 @@ Swagger UI available at `/docs` (disable in production via `DOCS_ENABLED=false`)
 
 ### Scene deployment
 
-Deploy loads the scene package into SceneRegistry so subsequent `/run` calls
+Deploy loads the scene package into `SceneRegistry` so subsequent `/run` calls
 skip the unpack and module-loading overhead.
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
-| `POST` | `/deploy/{id}` | ZIP (multipart) | Unpack to temp dir; load into SceneRegistry |
-| `DELETE` | `/deploy/{id}` | — | Evict from SceneRegistry; remove temp dir |
+| `POST` | `/deploy/{id}` | ZIP (multipart) | Unpack to temp dir; load into SceneRegistry; warm worker process |
+| `DELETE` | `/deploy/{id}` | — | Evict from SceneRegistry; stop warm worker; remove files |
 
 ### Execution
 
-| Method | Path | Body | Description |
-|--------|------|------|-------------|
-| `POST` | `/run/{id}` | `{timeout: int}` | Run deployed scene; return `{stdout, stderr, returncode}` |
-| `POST` | `/run/{id}/stream` | `{timeout: int}` | Stream output lines (one per chunk) |
-| `POST` | `/run/once` | ZIP (multipart) | Unpack, run, delete — no registry entry; for one-off or test runs |
+| Method | Path | Query params | Description |
+|--------|------|-------------|-------------|
+| `POST` | `/run/once` | `timeout`, `run_id` | Unpack ZIP, run, delete — no registry entry |
+| `POST` | `/run/once/stream` | `timeout`, `verbose`, `run_id` | Unpack ZIP, stream output, delete |
+| `POST` | `/run/{id}` | `timeout` | Run deployed scene; return `{stdout, stderr, returncode}` |
+| `POST` | `/run/{id}/stream` | `timeout`, `verbose` | Stream output from a deployed scene |
+
+`run_id` (optional UUID string) enables cancel and status lookup for ephemeral runs.
+
+### Run cancel and status (ephemeral runs)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `DELETE` | `/run/once/{run_id}` | Kill the active subprocess for this `run_id`; returns `{cancelled: bool, run_id}` |
+| `GET` | `/run/once/{run_id}/active` | Check whether an ephemeral run is still executing; returns `{active: bool, run_id}` |
 
 ### Monitoring
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Server status: loaded scenes, active workers, GPU availability |
+| `GET` | `/health` | Server status: loaded scenes, active workers |
+
+---
+
+## Scene JSON — timeout field
+
+The `timeout` field in `scene.json` controls how long the runner waits before
+killing the scene process. It is read by both the Authoring scratch runner
+(`/api/play/stream/`) and the managed runner (`/api/scenes/{id}/run/stream/`).
+
+| Value | Seconds | Notes |
+|-------|---------|-------|
+| `"short"` | 60 | Quick validation runs |
+| `"medium"` | 600 | Default for new scenes |
+| `"long"` | 3600 | Long-running pipelines |
+| `null` or `"none"` | — | No limit; process runs until `player/done` |
+| integer | exact | Custom value in seconds (set via the H:MM:SS picker in the editor) |
+
+```json
+{
+  "title": "My Pipeline",
+  "timeout": "medium",
+  "imports": ["noid:data.text_source"],
+  "components": [...]
+}
+```
+
+```json
+{ "timeout": 7265 }   // 2 h 0 m 5 s
+{ "timeout": null  }  // no limit
+```

@@ -81,6 +81,36 @@ result = await asyncio.to_thread(
 
 ---
 
+## scene.json — platform extensions
+
+The platform adds one top-level field to `scene.json` that the core noid framework
+does not define:
+
+### `timeout`
+
+Controls how long the runner waits before killing the scene process.
+
+```json
+{ "timeout": "medium" }    // preset: 60 | 600 | 3600 s
+{ "timeout": 7265 }        // custom: total seconds (H:MM:SS picker in editor)
+{ "timeout": null }        // no limit
+```
+
+| Value | Seconds |
+|-------|---------|
+| `"short"` | 60 |
+| `"medium"` | 600 (default) |
+| `"long"` | 3600 |
+| `null` / `"none"` | no timeout |
+| integer > 0 | exact seconds |
+
+The field is read by both the Authoring scratch runner (`/api/play/stream/`) and
+the managed runner (`/api/scenes/{id}/run/stream/`). It is forwarded as the
+`timeout` query parameter on Processing requests. See `docs/api.md` for the full
+parameter table.
+
+---
+
 ## Namespace support
 
 The platform defines project-level namespaces in `noid/noid-namespaces.yaml`.
