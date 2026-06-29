@@ -1,3 +1,2 @@
-cd noid
-source .venv/bin/activate
-uvicorn processing.main:app --reload --port 8001
+cd noid/dbms
+docker compose up

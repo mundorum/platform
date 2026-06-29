@@ -1,6 +1,7 @@
 """Django views for the noid scene editor API."""
 import json
 
+from django.conf import settings as django_settings
 from django.http import JsonResponse, StreamingHttpResponse
 from django.utils.decorators import method_decorator
 from django.views import View
@@ -9,6 +10,24 @@ from django.views.decorators.csrf import csrf_exempt
 from noid_runner.catalog import load_modules, build_catalog, get_load_errors
 
 from .runner import run_scene, stream_scene
+
+
+def _inject_namespaces(scene: dict) -> dict:
+    """Add server-side namespace definitions to the scene before running.
+
+    Scratch-play scenes are executed in a system temp directory, so
+    NoidPlayer's walk-up discovery cannot find noid-namespaces.yaml.
+    Injecting namespaces inline makes resource references resolvable
+    regardless of where the temp file lands.
+    """
+    scene = dict(scene)
+    ns = dict(scene.get("namespaces") or {})
+    ns.setdefault("shared", {
+        "kind": "resource",
+        "root": str(django_settings.SHARED_RESOURCES_DIR),
+    })
+    scene["namespaces"] = ns
+    return scene
 
 
 def _load_enabled_modules() -> tuple[list[dict], list[str]]:
@@ -52,7 +71,7 @@ class PlayView(View):
 
         catalog, _ = _load_enabled_modules()
         timeout = min(int(request.GET.get('timeout', 30)), 300)
-        result = run_scene(scene, catalog, timeout=timeout)
+        result = run_scene(_inject_namespaces(scene), catalog, timeout=timeout)
         return JsonResponse(result)
 
 
@@ -69,10 +88,10 @@ class PlayStreamView(View):
             return StreamingHttpResponse(_err(), content_type='text/plain; charset=utf-8')
 
         catalog, _ = _load_enabled_modules()
-        timeout = min(int(request.GET.get('timeout', 60)), 300)
+        timeout = min(int(request.GET.get('timeout', 600)), 3600)
         verbose = request.GET.get('verbose', '1') == '1'
 
         return StreamingHttpResponse(
-            stream_scene(scene, catalog, timeout=timeout, verbose=verbose),
+            stream_scene(_inject_namespaces(scene), catalog, timeout=timeout, verbose=verbose),
             content_type='text/plain; charset=utf-8',
         )

@@ -1,4 +1,3 @@
 cd noid
 source .venv/bin/activate
-cd authoring
-python manage.py runserver 8000
+uvicorn processing.main:app --reload --port 8001

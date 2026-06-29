@@ -1,0 +1,20 @@
+{
+  "title": "New Scene",
+  "imports": [],
+  "components": [
+    {
+      "type": "pdf:ocr",
+      "id": "ocr_1",
+      "properties": {
+        "input_file": "shared:books/case-teaching-in-medicine-1906.pdf",
+        "output_file": "shared:books/case-teaching-in-medicine-1906_extracted.pdf",
+        "language": "eng",
+        "deskew": true,
+        "rotate_pages": true,
+        "force_ocr": true
+      },
+      "publish": "done~player/done",
+      "subscribe": "player/start~ocr"
+    }
+  ]
+}

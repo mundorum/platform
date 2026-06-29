@@ -1,0 +1,7 @@
+namespaces:
+  noid:
+    kind: module
+    root: noid_collections
+  shared:
+    kind: resource
+    root: ./shared_resources
