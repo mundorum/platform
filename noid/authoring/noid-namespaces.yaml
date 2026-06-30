@@ -18,5 +18,5 @@ namespaces:
   # Override the root via the NOID_SHARED_ROOT env var or an inline namespace in scene.json.
   shared:
     kind: resource
-    root: "/srv/noid/shared"
+    root: "/srv/noid/storage/shared_resources"
     description: "Central shared resource repository (mounted on Authoring and Processing machines)"

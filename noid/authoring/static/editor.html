@@ -3294,7 +3294,8 @@ createApp({
       // Delay so the server creates the SceneRun record before the badge refresh.
       setTimeout(() => fetchRuns(), 800);
 
-      const url = `/api/play/stream/?verbose=${verbosePlay.value ? '1' : '0'}`;
+      const sceneParam = savedSceneId.value ? `&scene_id=${encodeURIComponent(savedSceneId.value)}` : '';
+      const url = `/api/play/stream/?verbose=${verbosePlay.value ? '1' : '0'}${sceneParam}`;
       try {
         const response = await apiFetch(url, {
           method: 'POST',

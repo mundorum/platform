@@ -26,8 +26,9 @@ before making any structural change.
    See `~/git/mundorum/noid/docs/namespaces.md` for the format.
 5. **`collections.yaml`** at `noid/` root. Both servers read it; path set via
    `COLLECTIONS_FILE` env var.
-6. **`scene_packages/`** at `noid/` root in development. Each production machine
-   mounts its own volume.
+6. **`storage/`** at `noid/` root in development contains `scene_packages/` and
+   `shared_resources/`. In Docker both servers mount a single `noid_storage`
+   named volume at `/srv/noid/storage`.
 7. **Docker build context** is always `noid/` (not a sub-directory) so both
    Dockerfiles can `COPY runner/`. See `docker-compose.yml`.
 8. **ZIP API**: `POST /scenes/import/` and `GET /scenes/{id}/export` handle a
@@ -70,7 +71,9 @@ noid/
 │           ├── run.py       POST /run/{id}  /run/{id}/stream  /run/once  /run/once/stream
 │           └── health.py    GET /health
 │
-├── scene_packages/          dev scene storage (gitignored)
+├── storage/                 dev data volume (gitignored)
+│   ├── scene_packages/      scene package directories
+│   └── shared_resources/    shared data files (shared: namespace)
 ├── collections.yaml         component collections config
 ├── docker-compose.yml       dev orchestration
 ├── .env.example             env vars template

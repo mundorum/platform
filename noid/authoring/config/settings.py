@@ -104,16 +104,21 @@ CORS_ALLOW_CREDENTIALS = True
 INITIAL_MANAGER_EMAIL = os.environ.get('INITIAL_MANAGER_EMAIL', '')
 
 # ── scene packages ────────────────────────────────────────────────────────────
-SCENE_PACKAGES_DIR = os.environ.get(
-    'SCENE_PACKAGES_DIR',
-    str(BASE_DIR.parent / 'scene_packages'),
-)
+_NOID_ROOT = BASE_DIR.parent  # noid/ — used to anchor relative env-var paths
+
+
+def _resolve_noid_path(env_var: str, default_name: str) -> str:
+    raw = os.environ.get(env_var, '')
+    if raw:
+        p = Path(raw)
+        return str(p if p.is_absolute() else (_NOID_ROOT / p).resolve())
+    return str(_NOID_ROOT / default_name)
+
+
+SCENE_PACKAGES_DIR = _resolve_noid_path('SCENE_PACKAGES_DIR', 'scene_packages')
 
 # ── shared resource store ─────────────────────────────────────────────────────
-SHARED_RESOURCES_DIR = os.environ.get(
-    'SHARED_RESOURCES_DIR',
-    str(BASE_DIR.parent / 'shared_resources'),
-)
+SHARED_RESOURCES_DIR = _resolve_noid_path('SHARED_RESOURCES_DIR', 'shared_resources')
 
 # ── processing machine ────────────────────────────────────────────────────────
 PROCESSING_URL = os.environ.get('PROCESSING_URL', 'http://localhost:8001')

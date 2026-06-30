@@ -217,5 +217,4 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-noid/shared_resources
-noid/authoring/scene_packages
+noid/storage

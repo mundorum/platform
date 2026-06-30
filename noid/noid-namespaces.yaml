@@ -4,4 +4,4 @@ namespaces:
     root: noid_collections
   shared:
     kind: resource
-    root: ./shared_resources
+    root: ./storage/shared_resources

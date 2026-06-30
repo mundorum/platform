@@ -3,6 +3,7 @@ import json
 import re
 import subprocess
 import threading
+from pathlib import Path
 from typing import Optional
 
 from django.conf import settings as django_settings
@@ -46,7 +47,23 @@ def _resolve_timeout(value) -> Optional[int]:
     return 600
 
 
-def _inject_namespaces(scene: dict) -> dict:
+def _lookup_scene_dir(scene_id: str | None) -> Path | None:
+    """Return the package_dir Path for a saved scene, or None."""
+    if not scene_id:
+        return None
+    try:
+        from scenes.models import Scene
+        scene_obj = Scene.objects.get(id=scene_id)
+        if scene_obj.package_dir:
+            p = Path(scene_obj.package_dir)
+            if p.exists():
+                return p
+    except Exception:
+        pass
+    return None
+
+
+def _inject_namespaces(scene: dict, scene_dir: Path | None = None) -> dict:
     """Add server-side namespace definitions to the scene before running.
 
     Scratch-play scenes are executed in a system temp directory, so
@@ -60,6 +77,11 @@ def _inject_namespaces(scene: dict) -> dict:
         "kind": "resource",
         "root": str(django_settings.SHARED_RESOURCES_DIR),
     })
+    if scene_dir is not None:
+        ns.setdefault("scene", {
+            "kind": "resource",
+            "root": str(scene_dir / 'data'),
+        })
     scene["namespaces"] = ns
     return scene
 
@@ -97,9 +119,10 @@ class PlayView(View):
         except json.JSONDecodeError as exc:
             return JsonResponse({'error': f'Invalid JSON: {exc}'}, status=400)
 
+        scene_dir = _lookup_scene_dir(request.GET.get('scene_id'))
         catalog, _ = _load_enabled_modules()
         timeout = _resolve_timeout(scene.get('timeout'))
-        result = run_scene(_inject_namespaces(scene), catalog, timeout=timeout)
+        result = run_scene(_inject_namespaces(scene, scene_dir), catalog, timeout=timeout, scene_dir=scene_dir)
         return JsonResponse(result)
 
 
@@ -117,6 +140,7 @@ class PlayStreamView(View):
 
         from scenes.models import SceneRun
 
+        scene_dir  = _lookup_scene_dir(request.GET.get('scene_id'))
         catalog, _ = _load_enabled_modules()
         timeout    = _resolve_timeout(scene_spec.get('timeout'))
         verbose    = request.GET.get('verbose', '1') == '1'
@@ -137,8 +161,9 @@ class PlayStreamView(View):
             chunks: list[str] = []
             try:
                 for chunk in stream_scene(
-                    _inject_namespaces(scene_spec), catalog,
+                    _inject_namespaces(scene_spec, scene_dir), catalog,
                     timeout=timeout, verbose=verbose,
+                    scene_dir=scene_dir,
                     on_start=on_start,
                 ):
                     if chunk:

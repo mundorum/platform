@@ -1,0 +1,25 @@
+{
+  "title": "Copy Text",
+  "imports": [],
+  "components": [
+    {
+      "id": "src",
+      "type": "data:text-source",
+      "publish": "text~pipeline/text;done~pipeline/done",
+      "subscribe": "player/start~load",
+      "properties": {
+        "label": "dinosaur",
+        "input_file": "scene:dinosaur.txt"
+      }
+    },
+    {
+      "id": "writer",
+      "type": "data:text-writer",
+      "publish": "written~player/done",
+      "subscribe": "pipeline/text~text;pipeline/done~done",
+      "properties": {
+        "output_file": "scene:dinosaur-copy.txt"
+      }
+    }
+  ]
+}
