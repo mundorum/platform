@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>noid editor</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a3e1a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 18a2 2 0 1 0 -4 0a2 2 0 0 0 4 0'/%3E%3Cpath d='M8 18a2 2 0 1 0 -4 0a2 2 0 0 0 4 0'/%3E%3Cpath d='M8 6a2 2 0 1 0 -4 0a2 2 0 0 0 4 0'/%3E%3Cpath d='M20 6a2 2 0 1 0 -4 0a2 2 0 0 0 4 0'/%3E%3Cpath d='M14 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0'/%3E%3Cpath d='M7.5 7.5l3 3'/%3E%3Cpath d='M6 8v8'/%3E%3Cpath d='M18 16v-8'/%3E%3Cpath d='M8 6h8'/%3E%3Cpath d='M16 18h-8'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -1360,7 +1361,7 @@ select.prop-val { padding: 3px 4px; }
   <!-- Login overlay — shown until authenticated -->
   <div id="login-overlay" v-show="!auth.token">
     <div class="login-card">
-      <div class="login-brand"><i class="ti ti-circuit-diode"></i> noid</div>
+      <div class="login-brand"><i class="ti ti-topology-complex"></i> noid</div>
       <p class="login-tagline">Scene authoring environment</p>
       <p class="login-desc">Sign in with a pre-authorized Google account.</p>
       <div id="google-signin-btn"></div>
@@ -1725,7 +1726,7 @@ select.prop-val { padding: 3px 4px; }
           <div v-else-if="myScenes.length===0" class="lib-empty">No saved scenes yet. Click <strong>New Scene</strong> or upload a JSON file.</div>
           <div v-else class="res-grid">
             <div v-for="s in myScenes" :key="s.id" class="res-row">
-              <div class="res-icon other"><i class="ti ti-circuit-diode"></i></div>
+              <div class="res-icon other"><i class="ti ti-topology-complex"></i></div>
               <div class="res-info">
                 <div class="res-name">[[ s.title ]]</div>
                 <div class="res-meta">
@@ -1755,7 +1756,7 @@ select.prop-val { padding: 3px 4px; }
           <div v-else-if="publicScenes.length===0" class="lib-empty">No public scenes have been published yet.</div>
           <div v-else class="res-grid">
             <div v-for="s in publicScenes" :key="s.id" class="res-row">
-              <div class="res-icon other"><i class="ti ti-circuit-diode"></i></div>
+              <div class="res-icon other"><i class="ti ti-topology-complex"></i></div>
               <div class="res-info">
                 <div class="res-name">[[ s.title ]]</div>
                 <div class="res-meta">
@@ -1778,7 +1779,7 @@ select.prop-val { padding: 3px 4px; }
 
   <!-- Topbar -->
   <header id="topbar">
-    <div id="logo"><i class="ti ti-circuit-diode"></i> noid</div>
+    <div id="logo"><i class="ti ti-topology-complex"></i> noid</div>
     <input id="filename-input" type="text" v-model="scene.title" placeholder="Scene name" spellcheck="false">
     <button class="tb-btn ghost" @click="saveCurrentScene" :disabled="scenesSaving || !auth.token" title="Save scene to database">
       <i class="ti ti-loader-2" v-if="scenesSaving"></i>
