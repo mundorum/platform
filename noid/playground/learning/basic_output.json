@@ -1,27 +1,27 @@
 {
-  "title": "New Scene",
+  "title": "Simple Output",
   "imports": [],
   "components": [
     {
-      "type": "data:text-source",
       "id": "text_source_1",
+      "type": "data:text-source",
+      "publish": "text~text/output",
+      "subscribe": "player/start~load",
       "properties": {
         "text": "O dinossauro pulou na lama.",
         "label": "text"
-      },
-      "publish": "text~text/output",
-      "subscribe": "player/start~trigger"
+      }
     },
     {
-      "type": "basic:console-display",
       "id": "console_display_1",
+      "type": "basic:console-display",
+      "publish": "output~player/done",
+      "subscribe": "text/output~show",
       "properties": {
         "label": "",
-        "show_topic": false,
-        "pretty": true
-      },
-      "publish": "output~player/done",
-      "subscribe": "text/output~show"
+        "pretty": true,
+        "show_topic": false
+      }
     }
   ]
 }
