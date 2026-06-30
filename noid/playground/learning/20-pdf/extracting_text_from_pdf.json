@@ -14,7 +14,7 @@
     },
     {
       "id": "file_writer_1",
-      "type": "data:file-writer",
+      "type": "data:text-writer",
       "publish": "written~player/done",
       "subscribe": "pdf/text~text;pdf/done~done",
       "properties": {

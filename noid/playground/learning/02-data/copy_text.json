@@ -14,7 +14,7 @@
     },
     {
       "id": "writer",
-      "type": "data:file-writer",
+      "type": "data:text-writer",
       "publish": "written~player/done",
       "subscribe": "pipeline/text~text;pipeline/done~done",
       "properties": {
