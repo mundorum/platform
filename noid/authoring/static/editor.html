@@ -1369,6 +1369,296 @@ select.prop-val { padding: 3px 4px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── View panel ── */
+#view-panel {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.view-sub-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 14px;
+  border-bottom: 0.5px solid var(--c-border);
+  background: var(--c-surface);
+  flex-shrink: 0;
+}
+.view-sub-tab {
+  padding: 4px 12px;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-muted);
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.12s, color 0.12s;
+}
+.view-sub-tab.active { background: var(--c-accent); color: #fff; }
+.view-sub-tab:hover:not(.active) { color: var(--c-text); }
+.view-sub-hint {
+  font-size: 11.5px;
+  color: var(--c-muted);
+  margin-left: 8px;
+  font-style: italic;
+}
+.view-sub-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+/* Authoring two-column layout */
+.view-author-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+.view-available-pane {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 0.5px solid var(--c-border);
+  background: var(--c-surface);
+  overflow-y: auto;
+  padding: 8px 0 20px;
+  display: flex;
+  flex-direction: column;
+}
+.view-canvas-pane {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  background: var(--c-bg);
+}
+
+.avail-section-hdr {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  padding: 6px 14px 4px;
+}
+.avail-comp-hdr {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--c-text);
+  padding: 6px 14px 2px;
+  margin-top: 4px;
+}
+.avail-comp-type {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  background: var(--c-accent-light);
+  color: var(--c-accent);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.avail-prop-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 14px 3px 24px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.avail-prop-row:hover:not(.added) { background: var(--c-accent-light); }
+.avail-prop-row.added { opacity: 0.45; cursor: default; }
+.avail-prop-key {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--c-muted);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.avail-add-btn {
+  background: none;
+  border: 0.5px solid var(--c-accent);
+  color: var(--c-accent);
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.avail-add-btn:hover:not(:disabled) { background: var(--c-accent); color: #fff; }
+.avail-add-btn:disabled { opacity: 0.5; cursor: default; border-color: var(--c-border-strong); color: var(--c-muted); }
+.avail-empty {
+  padding: 24px 14px;
+  font-size: 12px;
+  color: var(--c-muted);
+  font-style: italic;
+}
+
+/* View item cards */
+.view-canvas-empty {
+  text-align: center;
+  padding: 56px 24px;
+  color: var(--c-muted);
+  font-size: 13px;
+  font-style: italic;
+}
+.view-item-card {
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  transition: box-shadow 0.12s, border-color 0.15s;
+}
+.view-item-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.view-item-card.drag-over { border-color: var(--c-accent); background: var(--c-accent-light); }
+.view-item-grip {
+  color: var(--c-muted);
+  font-size: 15px;
+  cursor: grab;
+  flex-shrink: 0;
+  margin-top: 3px;
+  opacity: 0.45;
+  user-select: none;
+}
+.view-item-grip:active { cursor: grabbing; }
+.view-item-body { flex: 1; min-width: 0; }
+.view-item-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.view-item-label-input {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text);
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  outline: none;
+  transition: border-color 0.12s;
+  padding: 1px 2px;
+  min-width: 0;
+}
+.view-item-label-input:focus { border-bottom-color: var(--c-border-strong); }
+.view-item-ref {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--c-accent);
+  background: var(--c-accent-light);
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.view-item-controls { display: flex; align-items: center; gap: 5px; }
+.view-item-width-btn {
+  background: none;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-family: var(--font-ui);
+  color: var(--c-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.view-item-width-btn i { font-size: 11px; }
+.view-item-width-btn.active { background: var(--c-accent); color: #fff; border-color: var(--c-accent); }
+.view-item-del {
+  background: none;
+  border: none;
+  color: var(--c-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 3px;
+  flex-shrink: 0;
+  line-height: 1;
+  border-radius: 3px;
+  transition: color 0.12s;
+}
+.view-item-del:hover { color: #c0392b; }
+
+/* Render mode */
+.view-render-outer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 40px;
+  background: var(--c-bg);
+}
+.view-render-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  max-width: 820px;
+}
+.view-field { display: flex; flex-direction: column; gap: 5px; }
+.view-field.full { grid-column: span 2; }
+.view-field.half { grid-column: span 1; }
+.view-field-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--c-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.view-field-input {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--c-text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.view-field-input:focus { border-color: var(--c-accent); }
+.view-field-textarea {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--c-text);
+  outline: none;
+  resize: vertical;
+  min-height: 88px;
+  line-height: 1.55;
+  transition: border-color 0.15s;
+}
+.view-field-textarea:focus { border-color: var(--c-accent); }
+.view-field-checkbox { accent-color: var(--c-accent); width: 16px; height: 16px; cursor: pointer; margin-top: 2px; }
+.view-render-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  color: var(--c-muted);
+  font-size: 13px;
+  font-style: italic;
+  gap: 10px;
+  text-align: center;
+}
+.view-render-empty i { font-size: 34px; opacity: 0.3; }
 </style>
 </head>
 <body>
@@ -1845,6 +2135,9 @@ select.prop-val { padding: 3px 4px; }
       <button class="view-tab" :class="{active: view==='json'}" @click="switchView('json')">
         <i class="ti ti-braces"></i> JSON
       </button>
+      <button class="view-tab" :class="{active: view==='view'}" @click="switchView('view')">
+        <i class="ti ti-layout-columns"></i> View
+      </button>
     </div>
     <div class="user-badge" v-if="auth.user">
       <img class="user-avatar" :src="auth.user.picture" :alt="auth.user.name" referrerpolicy="no-referrer">
@@ -1856,7 +2149,7 @@ select.prop-val { padding: 3px 4px; }
   <div id="content-row">
 
   <!-- Left: Palette -->
-  <nav id="palette" aria-label="Component palette">
+  <nav id="palette" v-show="view !== 'view'" aria-label="Component palette">
     <div class="palette-header">Components</div>
     <div v-if="catalogErrors.length" class="palette-error" v-for="err in catalogErrors" :key="err">
       ⚠ [[ err ]]
@@ -2001,6 +2294,154 @@ select.prop-val { padding: 3px 4px; }
       <div id="json-error" v-if="jsonError">[[ jsonError ]]</div>
     </div>
 
+    <!-- View mode panel -->
+    <div id="view-panel" v-show="view === 'view'">
+
+      <!-- Sub-tabs -->
+      <div class="view-sub-tabs">
+        <button class="view-sub-tab" :class="{active: viewMode==='author'}" @click="viewMode='author'">
+          <i class="ti ti-edit"></i> Author
+        </button>
+        <button class="view-sub-tab" :class="{active: viewMode==='render'}" @click="viewMode='render'">
+          <i class="ti ti-eye"></i> Preview
+        </button>
+        <span class="view-sub-hint" v-if="viewMode==='author'">Select properties from the left and arrange them into a form</span>
+        <span class="view-sub-hint" v-else>Edit property values — changes apply immediately to the scene</span>
+        <div class="view-sub-actions" v-if="viewMode==='render'">
+          <button class="tb-btn ghost" @click="saveCurrentScene" :disabled="scenesSaving || !auth.token">
+            <i class="ti" :class="scenesSaving ? 'ti-loader-2' : 'ti-device-floppy'"></i> Save
+          </button>
+          <button class="tb-btn" @click="playScene" :disabled="scene.components.length === 0">
+            <i class="ti ti-player-play"></i> Play
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Author mode ── -->
+      <div class="view-author-layout" v-show="viewMode === 'author'">
+
+        <!-- Left: available properties by component -->
+        <div class="view-available-pane">
+          <div class="avail-section-hdr">Properties</div>
+          <div v-if="scene.components.length === 0" class="avail-empty">Add components to the scene first.</div>
+          <template v-for="comp in scene.components" :key="comp.id">
+            <template v-if="compViewProps(comp).length > 0">
+              <div class="avail-comp-hdr">
+                [[ comp.id ]]
+                <span class="avail-comp-type">[[ comp.type.split(':').pop() ]]</span>
+              </div>
+              <div
+                v-for="propKey in compViewProps(comp)"
+                :key="comp.id + '::' + propKey"
+                class="avail-prop-row"
+                :class="{added: isViewPropAdded(comp.id, propKey)}"
+              >
+                <span class="avail-prop-key" :title="propKey">[[ propKey ]]</span>
+                <button
+                  class="avail-add-btn"
+                  :disabled="isViewPropAdded(comp.id, propKey)"
+                  @click="addViewItem(comp.id, propKey)"
+                >
+                  [[ isViewPropAdded(comp.id, propKey) ? '✓ Added' : '+ Add' ]]
+                </button>
+              </div>
+            </template>
+          </template>
+        </div>
+
+        <!-- Right: sortable view canvas -->
+        <div class="view-canvas-pane">
+          <div v-if="!scene.view || !scene.view.items || !scene.view.items.length" class="view-canvas-empty">
+            Select properties from the left panel to build the view.<br>
+            <span style="font-size:11.5px;margin-top:6px;display:block">Drag cards to reorder · toggle Full / Half width for layout</span>
+          </div>
+          <div
+            v-for="(item, idx) in (scene.view && scene.view.items) || []"
+            :key="item.id"
+            class="view-item-card"
+            :class="{'drag-over': viewDragOver === idx}"
+            draggable="true"
+            @dragstart="onViewDragStart(idx)"
+            @dragover.prevent="onViewDragOver(idx)"
+            @dragleave="viewDragOver = null"
+            @drop.prevent="onViewDrop(idx)"
+            @dragend="viewDragOver = null"
+          >
+            <i class="ti ti-grip-vertical view-item-grip"></i>
+            <div class="view-item-body">
+              <div class="view-item-label-row">
+                <input
+                  class="view-item-label-input"
+                  type="text"
+                  v-model="item.label"
+                  placeholder="Label shown to user"
+                >
+                <span class="view-item-ref">[[ item.component_id ]].[[ item.property ]]</span>
+              </div>
+              <div class="view-item-controls">
+                <button
+                  class="view-item-width-btn"
+                  :class="{active: item.width !== 'half'}"
+                  @click="item.width = 'full'"
+                  title="Full row width"
+                ><i class="ti ti-layout-distribute-horizontal"></i> Full</button>
+                <button
+                  class="view-item-width-btn"
+                  :class="{active: item.width === 'half'}"
+                  @click="item.width = 'half'"
+                  title="Half row — pair with next item"
+                ><i class="ti ti-layout-columns"></i> Half</button>
+              </div>
+            </div>
+            <button class="view-item-del" @click="removeViewItem(item.id)" title="Remove from view">
+              <i class="ti ti-trash"></i>
+            </button>
+          </div>
+        </div>
+
+      </div><!-- /.view-author-layout -->
+
+      <!-- ── Render / Preview mode ── -->
+      <div class="view-render-outer" v-show="viewMode === 'render'">
+        <div v-if="!scene.view || !scene.view.items || !scene.view.items.length" class="view-render-empty">
+          <i class="ti ti-layout-off"></i>
+          <span>No properties in this view yet.</span>
+          <span style="font-size:11.5px">Switch to <strong>Author</strong> mode and add properties from the left panel.</span>
+        </div>
+        <div v-else class="view-render-grid">
+          <div
+            v-for="item in scene.view.items"
+            :key="item.id"
+            class="view-field"
+            :class="item.width === 'half' ? 'half' : 'full'"
+          >
+            <label class="view-field-label">[[ item.label || item.property ]]</label>
+            <textarea
+              v-if="viewPropKind(item) === 'text'"
+              class="view-field-textarea"
+              :value="getViewPropValue(item)"
+              @change="setViewPropValue(item, $event.target.value, 'string')"
+            ></textarea>
+            <input
+              v-else-if="viewPropIsBoolean(item)"
+              type="checkbox"
+              class="view-field-checkbox"
+              :checked="getViewPropValue(item)"
+              @change="setViewPropValue(item, $event.target.checked, 'boolean')"
+            >
+            <input
+              v-else
+              class="view-field-input"
+              :type="viewPropIsNumber(item) ? 'number' : 'text'"
+              :value="getViewPropValue(item)"
+              @change="setViewPropValue(item, $event.target.value, viewPropIsNumber(item) ? 'number' : 'string')"
+            >
+          </div>
+        </div>
+      </div><!-- /.view-render-outer -->
+
+    </div><!-- /#view-panel -->
+
     <!-- Execution panel -->
     <div id="exec-panel" v-show="showExecPanel">
       <!-- Tab bar: one tab per run -->
@@ -2056,7 +2497,7 @@ select.prop-val { padding: 3px 4px; }
   </main>
 
   <!-- Right: Properties panel -->
-  <aside id="props-panel" v-if="selectedId !== null">
+  <aside id="props-panel" v-if="selectedId !== null && view !== 'view'">
 
     <template v-if="selectedComp">
 
@@ -2272,6 +2713,11 @@ createApp({
     const jsonText  = ref('');
     const jsonError = ref('');
     let   _syncFromJson = false;
+
+    /* ── View mode ── */
+    const viewMode    = ref('author');  // 'author' | 'render'
+    let   viewDragIdx = null;
+    const viewDragOver = ref(null);
 
     const showExecPanel  = ref(false);
     const verbosePlay    = ref(false);
@@ -3119,7 +3565,100 @@ createApp({
       if (v === 'json') {
         jsonText.value = JSON.stringify(scene.value, null, 2);
       }
+      if (v === 'view') {
+        _ensureView();
+      }
       view.value = v;
+    }
+
+    /* ── View helpers ── */
+    function _ensureView() {
+      if (!scene.value.view) scene.value.view = { items: [] };
+      if (!Array.isArray(scene.value.view.items)) scene.value.view.items = [];
+    }
+
+    function compViewProps(comp) {
+      const entry = catalog.value.find(c => c.id === comp.type);
+      if (!entry || !entry.properties) return [];
+      return Object.keys(entry.properties);
+    }
+
+    function isViewPropAdded(compId, propKey) {
+      const items = scene.value.view?.items || [];
+      return items.some(item => item.component_id === compId && item.property === propKey);
+    }
+
+    function addViewItem(compId, propKey) {
+      if (isViewPropAdded(compId, propKey)) return;
+      _ensureView();
+      const label = propKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      scene.value.view.items.push({
+        id: `vi_${Date.now()}`,
+        component_id: compId,
+        property: propKey,
+        label,
+        width: 'full',
+      });
+    }
+
+    function removeViewItem(id) {
+      if (!scene.value.view?.items) return;
+      scene.value.view.items = scene.value.view.items.filter(x => x.id !== id);
+    }
+
+    function onViewDragStart(idx) { viewDragIdx = idx; }
+    function onViewDragOver(idx)  { viewDragOver.value = idx; }
+    function onViewDrop(toIdx) {
+      const fromIdx = viewDragIdx;
+      viewDragIdx = null;
+      viewDragOver.value = null;
+      if (fromIdx === null || fromIdx === toIdx) return;
+      _ensureView();
+      const items = [...scene.value.view.items];
+      const [moved] = items.splice(fromIdx, 1);
+      items.splice(toIdx, 0, moved);
+      scene.value.view.items = items;
+    }
+
+    function _viewCompEntry(item) {
+      const comp = scene.value.components.find(c => c.id === item.component_id);
+      if (!comp) return null;
+      return catalog.value.find(c => c.id === comp.type) || null;
+    }
+
+    function viewPropKind(item) {
+      const entry = _viewCompEntry(item);
+      const spec = entry?.properties_spec?.[item.property];
+      return (spec && typeof spec === 'object' && spec.kind) ? spec.kind : '';
+    }
+
+    function viewPropIsBoolean(item) {
+      const entry = _viewCompEntry(item);
+      return typeof entry?.properties?.[item.property] === 'boolean';
+    }
+
+    function viewPropIsNumber(item) {
+      const entry = _viewCompEntry(item);
+      return typeof entry?.properties?.[item.property] === 'number';
+    }
+
+    function getViewPropValue(item) {
+      const comp = scene.value.components.find(c => c.id === item.component_id);
+      if (!comp) return '';
+      const entry = _viewCompEntry(item);
+      const defVal = entry?.properties?.[item.property];
+      return comp.properties?.[item.property] !== undefined
+        ? comp.properties[item.property]
+        : (defVal ?? '');
+    }
+
+    function setViewPropValue(item, rawVal, type) {
+      const comp = scene.value.components.find(c => c.id === item.component_id);
+      if (!comp) return;
+      if (!comp.properties) comp.properties = {};
+      if (type === 'boolean') comp.properties[item.property] = Boolean(rawVal);
+      else if (type === 'number') comp.properties[item.property] = Number(rawVal);
+      else comp.properties[item.property] = rawVal;
     }
 
     /* ── Add component ── */
@@ -3419,6 +3958,11 @@ createApp({
       onTimeoutModeChange, onTimeoutHmsChange,
       showPlayWarning, playWarnings, proceedPlay,
       fileInput,
+      viewMode, viewDragOver,
+      compViewProps, isViewPropAdded, addViewItem, removeViewItem,
+      onViewDragStart, onViewDragOver, onViewDrop,
+      viewPropKind, viewPropIsBoolean, viewPropIsNumber,
+      getViewPropValue, setViewPropValue,
       addComponent, deleteComponent,
       onIdChange, setProp,
       syncSub, syncPub, addSubPair, addPubPair, removeSubPair, removePubPair,
