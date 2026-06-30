@@ -476,6 +476,22 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   margin-bottom: 6px;
 }
 .prop-val-full:focus { border-color: var(--c-accent); }
+.prop-val-text {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: var(--c-text);
+  outline: none;
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.5;
+  margin-top: 2px;
+}
+.prop-val-text:focus { border-color: var(--c-accent); }
 select.prop-val { padding: 3px 4px; }
 .prop-del {
   background: none;
@@ -2063,32 +2079,51 @@ select.prop-val { padding: 3px 4px; }
         <div class="props-label">
           Properties
         </div>
-        <div
+        <template
           v-for="(defVal, key) in selectedCatalogEntry.properties"
           :key="key"
-          class="prop-row"
         >
-          <span class="prop-key" :title="key">[[ key ]]</span>
-          <span v-if="propDesc(key)" class="help-icon" :title="propDesc(key)">?</span>
-          <input
-            v-if="typeof defVal !== 'boolean'"
-            class="prop-val"
-            :type="typeof defVal === 'number' ? 'number' : 'text'"
-            :value="selectedComp.properties && selectedComp.properties[key] !== undefined
-                     ? selectedComp.properties[key]
-                     : defVal"
-            @change="setProp(key, $event.target.value, typeof defVal)"
-          >
-          <input
-            v-else
-            class="prop-val"
-            type="checkbox"
-            :checked="selectedComp.properties && selectedComp.properties[key] !== undefined
+          <!-- Multiline text property -->
+          <template v-if="propKind(key) === 'text'">
+            <div class="prop-row">
+              <span class="prop-key" :title="key">[[ key ]]</span>
+              <span v-if="propDesc(key)" class="help-icon" :title="propDesc(key)">?</span>
+            </div>
+            <textarea
+              class="prop-val-text"
+              :value="selectedComp.properties && selectedComp.properties[key] !== undefined
                        ? selectedComp.properties[key]
                        : defVal"
-            @change="setProp(key, $event.target.checked, 'boolean')"
-          >
-        </div>
+              @change="setProp(key, $event.target.value, 'string')"
+            ></textarea>
+          </template>
+          <!-- Boolean property -->
+          <div v-else-if="typeof defVal === 'boolean'" class="prop-row">
+            <span class="prop-key" :title="key">[[ key ]]</span>
+            <span v-if="propDesc(key)" class="help-icon" :title="propDesc(key)">?</span>
+            <input
+              class="prop-val"
+              type="checkbox"
+              :checked="selectedComp.properties && selectedComp.properties[key] !== undefined
+                         ? selectedComp.properties[key]
+                         : defVal"
+              @change="setProp(key, $event.target.checked, 'boolean')"
+            >
+          </div>
+          <!-- Number or single-line text property -->
+          <div v-else class="prop-row">
+            <span class="prop-key" :title="key">[[ key ]]</span>
+            <span v-if="propDesc(key)" class="help-icon" :title="propDesc(key)">?</span>
+            <input
+              class="prop-val"
+              :type="typeof defVal === 'number' ? 'number' : 'text'"
+              :value="selectedComp.properties && selectedComp.properties[key] !== undefined
+                       ? selectedComp.properties[key]
+                       : defVal"
+              @change="setProp(key, $event.target.value, typeof defVal)"
+            >
+          </div>
+        </template>
       </div>
 
       <!-- Subscribe wiring -->
@@ -3044,6 +3079,11 @@ createApp({
       return (spec && typeof spec === 'object' && spec.description) ? spec.description : '';
     }
 
+    function propKind(key) {
+      const spec = selectedCatalogEntry.value?.properties_spec?.[key];
+      return (spec && typeof spec === 'object' && spec.kind) ? spec.kind : '';
+    }
+
     /* ── Sync edit pairs when selection changes ── */
     watch(selectedId, id => {
       const comp = scene.value.components.find(c => c.id === id);
@@ -3368,7 +3408,7 @@ createApp({
       scene, layout, catalog, catalogErrors, catalogGroups,
       filename, view, selectedId, selectedComp, selectedCatalogEntry,
       selectedCompDescription, selectedInputNotices, selectedOutputNotices,
-      allPublishedTopics, inputNoticesTitle, outputNoticesTitle, propDesc,
+      allPublishedTopics, inputNoticesTitle, outputNoticesTitle, propDesc, propKind,
       jsonText, jsonError, onJsonInput, switchView,
       graphNodes, graphEdges, canvasStyle, graphCanvas,
       editSubPairs, editPubPairs,
