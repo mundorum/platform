@@ -92,18 +92,20 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 }
 #logo i { font-size: 18px; }
 #filename-input {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--c-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text);
   background: none;
   border: none;
   outline: none;
-  width: 180px;
+  width: 220px;
   border-bottom: 1px solid transparent;
   transition: border-color 0.15s;
   padding: 2px 4px;
 }
-#filename-input:focus { border-bottom-color: var(--c-border-strong); color: var(--c-text); }
+#filename-input::placeholder { color: var(--c-muted); font-weight: 400; }
+#filename-input:focus { border-bottom-color: var(--c-border-strong); }
 .tb-sep { flex: 1; }
 .tb-btn {
   display: flex;
@@ -1777,7 +1779,12 @@ select.prop-val { padding: 3px 4px; }
   <!-- Topbar -->
   <header id="topbar">
     <div id="logo"><i class="ti ti-circuit-diode"></i> noid</div>
-    <input id="filename-input" type="text" v-model="filename" spellcheck="false">
+    <input id="filename-input" type="text" v-model="scene.title" placeholder="Scene name" spellcheck="false">
+    <button class="tb-btn ghost" @click="saveCurrentScene" :disabled="scenesSaving || !auth.token" title="Save scene to database">
+      <i class="ti ti-loader-2" v-if="scenesSaving"></i>
+      <i class="ti ti-device-floppy" v-else></i>
+      Save
+    </button>
     <button class="tb-btn" @click="newScene" title="Save current scene and start a new one"><i class="ti ti-plus"></i> New Scene</button>
     <button class="tb-btn ghost" @click="openScenesModal"><i class="ti ti-layout-list"></i> Scenes</button>
     <button class="tb-btn ghost" @click="triggerUpload"><i class="ti ti-upload"></i> Upload</button>
@@ -3173,7 +3180,6 @@ createApp({
     function onUpload(e) {
       const file = e.target.files[0];
       if (!file) return;
-      filename.value = file.name;
       const reader = new FileReader();
       reader.onload = ev => {
         try {
@@ -3204,7 +3210,9 @@ createApp({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename.value.endsWith('.json') ? filename.value : filename.value + '.json';
+      const slug = (scene.value.title || 'scene')
+        .trim().replace(/\s+/g, '_').replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'scene';
+      a.download = slug + '.json';
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -3268,14 +3276,16 @@ createApp({
       showPlayWarning.value = false;
 
       // Create a new output slot for this run and make it active.
-      const slot = {
+      // Must use reactive() so mutations to slot.text/loading/done during
+      // streaming are intercepted by Vue and trigger template re-renders.
+      const slot = reactive({
         id:      `slot-${Date.now()}`,
         title:   (scene.value?.title || 'Scratch Run').trim() || 'Scratch Run',
         text:    '',
         code:    null,
         done:    false,
         loading: true,
-      };
+      });
       playSlots.value.push(slot);
       const slotIndex = playSlots.value.length - 1;
       activeSlotIdx.value = slotIndex;
@@ -3348,7 +3358,7 @@ createApp({
       toggleLibrary, deleteLibrary, addFromManifest, saveNewLibrary,
       savedSceneId, showScenesModal, scenesTab, myScenes, publicScenes,
       myScenesLoading, publicScenesLoading, scenesSaving,
-      openScenesModal, newScene, fetchMyScenes, fetchPublicScenes,
+      openScenesModal, newScene, saveCurrentScene, fetchMyScenes, fetchPublicScenes,
       loadScene, togglePublish, deleteMyScene, fmtDate,
       showMonitor, monitorRuns, monitorLoading, activeRunCount,
       openMonitor, closeMonitor, fetchRuns, cancelRun, dismissRun,
