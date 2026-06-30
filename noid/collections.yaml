@@ -1,0 +1,37 @@
+# noid — component collections
+#
+# List Python module paths to import when the server starts.
+# Each module self-registers its components with the Noid registry via
+# @Noid.component(spec) decorators; no extra code is needed here.
+#
+# Update this file and restart the server to add or remove collections.
+# Modules whose optional pip dependencies are missing are skipped with a
+# warning visible in GET /api/catalog/ → "errors" list.
+
+collections:
+  - label: "Basic"
+    modules:
+      - noid_collections.basic.console_display.console_display
+
+  - label: "Data"
+    modules:
+      - noid_collections.data.text_source.text_source
+      - noid_collections.data.csv_source.csv_source
+      - noid_collections.data.text_writer.text_writer
+      - noid_collections.data.sql.sql
+
+  - label: "PDF"
+    modules:
+      - noid_collections.pdf.extractor_pymupdf.extractor_pymupdf
+      - noid_collections.pdf.extractor_markitdown.extractor_markitdown
+      - noid_collections.pdf.ocr.ocr
+      - noid_collections.pdf.postprocessor.postprocessor
+
+  - label: "Logic"
+    modules:
+      - noid_collections.logic.prolog.prolog
+
+  - label: "LM Agents"
+    modules:
+      - noid_collections.lm_agents.lm.lm
+      - noid_collections.lm_agents.ner.ner

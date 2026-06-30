@@ -1,5 +1,19 @@
 services:
 
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-noid}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-noid}
+      POSTGRES_DB: ${POSTGRES_DB:-noid}
+    volumes:
+      - noid_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-noid}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   authoring:
     build:
       context: .
@@ -10,14 +24,17 @@ services:
       - noid_storage:/srv/noid/storage
     environment:
       SECRET_KEY: ${SECRET_KEY:-noid-authoring-dev-key-change-in-production}
-      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/authoring/authoring.db}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://noid:noid@db:5432/noid}
       SCENE_PACKAGES_DIR: /srv/noid/storage/scene_packages
       SHARED_RESOURCES_DIR: /srv/noid/storage/shared_resources
       PROCESSING_URL: http://processing:8001
       PROCESSING_API_KEY: ${PROCESSING_API_KEY:-dev-key}
       COLLECTIONS_FILE: /app/collections.yaml
     depends_on:
-      - processing
+      db:
+        condition: service_healthy
+      processing:
+        condition: service_started
 
   processing:
     build:
@@ -34,3 +51,4 @@ services:
 
 volumes:
   noid_storage:
+  noid_db:

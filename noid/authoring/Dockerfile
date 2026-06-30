@@ -1,5 +1,7 @@
 FROM python:3.11-slim
 
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install shared runner package first (build context is noid/)
@@ -12,6 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy authoring source
 COPY authoring/ authoring/
+
+# Shared collections config (read by both authoring and processing)
+COPY collections.yaml .
 
 WORKDIR /app/authoring
 
