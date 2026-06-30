@@ -1,0 +1,35 @@
+{
+  "title": "Llama CSV row-by-row",
+  "imports": [],
+  "components": [
+    {
+      "id": "csv",
+      "type": "data:csv-source",
+      "publish": "row~pipeline/row;exhausted~player/done",
+      "subscribe": "player/start~first;pipeline/next~next",
+      "properties": {
+        "label": "patients",
+        "content": "name,age,symptoms\nAlice,30,fever cough\nBob,25,headache fatigue\nCarol,45,chest pain shortness of breath"
+      }
+    },
+    {
+      "id": "lm",
+      "type": "lm:lm-agent",
+      "publish": "output~pipeline/lm-out",
+      "subscribe": "pipeline/row~input",
+      "properties": {
+        "model": "llama3.2:3b",
+        "prompt_template": "Given this patient data: {row}\nWhat might be the diagnosis? Answer in one sentence."
+      }
+    },
+    {
+      "id": "display",
+      "type": "basic:console-display",
+      "publish": "output~pipeline/next",
+      "subscribe": "pipeline/lm-out~show",
+      "properties": {
+        "label": "Diagnosis"
+      }
+    }
+  ]
+}

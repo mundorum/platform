@@ -1,0 +1,29 @@
+{
+  "title": "Llama Simple Question",
+  "imports": [],
+  "components": [
+    {
+      "id": "lm_agent_1",
+      "type": "lm:lm-agent",
+      "publish": "output~lm/output",
+      "subscribe": "player/start~input",
+      "properties": {
+        "host": "http://localhost:11434",
+        "model": "llama3.2:3b",
+        "temperature": 0.1,
+        "prompt_template": "Who are you?"
+      }
+    },
+    {
+      "id": "console_display_1",
+      "type": "basic:console-display",
+      "publish": "output~player/done",
+      "subscribe": "lm/output~show",
+      "properties": {
+        "label": "",
+        "pretty": true,
+        "show_topic": false
+      }
+    }
+  ]
+}

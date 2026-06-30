@@ -1,0 +1,28 @@
+{
+  "title": "Extracting Text from PDF",
+  "imports": [],
+  "components": [
+    {
+      "id": "extractor_pymupdf_1",
+      "type": "pdf:extractor-pymupdf",
+      "publish": "text~pdf/text;done~pdf/done",
+      "subscribe": "player/start~extract",
+      "properties": {
+        "input_file": "shared:books/ulisses-james-joyce.pdf",
+        "output_mode": "complete"
+      }
+    },
+    {
+      "id": "file_writer_1",
+      "type": "data:file-writer",
+      "publish": "written~player/done",
+      "subscribe": "pdf/text~text;pdf/done~done",
+      "properties": {
+        "append": false,
+        "encoding": "utf-8",
+        "output_file": "shared:books/ulisses-james-joyce.txt",
+        "page_separator": "\n\n"
+      }
+    }
+  ]
+}

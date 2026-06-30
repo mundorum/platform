@@ -1,6 +1,7 @@
 {
-  "title": "Simple Output",
+  "title": "String to Console",
   "imports": [],
+  "timeout": "short",
   "components": [
     {
       "id": "text_source_1",
@@ -9,7 +10,8 @@
       "subscribe": "player/start~load",
       "properties": {
         "text": "O dinossauro pulou na lama.",
-        "label": "text"
+        "label": "text",
+        "content": "O dinossauro pulou na lama."
       }
     },
     {
