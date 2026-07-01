@@ -1659,6 +1659,157 @@ select.prop-val { padding: 3px 4px; }
   text-align: center;
 }
 .view-render-empty i { font-size: 34px; opacity: 0.3; }
+
+/* Output field type rows in the available-pane */
+.avail-out-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px 4px 14px;
+  transition: background 0.1s;
+}
+.avail-out-row:hover { background: var(--c-accent-light); }
+.avail-out-label {
+  font-size: 11px;
+  color: var(--c-muted);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.avail-out-label i { font-size: 12px; }
+.avail-sep { height: 0.5px; background: var(--c-border); margin: 8px 14px 4px; }
+
+/* Kind badge on output field cards */
+.view-item-kind-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  background: var(--c-tag-text-bg);
+  color: var(--c-tag-text);
+  padding: 1px 7px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.view-item-kind-badge.kind-console { background: #1e1a14; color: #c8a84a; }
+.view-item-kind-badge.kind-text_file { background: var(--c-tag-char-bg); color: var(--c-tag-char); }
+.view-item-kind-badge.kind-csv_file { background: var(--c-tag-place-bg); color: var(--c-tag-place); }
+
+/* Address input inside an authoring card */
+.view-item-addr-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 4px;
+  padding: 3px 7px;
+  color: var(--c-text);
+  outline: none;
+  margin-top: 6px;
+  transition: border-color 0.12s;
+}
+.view-item-addr-input:focus { border-color: var(--c-accent); }
+.view-item-addr-input::placeholder { color: var(--c-muted); font-style: italic; }
+
+/* Output field render: shared header row (label + refresh) */
+.view-field-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.view-field-refresh {
+  background: none;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 10.5px;
+  font-family: var(--font-ui);
+  color: var(--c-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transition: color 0.12s, border-color 0.12s;
+  margin-left: auto;
+}
+.view-field-refresh:hover { color: var(--c-accent); border-color: var(--c-accent); }
+.view-field-refresh i { font-size: 11px; }
+.view-field-err {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #c0392b;
+  padding: 4px 0;
+}
+
+/* Text file output block */
+.view-field-pre {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow: auto;
+  max-height: 320px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--c-text);
+}
+.view-field-pre.empty { color: var(--c-muted); font-style: italic; }
+
+/* Console output block */
+.view-field-console {
+  background: #181510;
+  color: #c8c0a8;
+  border-color: rgba(200,180,140,0.18);
+  max-height: 380px;
+}
+.view-field-console .line-err  { color: #e07060; }
+.view-field-console .line-log  { color: #7a9e78; }
+.view-field-console .line-exit { color: #9a8e78; font-style: italic; }
+
+/* CSV table */
+.view-csv-wrap {
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 320px;
+}
+.view-csv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+}
+.view-csv-table th {
+  background: var(--c-accent-light);
+  color: var(--c-accent);
+  font-weight: 600;
+  padding: 5px 10px;
+  text-align: left;
+  border-bottom: 0.5px solid var(--c-border-strong);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.view-csv-table td {
+  padding: 4px 10px;
+  border-bottom: 0.5px solid var(--c-border);
+  color: var(--c-text);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.view-csv-table tr:hover td { background: var(--c-accent-light); }
+.view-csv-empty { padding: 24px; text-align: center; color: var(--c-muted); font-size: 12px; font-style: italic; }
 </style>
 </head>
 <body>
@@ -2347,6 +2498,23 @@ select.prop-val { padding: 3px 4px; }
               </div>
             </template>
           </template>
+          <!-- Output fields -->
+          <div class="avail-sep"></div>
+          <div class="avail-section-hdr">Output Fields</div>
+          <div class="avail-out-row">
+            <span class="avail-out-label"><i class="ti ti-terminal-2"></i> Console output</span>
+            <button class="avail-add-btn" :disabled="hasConsoleField" @click="addOutputItem('console')">
+              [[ hasConsoleField ? '✓ Added' : '+ Add' ]]
+            </button>
+          </div>
+          <div class="avail-out-row">
+            <span class="avail-out-label"><i class="ti ti-file-text"></i> Text file</span>
+            <button class="avail-add-btn" @click="addOutputItem('text_file')">+ Add</button>
+          </div>
+          <div class="avail-out-row">
+            <span class="avail-out-label"><i class="ti ti-table"></i> CSV file</span>
+            <button class="avail-add-btn" @click="addOutputItem('csv_file')">+ Add</button>
+          </div>
         </div>
 
         <!-- Right: sortable view canvas -->
@@ -2376,9 +2544,27 @@ select.prop-val { padding: 3px 4px; }
                   v-model="item.label"
                   placeholder="Label shown to user"
                 >
-                <span class="view-item-ref">[[ item.component_id ]].[[ item.property ]]</span>
+                <!-- output field: kind badge -->
+                <span
+                  v-if="item.kind"
+                  class="view-item-kind-badge"
+                  :class="'kind-' + item.kind"
+                >
+                  <i class="ti" :class="viewKindIcon(item.kind)"></i>
+                  [[ viewKindLabel(item.kind) ]]
+                </span>
+                <!-- property field: component.property reference -->
+                <span v-else class="view-item-ref">[[ item.component_id ]].[[ item.property ]]</span>
               </div>
-              <div class="view-item-controls">
+              <!-- address input for file-based output fields -->
+              <input
+                v-if="item.kind === 'text_file' || item.kind === 'csv_file'"
+                class="view-item-addr-input"
+                type="text"
+                v-model="item.address"
+                placeholder="address: scope:path/file.ext  e.g. scene:output.txt"
+              >
+              <div class="view-item-controls" style="margin-top:6px">
                 <button
                   class="view-item-width-btn"
                   :class="{active: item.width !== 'half'}"
@@ -2415,27 +2601,102 @@ select.prop-val { padding: 3px 4px; }
             class="view-field"
             :class="item.width === 'half' ? 'half' : 'full'"
           >
-            <label class="view-field-label">[[ item.label || item.property ]]</label>
-            <textarea
-              v-if="viewPropKind(item) === 'text'"
-              class="view-field-textarea"
-              :value="getViewPropValue(item)"
-              @change="setViewPropValue(item, $event.target.value, 'string')"
-            ></textarea>
-            <input
-              v-else-if="viewPropIsBoolean(item)"
-              type="checkbox"
-              class="view-field-checkbox"
-              :checked="getViewPropValue(item)"
-              @change="setViewPropValue(item, $event.target.checked, 'boolean')"
-            >
-            <input
-              v-else
-              class="view-field-input"
-              :type="viewPropIsNumber(item) ? 'number' : 'text'"
-              :value="getViewPropValue(item)"
-              @change="setViewPropValue(item, $event.target.value, viewPropIsNumber(item) ? 'number' : 'string')"
-            >
+
+            <!-- ── Console output field ── -->
+            <template v-if="item.kind === 'console'">
+              <div class="view-field-meta">
+                <span class="view-field-label">[[ item.label || 'Console Output' ]]</span>
+              </div>
+              <pre
+                class="view-field-pre view-field-console"
+                v-if="execText"
+                v-html="execHighlighted"
+              ></pre>
+              <pre class="view-field-pre view-field-console empty" v-else>(no output — click Play to run the scene)</pre>
+            </template>
+
+            <!-- ── Text file field ── -->
+            <template v-else-if="item.kind === 'text_file'">
+              <div class="view-field-meta">
+                <span class="view-field-label">[[ item.label || 'Text File' ]]</span>
+                <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                  <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                  Refresh
+                </button>
+              </div>
+              <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+              </div>
+              <pre
+                class="view-field-pre"
+                v-else-if="viewFileData[item.id]?.text"
+              >[[ viewFileData[item.id].text ]]</pre>
+              <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
+              <pre class="view-field-pre empty" v-else>(click Refresh or run the scene to load)</pre>
+            </template>
+
+            <!-- ── CSV file field ── -->
+            <template v-else-if="item.kind === 'csv_file'">
+              <div class="view-field-meta">
+                <span class="view-field-label">[[ item.label || 'CSV File' ]]</span>
+                <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                  <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                  Refresh
+                </button>
+              </div>
+              <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+              </div>
+              <div v-else-if="viewFileData[item.id]?.text" class="view-csv-wrap">
+                <table class="view-csv-table">
+                  <thead v-if="parseCsvRows(viewFileData[item.id].text).length > 0">
+                    <tr>
+                      <th v-for="(col, ci) in parseCsvRows(viewFileData[item.id].text)[0]" :key="ci">
+                        [[ col ]]
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, ri) in parseCsvRows(viewFileData[item.id].text).slice(1)" :key="ri">
+                      <td v-for="(cell, ci) in row" :key="ci" :title="cell">[[ cell ]]</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-if="parseCsvRows(viewFileData[item.id].text).length <= 1" class="view-csv-empty">CSV file is empty or has only a header row.</div>
+              </div>
+              <div v-else-if="!item.address?.trim()" class="view-csv-wrap">
+                <div class="view-csv-empty">(no address set — configure in Author mode)</div>
+              </div>
+              <div v-else class="view-csv-wrap">
+                <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
+              </div>
+            </template>
+
+            <!-- ── Editable property field (default) ── -->
+            <template v-else>
+              <label class="view-field-label">[[ item.label || item.property ]]</label>
+              <textarea
+                v-if="viewPropKind(item) === 'text'"
+                class="view-field-textarea"
+                :value="getViewPropValue(item)"
+                @change="setViewPropValue(item, $event.target.value, 'string')"
+              ></textarea>
+              <input
+                v-else-if="viewPropIsBoolean(item)"
+                type="checkbox"
+                class="view-field-checkbox"
+                :checked="getViewPropValue(item)"
+                @change="setViewPropValue(item, $event.target.checked, 'boolean')"
+              >
+              <input
+                v-else
+                class="view-field-input"
+                :type="viewPropIsNumber(item) ? 'number' : 'text'"
+                :value="getViewPropValue(item)"
+                @change="setViewPropValue(item, $event.target.value, viewPropIsNumber(item) ? 'number' : 'string')"
+              >
+            </template>
+
           </div>
         </div>
       </div><!-- /.view-render-outer -->
@@ -3661,6 +3922,90 @@ createApp({
       else comp.properties[item.property] = rawVal;
     }
 
+    /* ── Output field state ── */
+    const viewFileData = reactive({});   // { [item.id]: { loading, text, error } }
+
+    const hasConsoleField = computed(() =>
+      (scene.value.view?.items || []).some(x => x.kind === 'console')
+    );
+
+    const OUTPUT_KINDS = { console: 'console', text_file: 'text_file', csv_file: 'csv_file' };
+
+    function addOutputItem(kind) {
+      _ensureView();
+      const labels = { console: 'Console Output', text_file: 'Text File', csv_file: 'CSV Table' };
+      const item = {
+        id: `vi_${Date.now()}`,
+        kind,
+        label: labels[kind] || kind,
+        width: 'full',
+      };
+      if (kind === 'text_file' || kind === 'csv_file') item.address = '';
+      scene.value.view.items.push(item);
+    }
+
+    function viewKindIcon(kind) {
+      return { console: 'ti-terminal-2', text_file: 'ti-file-text', csv_file: 'ti-table' }[kind] || 'ti-puzzle';
+    }
+
+    function viewKindLabel(kind) {
+      return { console: 'console', text_file: 'text file', csv_file: 'csv file' }[kind] || kind;
+    }
+
+    async function fetchViewFileContent(item) {
+      if (!item.address?.trim()) return;
+      viewFileData[item.id] = { loading: true, text: '', error: '' };
+      try {
+        const params = new URLSearchParams({ address: item.address.trim() });
+        if (savedSceneId.value) params.set('scene_id', savedSceneId.value);
+        const resp = await apiFetch(`/api/resources/read/?${params}`);
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          viewFileData[item.id] = { loading: false, text: '', error: err.detail || err.error || resp.statusText };
+          return;
+        }
+        const data = await resp.json();
+        viewFileData[item.id] = { loading: false, text: data.content, error: '' };
+      } catch(e) {
+        viewFileData[item.id] = { loading: false, text: '', error: String(e) };
+      }
+    }
+
+    function refreshAllFileItems() {
+      const items = scene.value.view?.items || [];
+      for (const item of items) {
+        if (item.kind === 'text_file' || item.kind === 'csv_file') {
+          fetchViewFileContent(item);
+        }
+      }
+    }
+
+    function parseCsvRows(text) {
+      if (!text) return [];
+      const rows = [];
+      for (const rawLine of text.split('\n')) {
+        const line = rawLine.replace(/\r$/, '');
+        if (!line.trim()) continue;
+        const cols = [];
+        let inQuote = false;
+        let cell = '';
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuote && line[i + 1] === '"') { cell += '"'; i++; }
+            else inQuote = !inQuote;
+          } else if (ch === ',' && !inQuote) {
+            cols.push(cell); cell = '';
+          } else {
+            cell += ch;
+          }
+        }
+        cols.push(cell);
+        rows.push(cols);
+      }
+      return rows;
+    }
+
     /* ── Add component ── */
     function addComponent(typeId) {
       const entry = catalog.value.find(c => c.id === typeId);
@@ -3910,6 +4255,8 @@ createApp({
         fetchRuns();
         // Refresh resources list to show any files produced by the run.
         if (showResources.value) fetchResources();
+        // Auto-refresh file-based view output fields.
+        if (view.value === 'view') refreshAllFileItems();
       }
     }
 
@@ -3963,6 +4310,9 @@ createApp({
       onViewDragStart, onViewDragOver, onViewDrop,
       viewPropKind, viewPropIsBoolean, viewPropIsNumber,
       getViewPropValue, setViewPropValue,
+      viewFileData, hasConsoleField,
+      addOutputItem, viewKindIcon, viewKindLabel,
+      fetchViewFileContent, parseCsvRows,
       addComponent, deleteComponent,
       onIdChange, setProp,
       syncSub, syncPub, addSubPair, addPubPair, removeSubPair, removePubPair,

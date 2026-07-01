@@ -213,6 +213,73 @@ class ResourceViewSet(viewsets.ModelViewSet):
             content_type=resource.mime_type or 'application/octet-stream',
         )
 
+    # ── read by address ───────────────────────────────────────────────────────
+
+    @action(detail=False, methods=['get'])
+    def read(self, request):
+        """Return UTF-8 text content of a resource identified by its address.
+
+        Query params:
+            address  – full address, e.g. ``scene:output/result.txt``
+            scene_id – disambiguates scene-scoped resources when address alone
+                       matches multiple records (rare)
+        """
+        address = request.query_params.get('address', '').strip()
+        if not address:
+            return Response({'error': 'address parameter is required'}, status=400)
+        if ':' not in address:
+            return Response(
+                {'error': 'address must have the form scope:slug[.ext]'}, status=400
+            )
+
+        scope, rest = address.split(':', 1)
+        m = _EXT_RE.search(rest)
+        if m:
+            ext  = m.group(0).lower()
+            slug = rest[: -len(ext)]
+        else:
+            ext  = ''
+            slug = rest
+
+        scene_id = request.query_params.get('scene_id')
+
+        # ── 1. Try DB lookup first ────────────────────────────────────────────
+        qs = Resource.objects.filter(scope=scope, slug=slug, extension=ext)
+        if scene_id:
+            qs = qs.filter(scene_id=scene_id)
+
+        resource = None
+        try:
+            resource = qs.get()
+        except Resource.DoesNotExist:
+            pass
+        except Resource.MultipleObjectsReturned:
+            resource = qs.order_by('-updated_at').first()
+
+        # ── 2. Resolve the file path ──────────────────────────────────────────
+        if resource:
+            path = Path(resource.storage_path)
+            rtype = resource.resource_type
+        else:
+            # File written by a scene component at runtime — not in DB yet.
+            # Re-use the same path convention that the upload endpoint uses.
+            path  = _storage_path(scope, slug, ext, scene_id)
+            rtype = _detect_type('', ext)
+
+        if not path.exists():
+            raise Http404(f'File not found on disk: {address!r}')
+
+        try:
+            content = path.read_text(encoding='utf-8', errors='replace')
+        except OSError as exc:
+            return Response({'error': str(exc)}, status=500)
+
+        return Response({
+            'content': content,
+            'address': address,
+            'resource_type': rtype,
+        })
+
     # ── tag autocomplete ──────────────────────────────────────────────────────
 
     @action(detail=False, methods=['get'])
