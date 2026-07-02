@@ -47,20 +47,39 @@ def _resolve_timeout(value) -> Optional[int]:
     return 600
 
 
-def _lookup_scene_dir(scene_id: str | None) -> Path | None:
-    """Return the package_dir Path for a saved scene, or None."""
+def _lookup_scene(scene_id: str | None):
+    """Return the Scene object for a saved scene, or None."""
     if not scene_id:
         return None
     try:
         from scenes.models import Scene
-        scene_obj = Scene.objects.get(id=scene_id)
-        if scene_obj.package_dir:
-            p = Path(scene_obj.package_dir)
-            if p.exists():
-                return p
+        return Scene.objects.get(id=scene_id)
+    except Exception:
+        return None
+
+
+def _lookup_scene_dir(scene_obj) -> Path | None:
+    """Return the package_dir Path for a Scene object, or None."""
+    if scene_obj is not None and scene_obj.package_dir:
+        p = Path(scene_obj.package_dir)
+        if p.exists():
+            return p
+    return None
+
+
+def _scan_new_resources(scene_obj, user) -> None:
+    """Register any files a Play run wrote to scene_obj's data/ dir as Resources.
+
+    Reuses the scanner shared with the Processing-Machine run path so both
+    execution routes keep the Resources view in sync with what's on disk.
+    """
+    if scene_obj is None:
+        return
+    try:
+        from scenes.views import _scan_new_resources as scan
+        scan(scene_obj, user)
     except Exception:
         pass
-    return None
 
 
 def _inject_namespaces(scene: dict, scene_dir: Path | None = None) -> dict:
@@ -119,10 +138,12 @@ class PlayView(View):
         except json.JSONDecodeError as exc:
             return JsonResponse({'error': f'Invalid JSON: {exc}'}, status=400)
 
-        scene_dir = _lookup_scene_dir(request.GET.get('scene_id'))
+        scene_obj = _lookup_scene(request.GET.get('scene_id'))
+        scene_dir = _lookup_scene_dir(scene_obj)
         catalog, _ = _load_enabled_modules()
         timeout = _resolve_timeout(scene.get('timeout'))
         result = run_scene(_inject_namespaces(scene, scene_dir), catalog, timeout=timeout, scene_dir=scene_dir)
+        _scan_new_resources(scene_obj, request.user)
         return JsonResponse(result)
 
 
@@ -140,7 +161,8 @@ class PlayStreamView(View):
 
         from scenes.models import SceneRun
 
-        scene_dir  = _lookup_scene_dir(request.GET.get('scene_id'))
+        scene_obj  = _lookup_scene(request.GET.get('scene_id'))
+        scene_dir  = _lookup_scene_dir(scene_obj)
         catalog, _ = _load_enabled_modules()
         timeout    = _resolve_timeout(scene_spec.get('timeout'))
         verbose    = request.GET.get('verbose', '1') == '1'
@@ -152,6 +174,8 @@ class PlayStreamView(View):
             started_at=timezone.now(),
         )
         run_id_str = str(run.run_id)
+        # Capture before the generator closure.
+        user = request.user
 
         def on_start(proc: subprocess.Popen) -> None:
             with _local_lock:
@@ -184,5 +208,6 @@ class PlayStreamView(View):
                 if run.status == SceneRun.Status.RUNNING:
                     run.status = SceneRun.Status.DONE if rc == 0 else SceneRun.Status.FAILED
                 run.save()
+                _scan_new_resources(scene_obj, user)
 
         return StreamingHttpResponse(gen(), content_type='text/plain; charset=utf-8')

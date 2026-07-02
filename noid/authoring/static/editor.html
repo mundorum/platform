@@ -1893,10 +1893,9 @@ select.prop-val { padding: 3px 4px; }
                   @click="copyAddress(r)">
                   <i class="ti" :class="resCopiedId===r.id ? 'ti-check' : 'ti-copy'"></i>
                 </button>
-                <a class="res-act-btn" :href="`/api/resources/${r.id}/download/`"
-                  :download="r.display_name" title="Download">
+                <button class="res-act-btn" title="Download" @click="downloadResource(r)">
                   <i class="ti ti-download"></i>
-                </a>
+                </button>
                 <button class="res-act-btn danger" title="Delete" @click="deleteResource(r)">
                   <i class="ti ti-trash"></i>
                 </button>
@@ -3242,6 +3241,9 @@ createApp({
       try {
         const params = new URLSearchParams();
         if (resFilterScope.value) params.set('scope', resFilterScope.value);
+        if (resFilterScope.value === 'scene' && savedSceneId.value) {
+          params.set('scene_id', savedSceneId.value);
+        }
         if (resFilterType.value)  params.set('type',  resFilterType.value);
         if (resSearch.value)      params.set('search', resSearch.value);
         const r = await apiFetch(`/api/resources/?${params}`);
@@ -3264,6 +3266,24 @@ createApp({
       await navigator.clipboard.writeText(r.address).catch(() => {});
       resCopiedId.value = r.id;
       setTimeout(() => { resCopiedId.value = null; }, 1800);
+    }
+
+    async function downloadResource(r) {
+      try {
+        const resp = await apiFetch(`/api/resources/${r.id}/download/`);
+        if (!resp.ok) throw new Error(await resp.text());
+        const blob = await resp.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = r.display_name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch(e) {
+        _resStatus(`Download failed: ${e}`, false);
+      }
     }
 
     async function deleteResource(r) {
@@ -4278,7 +4298,7 @@ createApp({
       showResources, resTab, resources, resLoading, resStatus, resStatusOk,
       resCopiedId, resDragover, resUploading, resFilterScope, resFilterType,
       resSearch, resTypes, resTypeIcon, resUpload, sceneList,
-      openResources, fetchResources, copyAddress, deleteResource,
+      openResources, fetchResources, copyAddress, deleteResource, downloadResource,
       onResFileChange, onResDrop, submitUpload,
       showLibraries, libTab, libraries, availableCollections, availableLoading,
       libStatus, libStatusOk, libSaving, newLib,

@@ -96,7 +96,12 @@ def _scan_new_resources(scene: 'Scene | None', user) -> int:
     if not dirs_to_scan:
         return 0
 
-    known_paths = set(Resource.objects.values_list('storage_path', flat=True))
+    # Resolve so a stray relative storage_path (e.g. legacy data) can't defeat
+    # the dedup check and cause the same on-disk file to be registered twice.
+    known_paths = {
+        str(Path(p).resolve())
+        for p in Resource.objects.values_list('storage_path', flat=True)
+    }
     owner = user if (user and hasattr(user, 'is_authenticated') and user.is_authenticated) else None
     created = 0
 
@@ -104,7 +109,7 @@ def _scan_new_resources(scene: 'Scene | None', user) -> int:
         for file_path in root_dir.rglob('*'):
             if not file_path.is_file():
                 continue
-            abs_path = str(file_path)
+            abs_path = str(file_path.resolve())
             if abs_path in known_paths:
                 continue
 
