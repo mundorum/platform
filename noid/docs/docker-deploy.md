@@ -138,6 +138,64 @@ curl http://localhost:8001/health
 
 ---
 
+## Production deployment behind a reverse proxy
+
+In production, only **Authoring** should be reachable from the internet. Processing
+is called server-side by Authoring over the Docker network
+(`PROCESSING_URL=http://processing:8001`) and every one of its routes requires a
+bearer token — it has no reason to be exposed publicly, and doing so only adds
+attack surface. Don't create a public proxy entry for it.
+
+### Environment for production
+
+In `.env`, beyond the values from step 2, set:
+
+```dotenv
+DEBUG=false
+ALLOWED_HOSTS=<your-domain>
+CORS_ALLOWED_ORIGINS=https://<your-domain>
+```
+
+`docker-compose.yml` also reads `AUTHORING_PORT` / `PROCESSING_PORT` to control which
+host ports get published (default `8000`/`8001`). On a shared host running other
+Dockerized services, pick free ports for these:
+
+```dotenv
+AUTHORING_PORT=<free-host-port>
+```
+
+If you're using Google OAuth login, register `https://<your-domain>` as an
+authorized JavaScript origin and `https://<your-domain>/auth/google/callback/` as
+an authorized redirect URI on the OAuth client — the frontend derives the
+callback URL from `window.location.origin`, so no code change is needed, just the
+OAuth client configuration.
+
+### Reverse proxy configuration
+
+Point your reverse proxy (nginx, Nginx Proxy Manager, Caddy, Traefik, etc.) at the
+Authoring container's published port, with SSL/TLS terminated at the proxy:
+
+```
+https://<your-domain>  →  http://<docker-host-address>:<AUTHORING_PORT>
+```
+
+A single location (`/`) is enough — Authoring serves the UI, `/api/`, and `/auth/`
+from one Django app on one port, so no path-based routing is required.
+
+If your proxy itself runs in a container (common with Nginx Proxy Manager), it
+generally can't reach the target container via `127.0.0.1` — it needs the Docker
+bridge gateway address instead. Find it with:
+
+```bash
+ip addr show docker0   # or: docker network inspect bridge
+```
+
+Do not publish or proxy the Processing port publicly. If you want to keep it
+reachable for local debugging on the host, restrict it at the firewall rather
+than routing it through the reverse proxy.
+
+---
+
 ## Day-to-day operations
 
 ### View logs

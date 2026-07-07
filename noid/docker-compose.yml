@@ -19,11 +19,16 @@ services:
       context: .
       dockerfile: authoring/Dockerfile
     ports:
-      - "8000:8000"
+      - "${AUTHORING_PORT:-8000}:8000"
     volumes:
       - noid_storage:/srv/noid/storage
     environment:
       SECRET_KEY: ${SECRET_KEY:-noid-authoring-dev-key-change-in-production}
+      DEBUG: ${DEBUG:-true}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8000}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      INITIAL_MANAGER_EMAIL: ${INITIAL_MANAGER_EMAIL:-}
       DATABASE_URL: ${DATABASE_URL:-postgresql://noid:noid@db:5432/noid}
       SCENE_PACKAGES_DIR: /srv/noid/storage/scene_packages
       SHARED_RESOURCES_DIR: /srv/noid/storage/shared_resources
@@ -41,7 +46,7 @@ services:
       context: .
       dockerfile: processing/Dockerfile
     ports:
-      - "8001:8001"
+      - "${PROCESSING_PORT:-8001}:8001"
     volumes:
       - noid_storage:/srv/noid/storage
     environment:
