@@ -119,16 +119,23 @@ noid/
   do not rename or remove its URL patterns (`/api/catalog/`, `/api/play/`,
   `/api/play/stream/`).
 - `pytest-django` for tests; real database, no mocks.
-- `authoring/Dockerfile`'s gunicorn `CMD` sets `--timeout 0` deliberately — do
-  not remove it. `/api/play/stream/` and `/api/scenes/{id}/run/stream/` are
-  long-running streaming responses whose duration is controlled by the
-  scene's own timeout system (`editor/views.py` `_resolve_timeout`,
-  `runner.py`'s subprocess timer, manual cancel via `RunCancelView`), not by
-  the WSGI server. Gunicorn's `sync` workers have no way to distinguish "still
-  legitimately streaming" from "hung" mid-request, so any nonzero timeout
-  here will eventually kill a valid long-running scene run — this exact
-  failure mode already happened in production (`WORKER TIMEOUT`, silent
-  because there was also no `LOGGING` config — see `config/settings.py`).
+- `authoring/Dockerfile`'s gunicorn `CMD` sets `--timeout 3700` deliberately —
+  don't drop it back to the default (30s) or disable it (`0`).
+  `/api/play/stream/` and `/api/scenes/{id}/run/stream/` are long-running
+  streaming responses whose duration is controlled by the scene's own
+  timeout system (`editor/views.py` `_resolve_timeout`, `runner.py`'s
+  subprocess timer, manual cancel via `RunCancelView`), not by the WSGI
+  server — gunicorn's default 30s killed a valid long-running run mid-stream
+  in production once already. But don't go back to disabling it either: with
+  only 2 sync workers, a scene that hangs forever due to an app-level bug
+  (e.g. bad pub/sub notice wiring that never publishes `player/done`, so
+  `NoidPlayer.run()`'s `await done.wait()` blocks with no timeout) can
+  exhaust every worker and take the entire service down, not just that one
+  request — this also already happened in production. `--timeout 3700` is
+  the compromise: comfortably above the app's own longest built-in preset
+  (3600s), but still a hard ceiling gunicorn can use to reclaim a worker from
+  a truly stuck request. Pair any increase to this value with more
+  `--workers`, not with disabling the timeout again.
 
 ### processing (FastAPI)
 - All configuration via env vars; no settings files (`app/config.py` uses
