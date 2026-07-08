@@ -132,9 +132,20 @@ docker compose exec authoring python manage.py seed_initial_manager
 Quick health checks:
 
 ```bash
-curl http://localhost:8000/api/health/
-curl http://localhost:8001/health
+# Authoring — serves the editor page, no auth required
+curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8000/
+curl http://localhost:8000/auth/config/
+
+# Processing — every route requires the shared bearer token
+curl -H "Authorization: Bearer ${PROCESSING_API_KEY}" http://localhost:8001/health
 ```
+
+> If `ALLOWED_HOSTS` is restricted to a specific domain (as recommended in
+> [production](#production-deployment-behind-a-reverse-proxy)), requests to
+> `localhost` will get a `400 Bad Request` regardless of path — Django rejects
+> them based on the `Host` header, not the URL. Either test through the real
+> domain, or add the header curl would otherwise be missing:
+> `curl -H "Host: <your-domain>" http://localhost:8000/auth/config/`
 
 ---
 
@@ -240,10 +251,20 @@ docker compose exec authoring python manage.py shell
 
 ### Update collections.yaml
 
-Edit the root-level `collections.yaml`, then restart the affected services:
+If you're only enabling/disabling collections that are already installed,
+edit the root-level `collections.yaml` and restart:
 
 ```bash
 docker compose restart authoring processing
+```
+
+If you're adding a **new** collection whose modules come from a package not
+yet in the images, editing `collections.yaml` alone isn't enough — a restart
+won't install anything. Add the package to both `authoring/requirements.txt`
+and `processing/requirements.txt`, then rebuild instead of restarting:
+
+```bash
+docker compose up -d --build authoring processing
 ```
 
 ---

@@ -149,6 +149,7 @@ activemq-data/
 
 # Environments
 .env
+.env.prod
 .envrc
 .venv
 env/
@@ -218,3 +219,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 noid/storage
+
+# Internal-only deployment notes — contains real infra details, never publish
+noid/docs/internal/

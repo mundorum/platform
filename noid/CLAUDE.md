@@ -142,6 +142,24 @@ noid/
 | `PROCESSING_URL` | authoring | base URL of the Processing server |
 | `PROCESSING_API_KEY` | both | shared secret for machine-to-machine auth |
 
+> Under Docker Compose, `COLLECTIONS_FILE`, `SCENE_PACKAGES_DIR`,
+> `SHARED_RESOURCES_DIR`, `PROCESSING_URL`, and `SCENES_DIR` are hardcoded in
+> `docker-compose.yml`'s `environment:` blocks and silently override whatever
+> `.env` says — editing `.env` has no effect on these under Docker. They only
+> take their `.env` value when running bare (`manage.py runserver` /
+> `uvicorn --reload`, no containers). When debugging container behavior for
+> any of these, check `docker-compose.yml` directly, not `.env`.
+
+`collections.yaml` entries reference importable module paths (e.g.
+`noid_collections.lm_agents.lm`) — the pip package providing them
+(`mundorum-noid-collections`) must be listed in **both**
+`authoring/requirements.txt` (catalog + `/api/libraries/available/`) **and**
+`processing/requirements.txt` (`worker.py` imports the same modules at
+scene-run time). Adding a collection to `collections.yaml` without adding its
+package to both requirements files fails silently — `libraries/views.py`'s
+`available()` catches the `ImportError` and returns `[]` with no visible
+error.
+
 ---
 
 ## Development commands

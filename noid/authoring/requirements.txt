@@ -5,6 +5,7 @@ pyyaml>=6.0
 requests>=2.31
 gunicorn>=21.2
 mundorum-noid>=0.1.1
+mundorum-noid-collections>=0.1.14
 google-auth>=2.38
 django-cors-headers>=4.7
 python-dotenv>=1.1
