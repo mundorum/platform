@@ -53,6 +53,8 @@ services:
       PROCESSING_API_KEY: ${PROCESSING_API_KEY:-dev-key}
       SCENES_DIR: /srv/noid/storage/scene_packages
       COLLECTIONS_FILE: /app/collections.yaml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   noid_storage:
