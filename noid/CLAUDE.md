@@ -119,6 +119,16 @@ noid/
   do not rename or remove its URL patterns (`/api/catalog/`, `/api/play/`,
   `/api/play/stream/`).
 - `pytest-django` for tests; real database, no mocks.
+- `authoring/Dockerfile`'s gunicorn `CMD` sets `--timeout 0` deliberately — do
+  not remove it. `/api/play/stream/` and `/api/scenes/{id}/run/stream/` are
+  long-running streaming responses whose duration is controlled by the
+  scene's own timeout system (`editor/views.py` `_resolve_timeout`,
+  `runner.py`'s subprocess timer, manual cancel via `RunCancelView`), not by
+  the WSGI server. Gunicorn's `sync` workers have no way to distinguish "still
+  legitimately streaming" from "hung" mid-request, so any nonzero timeout
+  here will eventually kill a valid long-running scene run — this exact
+  failure mode already happened in production (`WORKER TIMEOUT`, silent
+  because there was also no `LOGGING` config — see `config/settings.py`).
 
 ### processing (FastAPI)
 - All configuration via env vars; no settings files (`app/config.py` uses

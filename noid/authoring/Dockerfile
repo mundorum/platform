@@ -25,4 +25,11 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
+# --timeout 0 disables gunicorn's worker-timeout kill. Scenes have their own
+# timeout/cancel machinery (editor/views.py _resolve_timeout, runner.py's
+# subprocess timer, RunCancelView) and are allowed to run for minutes to
+# hours by design (timeout presets up to 3600s, or unlimited when unset) —
+# gunicorn's default 30s kill fired mid-stream on a legitimate long-running
+# run rather than a hung one, since sync workers can't distinguish the two
+# for a single in-progress streaming response.
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "0"]
