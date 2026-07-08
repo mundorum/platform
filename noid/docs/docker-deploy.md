@@ -231,12 +231,17 @@ docker compose down
 docker compose up -d
 ```
 
-### Rebuild after a code change
+### Deploy an update
 
 ```bash
+git pull
+
 # Rebuild and restart a single service
 docker compose up -d --build authoring
 docker compose up -d --build processing
+
+# Apply new migrations, if any
+docker compose exec authoring python manage.py migrate
 ```
 
 ### Run Django management commands

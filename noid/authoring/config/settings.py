@@ -14,6 +14,32 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'noid-authoring-dev-key-not-for-produc
 DEBUG = os.environ.get('DEBUG', 'true').lower() != 'false'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
+# Django's default LOGGING only prints unhandled-exception tracebacks to
+# console when DEBUG=True, and otherwise tries to email ADMINS (unconfigured
+# here, so it silently does nothing). Without this, a 500 in production
+# leaves no trace anywhere — override so tracebacks always reach stderr,
+# which `docker compose logs authoring` picks up.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
