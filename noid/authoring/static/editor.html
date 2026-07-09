@@ -2235,6 +2235,9 @@ select.prop-val { padding: 3px 4px; }
                 <button class="res-act-btn" title="Open a copy of this scene" @click="loadScene(s,false);showScenesModal=false">
                   <i class="ti ti-copy"></i>
                 </button>
+                <button class="res-act-btn" title="Open in view mode" @click="openShareLink(s)">
+                  <i class="ti ti-eye"></i>
+                </button>
                 <button class="res-act-btn" :class="{copied:shareCopiedId===s.id}"
                   :title="shareCopiedId===s.id ? 'Link copied!' : 'Copy share link'" @click="copyShareLink(s)">
                   <i class="ti" :class="shareCopiedId===s.id ? 'ti-check' : 'ti-share-2'"></i>
@@ -3654,11 +3657,18 @@ createApp({
       await fetchMyScenes();
     }
 
+    function shareLinkUrl(s) {
+      return `${window.location.origin}/?scene=${encodeURIComponent(s.id)}&view=true`;
+    }
+
     async function copyShareLink(s) {
-      const url = `${window.location.origin}/?scene=${encodeURIComponent(s.id)}&view=true`;
-      await navigator.clipboard.writeText(url).catch(() => {});
+      await navigator.clipboard.writeText(shareLinkUrl(s)).catch(() => {});
       shareCopiedId.value = s.id;
       setTimeout(() => { shareCopiedId.value = null; }, 1800);
+    }
+
+    function openShareLink(s) {
+      window.open(shareLinkUrl(s), '_blank', 'noopener');
     }
 
     async function togglePublish(s) {
@@ -4401,7 +4411,7 @@ createApp({
       savedSceneId, showScenesModal, scenesTab, myScenes, publicScenes,
       myScenesLoading, publicScenesLoading, scenesSaving, shareCopiedId,
       openScenesModal, newScene, saveCurrentScene, fetchMyScenes, fetchPublicScenes,
-      loadScene, togglePublish, deleteMyScene, fmtDate, copyShareLink,
+      loadScene, togglePublish, deleteMyScene, fmtDate, copyShareLink, openShareLink,
       showMonitor, monitorRuns, monitorLoading, activeRunCount,
       openMonitor, closeMonitor, fetchRuns, cancelRun, dismissRun,
       fmtDatetime, runDuration,
