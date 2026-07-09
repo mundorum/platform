@@ -136,6 +136,27 @@ noid/
   (3600s), but still a hard ceiling gunicorn can use to reclaim a worker from
   a truly stuck request. Pair any increase to this value with more
   `--workers`, not with disabling the timeout again.
+- `config/settings.py` sets `SECURE_PROXY_SSL_HEADER =
+  ('HTTP_X_FORWARDED_PROTO', 'https')` unconditionally — don't remove it.
+  Behind a TLS-terminating reverse proxy (NPM in production) the container
+  only ever sees plain HTTP, so without this `request.is_secure()` is always
+  `False`, and Django 4+'s CSRF check computes its expected Origin as
+  `http://<host>` while the browser sends `https://<host>` — every unsafe
+  request (including the `/admin/` login POST) gets rejected with a CSRF 403.
+  This already broke admin login in production once. Only safe with a proxy
+  that sets this header itself and strips any client-supplied copy first
+  (NPM does both) — never enable it in front of an untrusted proxy.
+  `CSRF_TRUSTED_ORIGINS` (env var, comma-separated, each with scheme) is a
+  second line of defense for the same class of failure.
+- Static files are served by `whitenoise` (`WhiteNoiseMiddleware` right after
+  `SecurityMiddleware`, `STORAGES['staticfiles']` using
+  `CompressedManifestStaticFilesStorage`), because gunicorn never serves
+  `/static/` on its own and there's no separate web server or nginx location
+  for it in front of the container. `authoring/Dockerfile` runs `python
+  manage.py collectstatic --noinput` at build time to build the manifest —
+  keep that step if you touch the Dockerfile. Without it, admin's own
+  CSS/JS 404s in production (silently fine under `DEBUG=True` `runserver`,
+  which autoserves static files — this only breaks under gunicorn).
 
 ### processing (FastAPI)
 - All configuration via env vars; no settings files (`app/config.py` uses

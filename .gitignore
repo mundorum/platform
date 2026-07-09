@@ -220,5 +220,8 @@ __marimo__/
 
 noid/storage
 
+# Built by collectstatic (Dockerfile / manual runs) — regenerated, not source
+noid/authoring/staticfiles/
+
 # Internal-only deployment notes — contains real infra details, never publish
 noid/docs/internal/

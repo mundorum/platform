@@ -23,6 +23,11 @@ WORKDIR /app/authoring
 ENV DJANGO_SETTINGS_MODULE=config.settings
 ENV PYTHONUNBUFFERED=1
 
+# Builds the whitenoise-served static manifest (admin CSS/JS, etc.) into
+# STATIC_ROOT. Doesn't touch the database, so it's safe to run at build time
+# with no real env vars present — settings.py's defaults are enough.
+RUN python manage.py collectstatic --noinput
+
 EXPOSE 8000
 
 # Scenes have their own timeout/cancel machinery (editor/views.py

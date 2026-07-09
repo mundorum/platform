@@ -165,7 +165,14 @@ In `.env`, beyond the values from step 2, set:
 DEBUG=false
 ALLOWED_HOSTS=<your-domain>
 CORS_ALLOWED_ORIGINS=https://<your-domain>
+CSRF_TRUSTED_ORIGINS=https://<your-domain>
 ```
+
+`CSRF_TRUSTED_ORIGINS` (with scheme) is required behind a reverse proxy that
+terminates TLS — the proxy talks plain HTTP to the container, so without it
+(and without `SECURE_PROXY_SSL_HEADER`, already set unconditionally in
+`config/settings.py` for exactly this case) Django's CSRF check rejects every
+POST, including the `/admin/` login form, with a 403.
 
 `docker-compose.yml` also reads `AUTHORING_PORT` / `PROCESSING_PORT` to control which
 host ports get published (default `8000`/`8001`). On a shared host running other

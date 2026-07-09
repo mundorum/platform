@@ -14,6 +14,16 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'noid-authoring-dev-key-not-for-produc
 DEBUG = os.environ.get('DEBUG', 'true').lower() != 'false'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
+# Behind a TLS-terminating reverse proxy (e.g. Nginx Proxy Manager) this
+# container only ever sees plain HTTP, so request.is_secure() is False unless
+# told otherwise — and Django's CSRF check builds its expected Origin as
+# scheme + host using is_secure(). Without this, that computed
+# "http://<host>" never matches the browser's real "https://<host>" Origin
+# header, and every unsafe request (including the admin login POST) gets
+# rejected with a CSRF 403. Only safe with a proxy that sets this header
+# itself and strips any client-supplied copy first (NPM does both).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # Django's default LOGGING only prints unhandled-exception tracebacks to
 # console when DEBUG=True, and otherwise tries to email ADMINS (unconfigured
 # here, so it silently does nothing). Without this, a 500 in production
@@ -60,6 +70,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -99,8 +110,23 @@ else:
     }
 
 # ── static files ──────────────────────────────────────────────────────────────
+# Gunicorn never serves /static/ on its own, and there's no separate web
+# server or nginx location for it in front of this container (NPM forwards
+# straight to gunicorn) — so admin's own CSS/JS (and anything else under
+# STATIC_URL) is 404 in production without something serving it from inside
+# the app itself. Whitenoise does that, backed by a manifest built by
+# `collectstatic` at image build time (see authoring/Dockerfile).
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 WSGI_APPLICATION = 'config.wsgi.application'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -125,6 +151,14 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 _cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',') if o.strip()]
 CORS_ALLOW_CREDENTIALS = True
+
+# ── CSRF ──────────────────────────────────────────────────────────────────────
+# Belt-and-suspenders alongside SECURE_PROXY_SSL_HEADER above: with that header
+# set correctly this shouldn't be needed for same-origin admin/API POSTs, but
+# it's what Django actually asks for when trusting an origin behind a proxy,
+# and it's required if this app is ever served from more than one hostname.
+_csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
 
 # ── initial manager seed ──────────────────────────────────────────────────────
 INITIAL_MANAGER_EMAIL = os.environ.get('INITIAL_MANAGER_EMAIL', '')
