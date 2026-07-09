@@ -2198,6 +2198,10 @@ select.prop-val { padding: 3px 4px; }
                 <button class="res-act-btn" :title="s.is_public?'Make private':'Publish to gallery'" @click="togglePublish(s)">
                   <i class="ti" :class="s.is_public?'ti-eye-off':'ti-world'"></i>
                 </button>
+                <button v-if="s.is_public" class="res-act-btn" :class="{copied:shareCopiedId===s.id}"
+                  :title="shareCopiedId===s.id ? 'Link copied!' : 'Copy share link'" @click="copyShareLink(s)">
+                  <i class="ti" :class="shareCopiedId===s.id ? 'ti-check' : 'ti-share-2'"></i>
+                </button>
                 <button class="res-act-btn danger" title="Delete" @click="deleteMyScene(s)">
                   <i class="ti ti-trash"></i>
                 </button>
@@ -2223,6 +2227,10 @@ select.prop-val { padding: 3px 4px; }
               <div class="res-actions">
                 <button class="res-act-btn" title="Open a copy of this scene" @click="loadScene(s,false);showScenesModal=false">
                   <i class="ti ti-copy"></i>
+                </button>
+                <button class="res-act-btn" :class="{copied:shareCopiedId===s.id}"
+                  :title="shareCopiedId===s.id ? 'Link copied!' : 'Copy share link'" @click="copyShareLink(s)">
+                  <i class="ti" :class="shareCopiedId===s.id ? 'ti-check' : 'ti-share-2'"></i>
                 </button>
               </div>
             </div>
@@ -3064,14 +3072,16 @@ createApp({
     }
 
     async function initAuth() {
-      // Consume token or error passed back by the Google redirect callback
+      // Consume token or error passed back by the Google redirect callback,
+      // and any deep link to a shared scene (?scene=<id>&view=true).
       const params = new URLSearchParams(window.location.search);
-      const urlToken = params.get('auth_token');
-      const urlError = params.get('auth_error');
+      const urlToken   = params.get('auth_token');
+      const urlError   = params.get('auth_error');
+      const sceneParam = params.get('scene');
+      const viewParam  = params.get('view');
       if (urlToken) {
         auth.token = urlToken;
         localStorage.setItem('noid_token', urlToken);
-        history.replaceState(null, '', '/');
       }
       if (urlError) {
         const messages = {
@@ -3080,6 +3090,8 @@ createApp({
           not_authorized:     'Access denied. Contact a manager to get access.',
         };
         loginError.value = messages[urlError] || 'Sign-in failed.';
+      }
+      if (urlToken || urlError) {
         history.replaceState(null, '', '/');
       }
 
@@ -3102,7 +3114,12 @@ createApp({
           if (r.ok) {
             auth.user = await r.json();
             fetchCatalog();
-            loadLastScene();
+            if (sceneParam) {
+              await openSharedScene(sceneParam, viewParam);
+              history.replaceState(null, '', '/');
+            } else {
+              loadLastScene();
+            }
           } else {
             auth.token = null;
             localStorage.removeItem('noid_token');
@@ -3123,10 +3140,17 @@ createApp({
       });
       await gsiReady();
 
+      // Carry the shared-scene deep link through the redirect round-trip:
+      // the callback view echoes next_scene/next_view back onto /?auth_token=...
+      const nextParams = new URLSearchParams();
+      if (sceneParam) nextParams.set('next_scene', sceneParam);
+      if (viewParam)  nextParams.set('next_view', viewParam);
+      const callbackQs = nextParams.toString();
+
       google.accounts.id.initialize({
         client_id:  googleClientId,
         ux_mode:    'redirect',
-        login_uri:  `${window.location.origin}/auth/google/callback/`,
+        login_uri:  `${window.location.origin}/auth/google/callback/${callbackQs ? '?' + callbackQs : ''}`,
       });
       google.accounts.id.renderButton(
         document.getElementById('google-signin-btn'),
@@ -3491,6 +3515,7 @@ createApp({
     const myScenesLoading     = ref(false);
     const publicScenesLoading = ref(false);
     const scenesSaving        = ref(false);
+    const shareCopiedId       = ref(null);
 
     async function saveCurrentScene() {
       if (!auth.token) return null;
@@ -3555,6 +3580,24 @@ createApp({
       } catch(e) { /* no saved scenes */ }
     }
 
+    /* Opens a scene from a shared link (?scene=<id>&view=true). Always loads
+       as an unowned copy — like "Open a copy" in the Public tab — so a
+       visitor can't accidentally overwrite someone else's scene on Save. */
+    async function openSharedScene(sceneId, viewParam) {
+      try {
+        const r = await apiFetch(`/api/scenes/${encodeURIComponent(sceneId)}/`);
+        if (r.ok) {
+          loadScene(await r.json(), false);
+          if (viewParam === 'true' || viewParam === '1') {
+            switchView('view');
+            viewMode.value = 'render';
+          }
+          return;
+        }
+      } catch(e) { console.error('Failed to open shared scene:', e); }
+      loadLastScene();
+    }
+
     async function newScene() {
       if (scene.value.components.length > 0 || savedSceneId.value) {
         await saveCurrentScene();
@@ -3589,6 +3632,13 @@ createApp({
       showScenesModal.value = true;
       scenesTab.value = 'my';
       await fetchMyScenes();
+    }
+
+    async function copyShareLink(s) {
+      const url = `${window.location.origin}/?scene=${encodeURIComponent(s.id)}&view=true`;
+      await navigator.clipboard.writeText(url).catch(() => {});
+      shareCopiedId.value = s.id;
+      setTimeout(() => { shareCopiedId.value = null; }, 1800);
     }
 
     async function togglePublish(s) {
@@ -4316,9 +4366,9 @@ createApp({
       openLibraries, fetchAvailable, isAlreadyInstalled,
       toggleLibrary, deleteLibrary, addFromManifest, saveNewLibrary,
       savedSceneId, showScenesModal, scenesTab, myScenes, publicScenes,
-      myScenesLoading, publicScenesLoading, scenesSaving,
+      myScenesLoading, publicScenesLoading, scenesSaving, shareCopiedId,
       openScenesModal, newScene, saveCurrentScene, fetchMyScenes, fetchPublicScenes,
-      loadScene, togglePublish, deleteMyScene, fmtDate,
+      loadScene, togglePublish, deleteMyScene, fmtDate, copyShareLink,
       showMonitor, monitorRuns, monitorLoading, activeRunCount,
       openMonitor, closeMonitor, fetchRuns, cancelRun, dismissRun,
       fmtDatetime, runDuration,

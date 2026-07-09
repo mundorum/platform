@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.shortcuts import redirect
@@ -102,9 +104,18 @@ class GoogleCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # login_uri carries these when the sign-in was triggered from a shared
+        # scene link, so the deep link survives the Google redirect round-trip.
+        next_params = {}
+        if request.GET.get('next_scene'):
+            next_params['scene'] = request.GET['next_scene']
+        if request.GET.get('next_view'):
+            next_params['view'] = request.GET['next_view']
+        next_qs = f'&{urlencode(next_params)}' if next_params else ''
+
         credential = request.data.get('credential') or request.POST.get('credential')
         if not credential:
-            return redirect('/?auth_error=missing_credential')
+            return redirect(f'/?auth_error=missing_credential{next_qs}')
 
         try:
             id_info = id_token.verify_oauth2_token(
@@ -113,7 +124,7 @@ class GoogleCallbackView(APIView):
                 settings.GOOGLE_CLIENT_ID,
             )
         except ValueError:
-            return redirect('/?auth_error=invalid_token')
+            return redirect(f'/?auth_error=invalid_token{next_qs}')
 
         email = id_info['email']
         google_id = id_info['sub']
@@ -127,7 +138,7 @@ class GoogleCallbackView(APIView):
             try:
                 preauth = PreAuthorization.objects.get(email=email)
             except PreAuthorization.DoesNotExist:
-                return redirect('/?auth_error=not_authorized')
+                return redirect(f'/?auth_error=not_authorized{next_qs}')
 
             user = User.objects.create_user(
                 username=email,
@@ -153,7 +164,7 @@ class GoogleCallbackView(APIView):
             profile.save(update_fields=['google_id', 'picture_url'])
 
         auth_token, _ = Token.objects.get_or_create(user=user)
-        return redirect(f'/?auth_token={auth_token.key}')
+        return redirect(f'/?auth_token={auth_token.key}{next_qs}')
 
 
 class ProfileView(APIView):
