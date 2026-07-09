@@ -1721,6 +1721,12 @@ select.prop-val { padding: 3px 4px; }
   align-items: center;
   gap: 8px;
 }
+.view-field-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
 .view-field-refresh {
   background: none;
   border: 0.5px solid var(--c-border-strong);
@@ -1734,10 +1740,11 @@ select.prop-val { padding: 3px 4px; }
   align-items: center;
   gap: 3px;
   transition: color 0.12s, border-color 0.12s;
-  margin-left: auto;
 }
 .view-field-refresh:hover { color: var(--c-accent); border-color: var(--c-accent); }
 .view-field-refresh i { font-size: 11px; }
+.view-field-refresh:disabled { color: var(--c-border-strong); cursor: not-allowed; }
+.view-field-refresh:disabled:hover { color: var(--c-border-strong); border-color: var(--c-border-strong); }
 .view-field-err {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -2626,10 +2633,12 @@ select.prop-val { padding: 3px 4px; }
             <template v-else-if="item.kind === 'text_file'">
               <div class="view-field-meta">
                 <span class="view-field-label">[[ item.label || 'Text File' ]]</span>
-                <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
-                  <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
-                  Refresh
-                </button>
+                <div class="view-field-actions">
+                  <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                    <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                    Refresh
+                  </button>
+                </div>
               </div>
               <div v-if="viewFileData[item.id]?.error" class="view-field-err">
                 <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
@@ -2646,10 +2655,21 @@ select.prop-val { padding: 3px 4px; }
             <template v-else-if="item.kind === 'csv_file'">
               <div class="view-field-meta">
                 <span class="view-field-label">[[ item.label || 'CSV File' ]]</span>
-                <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
-                  <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
-                  Refresh
-                </button>
+                <div class="view-field-actions">
+                  <button
+                    class="view-field-refresh"
+                    @click="downloadViewFile(item)"
+                    title="Download CSV"
+                    :disabled="!viewFileData[item.id]?.text"
+                  >
+                    <i class="ti ti-download"></i>
+                    Download
+                  </button>
+                  <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                    <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                    Refresh
+                  </button>
+                </div>
               </div>
               <div v-if="viewFileData[item.id]?.error" class="view-field-err">
                 <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
@@ -4041,6 +4061,19 @@ createApp({
       }
     }
 
+    function downloadViewFile(item) {
+      const data = viewFileData[item.id];
+      if (!data?.text) return;
+      const blob = new Blob([data.text], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const base = (item.address?.trim().split('/').pop() || item.label || 'table').trim();
+      a.download = base.toLowerCase().endsWith('.csv') ? base : base + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
     function refreshAllFileItems() {
       const items = scene.value.view?.items || [];
       for (const item of items) {
@@ -4393,7 +4426,7 @@ createApp({
       getViewPropValue, setViewPropValue,
       viewFileData, hasConsoleField,
       addOutputItem, viewKindIcon, viewKindLabel,
-      fetchViewFileContent, parseCsvRows,
+      fetchViewFileContent, parseCsvRows, downloadViewFile,
       addComponent, deleteComponent,
       onIdChange, setProp,
       syncSub, syncPub, addSubPair, addPubPair, removeSubPair, removePubPair,
