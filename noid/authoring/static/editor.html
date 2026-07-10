@@ -1715,6 +1715,25 @@ select.prop-val { padding: 3px 4px; }
 .view-item-addr-input:focus { border-color: var(--c-accent); }
 .view-item-addr-input::placeholder { color: var(--c-muted); font-style: italic; }
 
+.view-item-shared-write-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--c-muted);
+}
+
+/* Embedded web app (NoidBridge) iframe */
+.view-app-frame {
+  width: 100%;
+  height: 70vh;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  background: var(--c-surface);
+}
+
 /* Output field render: shared header row (label + refresh) */
 .view-field-meta {
   display: flex;
@@ -2532,6 +2551,10 @@ select.prop-val { padding: 3px 4px; }
             <span class="avail-out-label"><i class="ti ti-table"></i> CSV file</span>
             <button class="avail-add-btn" @click="addOutputItem('csv_file')">+ Add</button>
           </div>
+          <div class="avail-out-row">
+            <span class="avail-out-label"><i class="ti ti-apps"></i> Web app</span>
+            <button class="avail-add-btn" @click="addOutputItem('html_app')">+ Add</button>
+          </div>
         </div>
 
         <!-- Right: sortable view canvas -->
@@ -2575,12 +2598,17 @@ select.prop-val { padding: 3px 4px; }
               </div>
               <!-- address input for file-based output fields -->
               <input
-                v-if="item.kind === 'text_file' || item.kind === 'csv_file'"
+                v-if="item.kind === 'text_file' || item.kind === 'csv_file' || item.kind === 'html_app'"
                 class="view-item-addr-input"
                 type="text"
                 v-model="item.address"
-                placeholder="address: scope:path/file.ext  e.g. scene:output.txt"
+                :placeholder="item.kind === 'html_app' ? 'address: scope:path/app.html  e.g. scene:tools/app.html' : 'address: scope:path/file.ext  e.g. scene:output.txt'"
               >
+              <!-- write permission toggle for embedded web apps -->
+              <label v-if="item.kind === 'html_app'" class="view-item-shared-write-toggle">
+                <input type="checkbox" v-model="item.allow_shared_write">
+                Allow this app to write shared: resources
+              </label>
               <div class="view-item-controls" style="margin-top:6px">
                 <button
                   class="view-item-width-btn"
@@ -2700,6 +2728,35 @@ select.prop-val { padding: 3px 4px; }
               <div v-else class="view-csv-wrap">
                 <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
               </div>
+            </template>
+
+            <!-- ── Embedded web app field ── -->
+            <template v-else-if="item.kind === 'html_app'">
+              <div class="view-field-meta">
+                <span class="view-field-label">[[ item.label || 'Web App' ]]</span>
+                <div class="view-field-actions">
+                  <button class="view-field-refresh" @click="toggleAppFullscreen(item)" title="Fullscreen" :disabled="!viewFileData[item.id]?.html">
+                    <i class="ti ti-arrows-maximize"></i>
+                  </button>
+                  <button class="view-field-refresh" @click="fetchAppHtml(item)" title="Reload app">
+                    <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                    Refresh
+                  </button>
+                </div>
+              </div>
+              <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+              </div>
+              <iframe
+                v-else-if="viewFileData[item.id]?.html"
+                :ref="el => setAppFrameRef(item.id, el)"
+                sandbox="allow-scripts allow-forms allow-modals allow-popups"
+                allow="fullscreen"
+                :srcdoc="viewFileData[item.id].html"
+                class="view-app-frame"
+              ></iframe>
+              <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
+              <pre class="view-field-pre empty" v-else>(click Refresh to load the app)</pre>
             </template>
 
             <!-- ── Editable property field (default) ── -->
@@ -2934,6 +2991,46 @@ const NODE_W    = 230;
 const HEADER_H  = 40;   // px
 const ROW_H     = 26;   // px per port row
 const PUB_GAP   = 6;    // gap between sub and pub sections
+
+/* Injected into every embedded web-app iframe. Talks to the parent frame over
+   postMessage only — the sandboxed srcdoc iframe has an opaque origin and no
+   direct API access, so this is the app's entire surface for reading/writing
+   scene data. See handleBridgeMessage() in setup() for the parent-side proxy. */
+const NOID_BRIDGE_SCRIPT = `
+<script>
+(function(){
+  var pending = {};
+  var counter = 0;
+  window.addEventListener('message', function(ev){
+    var d = ev.data;
+    if (!d || !d.__noid || !pending[d.id]) return;
+    var p = pending[d.id];
+    delete pending[d.id];
+    if (d.ok) p.resolve(d.result); else p.reject(new Error(d.error || 'NoidBridge error'));
+  });
+  function call(action, payload) {
+    return new Promise(function(resolve, reject) {
+      var id = 'nb_' + (++counter) + '_' + Date.now();
+      pending[id] = { resolve: resolve, reject: reject };
+      window.parent.postMessage({ __noid: true, id: id, action: action, payload: payload }, '*');
+    });
+  }
+  window.NoidBridge = {
+    readResource: function(address) {
+      return call('read', { address: address });
+    },
+    writeCsv: function(name, table, scope) {
+      table = table || {};
+      return call('writeCsv', {
+        name: name,
+        columns: table.columns || [],
+        rows: table.rows || [],
+        scope: scope || 'scene',
+      });
+    },
+  };
+})();
+<\/script>`;
 
 /* ──────────────────────────────────────────────────────────────────
    Helpers
@@ -4029,27 +4126,28 @@ createApp({
       (scene.value.view?.items || []).some(x => x.kind === 'console')
     );
 
-    const OUTPUT_KINDS = { console: 'console', text_file: 'text_file', csv_file: 'csv_file' };
+    const OUTPUT_KINDS = { console: 'console', text_file: 'text_file', csv_file: 'csv_file', html_app: 'html_app' };
 
     function addOutputItem(kind) {
       _ensureView();
-      const labels = { console: 'Console Output', text_file: 'Text File', csv_file: 'CSV Table' };
+      const labels = { console: 'Console Output', text_file: 'Text File', csv_file: 'CSV Table', html_app: 'Web App' };
       const item = {
         id: `vi_${Date.now()}`,
         kind,
         label: labels[kind] || kind,
         width: 'full',
       };
-      if (kind === 'text_file' || kind === 'csv_file') item.address = '';
+      if (kind === 'text_file' || kind === 'csv_file' || kind === 'html_app') item.address = '';
+      if (kind === 'html_app') item.allow_shared_write = false;
       scene.value.view.items.push(item);
     }
 
     function viewKindIcon(kind) {
-      return { console: 'ti-terminal-2', text_file: 'ti-file-text', csv_file: 'ti-table' }[kind] || 'ti-puzzle';
+      return { console: 'ti-terminal-2', text_file: 'ti-file-text', csv_file: 'ti-table', html_app: 'ti-apps' }[kind] || 'ti-puzzle';
     }
 
     function viewKindLabel(kind) {
-      return { console: 'console', text_file: 'text file', csv_file: 'csv file' }[kind] || kind;
+      return { console: 'console', text_file: 'text file', csv_file: 'csv file', html_app: 'web app' }[kind] || kind;
     }
 
     async function fetchViewFileContent(item) {
@@ -4071,6 +4169,100 @@ createApp({
       }
     }
 
+    /* ── Embedded web app (NoidBridge) ── */
+    const appFrameEls = {};                // { [item.id]: iframe element }
+    const appFrameWindows = new Map();     // contentWindow -> item  (for postMessage routing)
+
+    function setAppFrameRef(itemId, el) {
+      const item = (scene.value.view?.items || []).find(x => x.id === itemId);
+      const prevEl = appFrameEls[itemId];
+      if (prevEl?.contentWindow) appFrameWindows.delete(prevEl.contentWindow);
+      appFrameEls[itemId] = el || undefined;
+      if (el?.contentWindow && item) appFrameWindows.set(el.contentWindow, item);
+    }
+
+    function injectNoidBridge(html) {
+      if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, m => m + NOID_BRIDGE_SCRIPT);
+      if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, m => m + NOID_BRIDGE_SCRIPT);
+      return NOID_BRIDGE_SCRIPT + html;
+    }
+
+    async function fetchAppHtml(item) {
+      if (!item.address?.trim()) return;
+      viewFileData[item.id] = { loading: true, html: '', error: '' };
+      try {
+        const params = new URLSearchParams({ address: item.address.trim() });
+        if (savedSceneId.value) params.set('scene_id', savedSceneId.value);
+        const resp = await apiFetch(`/api/resources/read/?${params}`);
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          viewFileData[item.id] = { loading: false, html: '', error: err.detail || err.error || resp.statusText };
+          return;
+        }
+        const data = await resp.json();
+        viewFileData[item.id] = { loading: false, html: injectNoidBridge(data.content), error: '' };
+      } catch(e) {
+        viewFileData[item.id] = { loading: false, html: '', error: String(e) };
+      }
+    }
+
+    function toggleAppFullscreen(item) {
+      appFrameEls[item.id]?.requestFullscreen?.();
+    }
+
+    /* Proxies bridge requests from a sandboxed app iframe to the authenticated
+       API. The iframe never holds an auth token or same-origin access — this
+       handler, running in the parent frame, is the only path from an embedded
+       app to scene data, and it's where read/write permissions are enforced. */
+    async function handleBridgeMessage(event) {
+      const msg = event.data;
+      if (!msg?.__noid) return;
+      const item = appFrameWindows.get(event.source);
+      if (!item) return;
+
+      const reply = (ok, resultOrError) => {
+        event.source.postMessage(
+          ok ? { __noid: true, id: msg.id, ok: true, result: resultOrError }
+             : { __noid: true, id: msg.id, ok: false, error: resultOrError },
+          '*'
+        );
+      };
+
+      if (msg.action === 'read') {
+        try {
+          const params = new URLSearchParams({ address: String(msg.payload?.address || '') });
+          if (savedSceneId.value) params.set('scene_id', savedSceneId.value);
+          const resp = await apiFetch(`/api/resources/read/?${params}`);
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok) return reply(false, data.detail || data.error || resp.statusText);
+          reply(true, data.content);
+        } catch(e) { reply(false, String(e)); }
+        return;
+      }
+
+      if (msg.action === 'writeCsv') {
+        const payload = msg.payload || {};
+        if (payload.scope === 'shared' && !item.allow_shared_write) {
+          return reply(false, 'This app is not permitted to write shared: resources — enable it in Author mode.');
+        }
+        if (payload.scope === 'scene' && !savedSceneId.value) {
+          return reply(false, 'Save the scene before this app can write scene-scoped files.');
+        }
+        try {
+          const resp = await apiFetch('/api/resources/write_csv/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...payload, scene_id: savedSceneId.value }),
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok) return reply(false, data.error || resp.statusText);
+          reply(true, { address: data.address });
+        } catch(e) { reply(false, String(e)); }
+        return;
+      }
+    }
+    window.addEventListener('message', handleBridgeMessage);
+
     function downloadViewFile(item) {
       const data = viewFileData[item.id];
       if (!data?.text) return;
@@ -4089,6 +4281,8 @@ createApp({
       for (const item of items) {
         if (item.kind === 'text_file' || item.kind === 'csv_file') {
           fetchViewFileContent(item);
+        } else if (item.kind === 'html_app') {
+          fetchAppHtml(item);
         }
       }
     }
@@ -4437,6 +4631,7 @@ createApp({
       viewFileData, hasConsoleField,
       addOutputItem, viewKindIcon, viewKindLabel,
       fetchViewFileContent, parseCsvRows, downloadViewFile,
+      fetchAppHtml, setAppFrameRef, toggleAppFullscreen,
       addComponent, deleteComponent,
       onIdChange, setProp,
       syncSub, syncPub, addSubPair, addPubPair, removeSubPair, removePubPair,

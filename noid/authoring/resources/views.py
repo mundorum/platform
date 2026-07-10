@@ -1,4 +1,6 @@
+import csv
 import hashlib
+import io
 import json
 import mimetypes
 import re
@@ -22,6 +24,16 @@ _SLUG_UNSAFE = re.compile(r'[^a-z0-9/\-]')
 _MULTI_DASH  = re.compile(r'-{2,}')
 _MULTI_SLASH = re.compile(r'/{2,}')
 
+# ── write_csv (NoidBridge) limits ───────────────────────────────────────────────
+# `name` here is deliberately stricter than the general slug: no dots, no
+# slashes, no directory indications — the server always appends `.csv`, so an
+# embedded HTML app can never control the file extension or write outside data/.
+_CSV_NAME_RE        = re.compile(r'^[A-Za-z0-9_-]{1,200}$')
+_MAX_CSV_ROWS        = 50_000
+_MAX_CSV_COLS        = 200
+_MAX_CSV_CELL_CHARS  = 20_000
+_MAX_CSV_BYTES       = 10 * 1024 * 1024
+
 
 def _normalize_slug(name: str) -> str:
     """Turn a bare filename (no extension) into a safe slug."""
@@ -42,6 +54,8 @@ def _detect_type(mime: str, ext: str) -> str:
         return Resource.TYPE_CSV
     if ext == '.py' or mime in ('text/x-python', 'application/x-python'):
         return Resource.TYPE_PYTHON
+    if ext in ('.html', '.htm') or mime == 'text/html':
+        return Resource.TYPE_HTML_APP
     if mime.startswith('text/') or ext in ('.txt', '.md', '.rst'):
         return Resource.TYPE_TEXT
     return Resource.TYPE_OTHER
@@ -279,6 +293,123 @@ class ResourceViewSet(viewsets.ModelViewSet):
             'address': address,
             'resource_type': rtype,
         })
+
+    # ── write structured CSV (NoidBridge) ───────────────────────────────────────
+
+    @action(detail=False, methods=['post'])
+    def write_csv(self, request):
+        """Write a CSV resource from structured data — never raw bytes.
+
+        Used by embedded HTML apps (via the parent frame's NoidBridge proxy) to
+        hand back results as data, not files: a column-name list and a row
+        matrix. The server always serializes with `csv.writer` and always
+        appends `.csv` itself, so the caller can never control file bytes,
+        extension, or path — that's what makes this safe to expose to
+        sandboxed third-party JS that never sees an auth token directly.
+
+        Body: {scope, name, columns: [str], rows: [[str|num, ...], ...], scene_id?}
+        `name` must not contain `.`, `/`, or any character outside
+        [A-Za-z0-9_-] — rejected outright, never sanitized, so behavior is
+        predictable to the caller.
+        """
+        data = request.data
+
+        scope = data.get('scope')
+        if scope not in (Resource.SCOPE_SHARED, Resource.SCOPE_SCENE):
+            return Response({'error': f'Invalid scope: {scope!r}'}, status=400)
+
+        name = str(data.get('name', ''))
+        if not _CSV_NAME_RE.match(name):
+            return Response(
+                {'error': 'name must contain only letters, digits, "-", "_" '
+                           '(no dots, slashes, or extensions)'},
+                status=400,
+            )
+
+        scene_id = data.get('scene_id') or None
+        scene_obj = None
+        if scope == Resource.SCOPE_SCENE:
+            if not scene_id:
+                return Response({'error': 'scene_id required for scope=scene'}, status=400)
+            from scenes.models import Scene
+            try:
+                scene_obj = Scene.objects.get(pk=scene_id)
+            except Scene.DoesNotExist:
+                return Response({'error': f'Scene {scene_id!r} not found'}, status=404)
+
+        columns = data.get('columns')
+        if not isinstance(columns, list) or not columns:
+            return Response({'error': 'columns must be a non-empty array'}, status=400)
+        if len(columns) > _MAX_CSV_COLS:
+            return Response({'error': f'columns exceeds limit of {_MAX_CSV_COLS}'}, status=400)
+        columns = [str(c) for c in columns]
+
+        rows = data.get('rows')
+        if not isinstance(rows, list):
+            return Response({'error': 'rows must be an array'}, status=400)
+        if len(rows) > _MAX_CSV_ROWS:
+            return Response({'error': f'rows exceeds limit of {_MAX_CSV_ROWS}'}, status=400)
+
+        str_rows = []
+        for i, row in enumerate(rows):
+            if not isinstance(row, list) or len(row) != len(columns):
+                return Response(
+                    {'error': f'row {i} has {len(row) if isinstance(row, list) else "?"} '
+                               f'cells, expected {len(columns)} (matching columns)'},
+                    status=400,
+                )
+            str_row = []
+            for cell in row:
+                cell = str(cell)
+                if len(cell) > _MAX_CSV_CELL_CHARS:
+                    return Response(
+                        {'error': f'row {i} has a cell exceeding {_MAX_CSV_CELL_CHARS} characters'},
+                        status=400,
+                    )
+                # Formula-injection guard: neutralize leading =,+,-,@ so a human
+                # opening this in Excel/Sheets later doesn't execute a formula.
+                if cell[:1] in ('=', '+', '-', '@'):
+                    cell = "'" + cell
+                str_row.append(cell)
+            str_rows.append(str_row)
+
+        buf = io.StringIO()
+        writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(columns)
+        writer.writerows(str_rows)
+        content = buf.getvalue().encode('utf-8')
+        if len(content) > _MAX_CSV_BYTES:
+            return Response(
+                {'error': f'serialized CSV exceeds limit of {_MAX_CSV_BYTES} bytes'},
+                status=413,
+            )
+
+        dest = _storage_path(scope, name, '.csv', scene_id)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(dest, 'wb') as fh:
+                fh.write(content)
+        except OSError as exc:
+            return Response({'error': str(exc)}, status=500)
+
+        checksum = _sha256(dest)
+        resource, _created = Resource.objects.update_or_create(
+            scope=scope,
+            slug=name,
+            extension='.csv',
+            scene=scene_obj,
+            defaults={
+                'display_name': name,
+                'resource_type': Resource.TYPE_CSV,
+                'mime_type': 'text/csv',
+                'storage_path': str(dest),
+                'size_bytes': len(content),
+                'sha256': checksum,
+                'created_by': request.user if request.user.is_authenticated else None,
+            },
+        )
+
+        return Response(ResourceSerializer(resource).data, status=200)
 
     # ── tag autocomplete ──────────────────────────────────────────────────────
 

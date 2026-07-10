@@ -73,6 +73,52 @@ Finished, failed, and interrupted runs persist until the user dismisses them.
 }
 ```
 
+### Resources
+
+Files attached to a scene (`scope=scene`) or shared across scenes (`scope=shared`),
+addressed as `{scope}:{slug}{ext}`. Backed by `resources/models.py::Resource`;
+`scope=scene` files live under `SCENE_PACKAGES_DIR/{scene_id}/data/`, `scope=shared`
+under `SHARED_RESOURCES_DIR/`.
+
+| Method | Path | Body | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/resources/` | multipart (`file`, `scope`, `scene_id?`, `slug?`, ...) | Upload a file; 409 if the address already exists |
+| `GET` | `/api/resources/{id}/download/` | — | Download the raw file |
+| `GET` | `/api/resources/read/` | query: `address`, `scene_id?` | Return UTF-8 text content: `{content, address, resource_type}` |
+| `POST` | `/api/resources/write_csv/` | JSON: `{scope, name, columns, rows, scene_id?}` | Write/overwrite a CSV from structured data — see below |
+| `DELETE` | `/api/resources/{id}/` | — | Delete the resource (DB record + file) |
+| `GET` | `/api/resources/tags/` | — | Sorted list of all tags in use |
+
+#### `write_csv` — structured CSV write
+
+Used by the [embedded web-app view field](scene-package.md#view--platform-only)
+to hand back results as data rather than a file. The server always serializes
+with a real CSV writer and always appends `.csv` itself — the caller supplies
+`name` (no extension, no path) and `columns`/`rows`, never raw bytes:
+
+```json
+// request
+{
+  "scope": "scene",           // "scene" | "shared"
+  "name": "results",          // [A-Za-z0-9_-]+ only — no dots, no slashes
+  "columns": ["age", "risk"],
+  "rows": [["45", "12.3"], ["61", "28.9"]],
+  "scene_id": "…"             // required when scope="scene"
+}
+```
+
+```json
+// response 200
+{ "id": "…", "address": "scene:results.csv", "resource_type": "csv", … }
+```
+
+Validation (400 on any failure — rejected, never silently sanitized): `name`
+against `^[A-Za-z0-9_-]{1,200}$`; up to 200 columns, 50,000 rows, 20,000 chars/cell,
+10 MB serialized; every row must match the column count exactly. Cells starting
+with `=`, `+`, `-`, or `@` are prefixed with `'` (CSV/formula-injection guard).
+Unlike the upload endpoint, this action **upserts** — a second call with the same
+`(scope, name)` overwrites, since it's meant to be called once per app run.
+
 ### Editor (scratch runner — backward-compatible)
 
 Accepts raw scene JSON directly; no DB record is created. Used by the editor's

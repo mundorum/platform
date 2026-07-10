@@ -9,19 +9,21 @@ class Resource(models.Model):
     SCOPE_SCENE = 'scene'
     SCOPE_CHOICES = [('shared', 'Shared'), ('scene', 'Scene')]
 
-    TYPE_PDF    = 'pdf'
-    TYPE_IMAGE  = 'image'
-    TYPE_CSV    = 'csv'
-    TYPE_PYTHON = 'python'
-    TYPE_TEXT   = 'text'
-    TYPE_OTHER  = 'other'
+    TYPE_PDF      = 'pdf'
+    TYPE_IMAGE    = 'image'
+    TYPE_CSV      = 'csv'
+    TYPE_PYTHON   = 'python'
+    TYPE_TEXT     = 'text'
+    TYPE_HTML_APP = 'html_app'
+    TYPE_OTHER    = 'other'
     TYPE_CHOICES = [
-        ('pdf',    'PDF'),
-        ('image',  'Image'),
-        ('csv',    'CSV'),
-        ('python', 'Python'),
-        ('text',   'Text'),
-        ('other',  'Other'),
+        ('pdf',      'PDF'),
+        ('image',    'Image'),
+        ('csv',      'CSV'),
+        ('python',   'Python'),
+        ('text',     'Text'),
+        ('html_app', 'HTML App'),
+        ('other',    'Other'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

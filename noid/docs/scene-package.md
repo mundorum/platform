@@ -111,6 +111,64 @@ parameter table.
 
 ---
 
+### `view` — platform-only
+
+Author/Preview layout for the scene editor's View tab. **Authoring-only**: the
+core runner (`NoidPlayer._load_data()`) reads a fixed set of keys and silently
+ignores anything else, so `view` never reaches scene execution — it's UI state,
+not part of the executable spec.
+
+```json
+{
+  "view": {
+    "items": [
+      { "id": "vi_1", "kind": "csv_file",  "label": "Output",  "width": "full", "address": "scene:output.csv" },
+      { "id": "vi_2", "kind": "html_app",  "label": "Tool",    "width": "full", "address": "scene:tools/app.html", "allow_shared_write": false }
+    ]
+  }
+}
+```
+
+Item kinds: `console`, `text_file`, `csv_file` (all read-only, via `GET
+/api/resources/read/`), a bare component-property reference (`component_id` +
+`property`, editable), and `html_app`.
+
+#### `html_app` — embedded third-party web apps
+
+Renders an uploaded single-file HTML/JS resource (`address`, e.g.
+`scene:tools/app.html` — stored under `data/` like any other scene resource, see
+the core [`data/` section](../../../../noid/docs/scene-package.md#data) linked
+above) inside a sandboxed `<iframe
+sandbox="allow-scripts allow-forms allow-modals allow-popups">` in the editor's
+Preview mode. Deliberately omits `allow-same-origin`: with `srcdoc` content, that
+gives the app an opaque origin — no cookies, no same-origin credentialed
+requests, no reachable auth token. The app's only way to touch scene data is a
+`NoidBridge` object the editor auto-injects into the HTML before rendering it,
+which talks to the parent frame over `postMessage`:
+
+```js
+const csvText = await NoidBridge.readResource('scene:input.csv');
+await NoidBridge.writeCsv('results', { columns: ['a','b'], rows: [['1','2']] }, 'scene');
+```
+
+- `readResource(address)` proxies straight to `GET /api/resources/read/`.
+- `writeCsv(name, {columns, rows}, scope)` proxies to the structured
+  `POST /api/resources/write_csv/` (see `docs/api.md#write_csv--structured-csv-write`)
+  — the app hands over data, never file bytes, so it can't control the written
+  path or extension.
+- `allow_shared_write` on the view item gates `scope: 'shared'` writes; unset
+  (default `false`), the parent rejects them before ever calling the API. This
+  is an editor-side policy, not enforced by the backend, matching how `write_csv`
+  itself imposes no extra scene-ownership check beyond normal auth — the
+  boundary this design relies on is that the iframe never holds the token, only
+  the parent frame's already-authenticated fetch does.
+
+This is intentionally a platform (Django editor) feature only, not a core noid
+concept — the runner never sees an `html_app` item, and nothing about it depends
+on the component/bus model.
+
+---
+
 ## Namespace support
 
 The platform defines project-level namespaces in `noid/noid-namespaces.yaml`.
