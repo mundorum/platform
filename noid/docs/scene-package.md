@@ -151,6 +151,12 @@ const csvText = await NoidBridge.readResource('scene:input.csv');
 await NoidBridge.writeCsv('results', { columns: ['a','b'], rows: [['1','2']] }, 'scene', 'Patient risk results');
 ```
 
+- `isEmbedded` is always `true` — its only purpose is a clean, documented way
+  for the app's own code to detect it's running inside the platform (`if
+  (window.NoidBridge && window.NoidBridge.isEmbedded) { ... }`), for apps that
+  are also meant to work standalone (opened directly as a file/URL, with no
+  bridge injected at all) and need to branch their data-loading/export UI
+  accordingly.
 - `readResource(address)` proxies straight to `GET /api/resources/read/`.
 - `writeCsv(name, {columns, rows}, scope, displayName?)` proxies to the
   structured `POST /api/resources/write_csv/` (see

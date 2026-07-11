@@ -1,4 +1,13 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(grep -n '`')",
+      "Bash(git status --short *)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  },
   "additionalDirectories": [
     "~/git/mundorum/noid",
     "~/git/mundorum/noid-collections"

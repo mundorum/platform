@@ -3016,6 +3016,11 @@ const NOID_BRIDGE_SCRIPT = `
     });
   }
   window.NoidBridge = {
+    // Present only inside the platform's sandboxed Preview iframe — apps that
+    // also need to run standalone (opened directly in a browser) should
+    // branch on this instead of just checking window.NoidBridge truthiness,
+    // so the check reads as intentional rather than an existence-check hack.
+    isEmbedded: true,
     readResource: function(address) {
       return call('read', { address: address });
     },
