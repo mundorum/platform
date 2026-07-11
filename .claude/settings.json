@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(grep -n '`')",
-      "Bash(git status --short *)"
+      "Bash(git status --short *)",
+      "Bash(python3 -c ' *)",
+      "Bash(node --check /tmp/_app_final_check.js)",
+      "Bash(awk '$1>1')"
     ],
     "additionalDirectories": [
       "/tmp"
