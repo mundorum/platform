@@ -3019,13 +3019,14 @@ const NOID_BRIDGE_SCRIPT = `
     readResource: function(address) {
       return call('read', { address: address });
     },
-    writeCsv: function(name, table, scope) {
+    writeCsv: function(name, table, scope, displayName) {
       table = table || {};
       return call('writeCsv', {
         name: name,
         columns: table.columns || [],
         rows: table.rows || [],
         scope: scope || 'scene',
+        display_name: displayName || '',
       });
     },
   };

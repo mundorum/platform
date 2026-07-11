@@ -148,14 +148,17 @@ which talks to the parent frame over `postMessage`:
 
 ```js
 const csvText = await NoidBridge.readResource('scene:input.csv');
-await NoidBridge.writeCsv('results', { columns: ['a','b'], rows: [['1','2']] }, 'scene');
+await NoidBridge.writeCsv('results', { columns: ['a','b'], rows: [['1','2']] }, 'scene', 'Patient risk results');
 ```
 
 - `readResource(address)` proxies straight to `GET /api/resources/read/`.
-- `writeCsv(name, {columns, rows}, scope)` proxies to the structured
-  `POST /api/resources/write_csv/` (see `docs/api.md#write_csv--structured-csv-write`)
-  — the app hands over data, never file bytes, so it can't control the written
-  path or extension.
+- `writeCsv(name, {columns, rows}, scope, displayName?)` proxies to the
+  structured `POST /api/resources/write_csv/` (see
+  `docs/api.md#write_csv--structured-csv-write`) — the app hands over data,
+  never file bytes, so it can't control the written path or extension. `name`
+  becomes the Resource `slug` (same `[A-Za-z0-9_-]+` constraint as the
+  backend); `displayName` is free text for the Resources UI's `display_name`
+  field, defaulting to `name` when omitted.
 - `allow_shared_write` on the view item gates `scope: 'shared'` writes; unset
   (default `false`), the parent rejects them before ever calling the API. This
   is an editor-side policy, not enforced by the backend, matching how `write_csv`

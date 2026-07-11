@@ -225,3 +225,5 @@ noid/authoring/staticfiles/
 
 # Internal-only deployment notes — contains real infra details, never publish
 noid/docs/internal/
+
+temp/

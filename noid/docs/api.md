@@ -85,7 +85,7 @@ under `SHARED_RESOURCES_DIR/`.
 | `POST` | `/api/resources/` | multipart (`file`, `scope`, `scene_id?`, `slug?`, ...) | Upload a file; 409 if the address already exists |
 | `GET` | `/api/resources/{id}/download/` | — | Download the raw file |
 | `GET` | `/api/resources/read/` | query: `address`, `scene_id?` | Return UTF-8 text content: `{content, address, resource_type}` |
-| `POST` | `/api/resources/write_csv/` | JSON: `{scope, name, columns, rows, scene_id?}` | Write/overwrite a CSV from structured data — see below |
+| `POST` | `/api/resources/write_csv/` | JSON: `{scope, name, columns, rows, scene_id?, display_name?}` | Write/overwrite a CSV from structured data — see below |
 | `DELETE` | `/api/resources/{id}/` | — | Delete the resource (DB record + file) |
 | `GET` | `/api/resources/tags/` | — | Sorted list of all tags in use |
 
@@ -100,12 +100,19 @@ with a real CSV writer and always appends `.csv` itself — the caller supplies
 // request
 {
   "scope": "scene",           // "scene" | "shared"
-  "name": "results",          // [A-Za-z0-9_-]+ only — no dots, no slashes
+  "name": "results",          // [A-Za-z0-9_-]+ only — no dots, no slashes (this becomes the Resource slug)
   "columns": ["age", "risk"],
   "rows": [["45", "12.3"], ["61", "28.9"]],
-  "scene_id": "…"             // required when scope="scene"
+  "scene_id": "…",            // required when scope="scene"
+  "display_name": "Patient risk results"   // optional, free text — defaults to `name`
 }
 ```
+
+`name` and `display_name` map onto the same `slug` / `display_name` distinction
+every other `Resource` uses (see `resources/models.py`): `name` is constrained
+to a safe, addressable slug (`{scope}:{name}.csv`), while `display_name` is
+whatever human-readable label the app wants to show in the Resources UI — free
+text, not validated beyond being cast to a string.
 
 ```json
 // response 200

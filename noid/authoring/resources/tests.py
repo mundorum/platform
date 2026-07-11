@@ -111,3 +111,21 @@ def test_write_csv_rejects_over_column_limit(api_client):
 def test_write_csv_rejects_over_row_limit(api_client):
     resp = _write(api_client, columns=['a'], rows=[['x']] * 50_001)
     assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_write_csv_uses_supplied_display_name(api_client, settings, tmp_path):
+    settings.SHARED_RESOURCES_DIR = str(tmp_path)
+    resp = _write(api_client, display_name='My Selected Patients')
+    assert resp.status_code == 200
+    assert resp.json()['display_name'] == 'My Selected Patients'
+    resource = Resource.objects.get(scope='shared', slug='my-output')
+    assert resource.display_name == 'My Selected Patients'
+
+
+@pytest.mark.django_db
+def test_write_csv_display_name_defaults_to_name(api_client, settings, tmp_path):
+    settings.SHARED_RESOURCES_DIR = str(tmp_path)
+    resp = _write(api_client)
+    assert resp.status_code == 200
+    assert resp.json()['display_name'] == 'my-output'

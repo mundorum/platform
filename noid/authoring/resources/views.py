@@ -307,10 +307,13 @@ class ResourceViewSet(viewsets.ModelViewSet):
         extension, or path — that's what makes this safe to expose to
         sandboxed third-party JS that never sees an auth token directly.
 
-        Body: {scope, name, columns: [str], rows: [[str|num, ...], ...], scene_id?}
+        Body: {scope, name, columns: [str], rows: [[str|num, ...], ...],
+               scene_id?, display_name?}
         `name` must not contain `.`, `/`, or any character outside
         [A-Za-z0-9_-] — rejected outright, never sanitized, so behavior is
-        predictable to the caller.
+        predictable to the caller. `display_name` is free text (matches the
+        Resource model's own distinction between `slug` and `display_name`);
+        it defaults to `name` when omitted.
         """
         data = request.data
 
@@ -325,6 +328,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
                            '(no dots, slashes, or extensions)'},
                 status=400,
             )
+        display_name = str(data.get('display_name', '') or '').strip() or name
 
         scene_id = data.get('scene_id') or None
         scene_obj = None
@@ -399,7 +403,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
             extension='.csv',
             scene=scene_obj,
             defaults={
-                'display_name': name,
+                'display_name': display_name,
                 'resource_type': Resource.TYPE_CSV,
                 'mime_type': 'text/csv',
                 'storage_path': str(dest),
