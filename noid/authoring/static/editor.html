@@ -1434,6 +1434,56 @@ select.prop-val { padding: 3px 4px; }
   background: var(--c-bg);
 }
 
+/* Author-mode drop zones: a full-width strip, then two independent columns */
+.view-canvas-zone {
+  border: 0.5px dashed var(--c-border-strong);
+  border-radius: 8px;
+  padding: 10px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.view-canvas-zone.zone-drag-over {
+  border-color: var(--c-accent);
+  background: var(--c-accent-light);
+}
+.view-canvas-zone-full { margin-bottom: 16px; }
+.view-canvas-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.view-canvas-zone-hdr {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  padding: 2px 4px 8px;
+}
+.view-col-default-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--c-muted);
+  cursor: pointer;
+}
+.view-col-default-toggle input { accent-color: var(--c-accent); cursor: pointer; }
+.view-canvas-zone-empty {
+  padding: 14px 8px;
+  font-size: 11.5px;
+  color: var(--c-muted);
+  font-style: italic;
+  text-align: center;
+}
+
 .avail-section-hdr {
   font-size: 10px;
   font-weight: 600;
@@ -1602,15 +1652,46 @@ select.prop-val { padding: 3px 4px; }
   padding: 28px 40px;
   background: var(--c-bg);
 }
-.view-render-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.view-render-body {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
-  max-width: 820px;
+  width: 100%;
+}
+.view-col-toolbar {
+  display: flex;
+  gap: 8px;
+}
+.view-col-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: var(--c-muted);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.view-col-toggle-btn:hover { color: var(--c-accent); border-color: var(--c-accent); }
+.view-col-toggle-btn i { font-size: 13px; }
+.view-columns-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.view-column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 .view-field { display: flex; flex-direction: column; gap: 5px; }
-.view-field.full { grid-column: span 2; }
-.view-field.half { grid-column: span 1; }
+.view-field.full-span { width: 100%; }
 .view-field-label {
   font-size: 10.5px;
   font-weight: 600;
@@ -2486,10 +2567,10 @@ select.prop-val { padding: 3px 4px; }
 
       <!-- Sub-tabs -->
       <div class="view-sub-tabs">
-        <button class="view-sub-tab" :class="{active: viewMode==='author'}" @click="viewMode='author'">
+        <button class="view-sub-tab" :class="{active: viewMode==='author'}" @click="switchViewMode('author')">
           <i class="ti ti-edit"></i> Author
         </button>
-        <button class="view-sub-tab" :class="{active: viewMode==='render'}" @click="viewMode='render'">
+        <button class="view-sub-tab" :class="{active: viewMode==='render'}" @click="switchViewMode('render')">
           <i class="ti ti-eye"></i> Preview
         </button>
         <span class="view-sub-hint" v-if="viewMode==='author'">Select properties from the left and arrange them into a form</span>
@@ -2561,73 +2642,125 @@ select.prop-val { padding: 3px 4px; }
         <div class="view-canvas-pane">
           <div v-if="!scene.view || !scene.view.items || !scene.view.items.length" class="view-canvas-empty">
             Select properties from the left panel to build the view.<br>
-            <span style="font-size:11.5px;margin-top:6px;display:block">Drag cards to reorder · toggle Full / Half width for layout</span>
+            <span style="font-size:11.5px;margin-top:6px;display:block">Drop cards into a column to place them · drag within a column to reorder</span>
           </div>
-          <div
-            v-for="(item, idx) in (scene.view && scene.view.items) || []"
-            :key="item.id"
-            class="view-item-card"
-            :class="{'drag-over': viewDragOver === idx}"
-            draggable="true"
-            @dragstart="onViewDragStart(idx)"
-            @dragover.prevent="onViewDragOver(idx)"
-            @dragleave="viewDragOver = null"
-            @drop.prevent="onViewDrop(idx)"
-            @dragend="viewDragOver = null"
-          >
-            <i class="ti ti-grip-vertical view-item-grip"></i>
-            <div class="view-item-body">
-              <div class="view-item-label-row">
-                <input
-                  class="view-item-label-input"
-                  type="text"
-                  v-model="item.label"
-                  placeholder="Label shown to user"
+          <template v-else>
+            <!-- Full-width strip: items here span the entire page width in Preview -->
+            <div
+              class="view-canvas-zone view-canvas-zone-full"
+              :class="{'zone-drag-over': viewZoneDragOver === 'full'}"
+              @dragover.prevent="viewZoneDragOver = 'full'"
+              @dragleave="viewZoneDragOver = null"
+              @drop.prevent="onViewZoneDrop('full')"
+            >
+              <div class="view-canvas-zone-hdr"><i class="ti ti-layout-distribute-horizontal"></i> Full width</div>
+              <div v-if="!viewFullItems.length" class="view-canvas-zone-empty">Drop a card here to span the full page width</div>
+              <template v-for="item in viewFullItems" :key="item.id">
+                <div
+                  class="view-item-card"
+                  :class="{'drag-over': viewDragOverId === item.id}"
+                  draggable="true"
+                  @dragstart="onViewItemDragStart(item.id)"
+                  @dragover.prevent="onViewItemDragOverCard(item.id)"
+                  @dragleave="onViewItemDragLeaveCard"
+                  @drop.prevent.stop="onViewItemDropOnCard(item.id)"
+                  @dragend="onViewItemDragLeaveCard"
                 >
-                <!-- output field: kind badge -->
-                <span
-                  v-if="item.kind"
-                  class="view-item-kind-badge"
-                  :class="'kind-' + item.kind"
-                >
-                  <i class="ti" :class="viewKindIcon(item.kind)"></i>
-                  [[ viewKindLabel(item.kind) ]]
-                </span>
-                <!-- property field: component.property reference -->
-                <span v-else class="view-item-ref">[[ item.component_id ]].[[ item.property ]]</span>
-              </div>
-              <!-- address input for file-based output fields -->
-              <input
-                v-if="item.kind === 'text_file' || item.kind === 'csv_file' || item.kind === 'html_app'"
-                class="view-item-addr-input"
-                type="text"
-                v-model="item.address"
-                :placeholder="item.kind === 'html_app' ? 'address: scope:path/app.html  e.g. scene:tools/app.html' : 'address: scope:path/file.ext  e.g. scene:output.txt'"
+                  <i class="ti ti-grip-vertical view-item-grip"></i>
+                  <div class="view-item-body">
+                    <div class="view-item-label-row">
+                      <input class="view-item-label-input" type="text" v-model="item.label" placeholder="Label shown to user">
+                      <span v-if="item.kind" class="view-item-kind-badge" :class="'kind-' + item.kind">
+                        <i class="ti" :class="viewKindIcon(item.kind)"></i>
+                        [[ viewKindLabel(item.kind) ]]
+                      </span>
+                      <span v-else class="view-item-ref">[[ item.component_id ]].[[ item.property ]]</span>
+                    </div>
+                    <input
+                      v-if="item.kind === 'text_file' || item.kind === 'csv_file' || item.kind === 'html_app'"
+                      class="view-item-addr-input"
+                      type="text"
+                      v-model="item.address"
+                      :placeholder="item.kind === 'html_app' ? 'address: scope:path/app.html  e.g. scene:tools/app.html' : 'address: scope:path/file.ext  e.g. scene:output.txt'"
+                    >
+                    <label v-if="item.kind === 'html_app'" class="view-item-shared-write-toggle">
+                      <input type="checkbox" v-model="item.allow_shared_write">
+                      Allow this app to write shared: resources
+                    </label>
+                    <div class="view-item-controls" style="margin-top:6px">
+                      <button class="view-item-width-btn" :class="{active: viewItemColumn(item) === 1}" @click="setViewItemColumn(item, 1)" title="Place in column 1">1</button>
+                      <button class="view-item-width-btn" :class="{active: viewItemColumn(item) === 2}" @click="setViewItemColumn(item, 2)" title="Place in column 2">2</button>
+                      <button class="view-item-width-btn" :class="{active: viewItemColumn(item) === 'full'}" @click="setViewItemColumn(item, 'full')" title="Span the full page width"><i class="ti ti-layout-distribute-horizontal"></i> Full</button>
+                    </div>
+                  </div>
+                  <button class="view-item-del" @click="removeViewItem(item.id)" title="Remove from view"><i class="ti ti-trash"></i></button>
+                </div>
+              </template>
+            </div>
+
+            <!-- Two independent columns: each spans half the page width in Preview -->
+            <div class="view-canvas-columns">
+              <div
+                v-for="col in [1, 2]"
+                :key="col"
+                class="view-canvas-zone view-canvas-zone-col"
+                :class="{'zone-drag-over': viewZoneDragOver === col}"
+                @dragover.prevent="viewZoneDragOver = col"
+                @dragleave="viewZoneDragOver = null"
+                @drop.prevent="onViewZoneDrop(col)"
               >
-              <!-- write permission toggle for embedded web apps -->
-              <label v-if="item.kind === 'html_app'" class="view-item-shared-write-toggle">
-                <input type="checkbox" v-model="item.allow_shared_write">
-                Allow this app to write shared: resources
-              </label>
-              <div class="view-item-controls" style="margin-top:6px">
-                <button
-                  class="view-item-width-btn"
-                  :class="{active: item.width !== 'half'}"
-                  @click="item.width = 'full'"
-                  title="Full row width"
-                ><i class="ti ti-layout-distribute-horizontal"></i> Full</button>
-                <button
-                  class="view-item-width-btn"
-                  :class="{active: item.width === 'half'}"
-                  @click="item.width = 'half'"
-                  title="Half row — pair with next item"
-                ><i class="ti ti-layout-columns"></i> Half</button>
+                <div class="view-canvas-zone-hdr">
+                  <i class="ti ti-layout-columns"></i> Column [[ col ]]
+                  <label class="view-col-default-toggle" :title="'Whether column ' + col + ' starts collapsed in Preview'">
+                    <input type="checkbox" :checked="isColumnDefaultCollapsed(col)" @change="setColumnDefaultCollapsed(col, $event.target.checked)">
+                    Start collapsed
+                  </label>
+                </div>
+                <div v-if="!(col === 1 ? viewCol1Items : viewCol2Items).length" class="view-canvas-zone-empty">Drop a card here</div>
+                <template v-for="item in (col === 1 ? viewCol1Items : viewCol2Items)" :key="item.id">
+                  <div
+                    class="view-item-card"
+                    :class="{'drag-over': viewDragOverId === item.id}"
+                    draggable="true"
+                    @dragstart="onViewItemDragStart(item.id)"
+                    @dragover.prevent="onViewItemDragOverCard(item.id)"
+                    @dragleave="onViewItemDragLeaveCard"
+                    @drop.prevent.stop="onViewItemDropOnCard(item.id)"
+                    @dragend="onViewItemDragLeaveCard"
+                  >
+                    <i class="ti ti-grip-vertical view-item-grip"></i>
+                    <div class="view-item-body">
+                      <div class="view-item-label-row">
+                        <input class="view-item-label-input" type="text" v-model="item.label" placeholder="Label shown to user">
+                        <span v-if="item.kind" class="view-item-kind-badge" :class="'kind-' + item.kind">
+                          <i class="ti" :class="viewKindIcon(item.kind)"></i>
+                          [[ viewKindLabel(item.kind) ]]
+                        </span>
+                        <span v-else class="view-item-ref">[[ item.component_id ]].[[ item.property ]]</span>
+                      </div>
+                      <input
+                        v-if="item.kind === 'text_file' || item.kind === 'csv_file' || item.kind === 'html_app'"
+                        class="view-item-addr-input"
+                        type="text"
+                        v-model="item.address"
+                        :placeholder="item.kind === 'html_app' ? 'address: scope:path/app.html  e.g. scene:tools/app.html' : 'address: scope:path/file.ext  e.g. scene:output.txt'"
+                      >
+                      <label v-if="item.kind === 'html_app'" class="view-item-shared-write-toggle">
+                        <input type="checkbox" v-model="item.allow_shared_write">
+                        Allow this app to write shared: resources
+                      </label>
+                      <div class="view-item-controls" style="margin-top:6px">
+                        <button class="view-item-width-btn" :class="{active: viewItemColumn(item) === 1}" @click="setViewItemColumn(item, 1)" title="Place in column 1">1</button>
+                        <button class="view-item-width-btn" :class="{active: viewItemColumn(item) === 2}" @click="setViewItemColumn(item, 2)" title="Place in column 2">2</button>
+                        <button class="view-item-width-btn" :class="{active: viewItemColumn(item) === 'full'}" @click="setViewItemColumn(item, 'full')" title="Span the full page width"><i class="ti ti-layout-distribute-horizontal"></i> Full</button>
+                      </div>
+                    </div>
+                    <button class="view-item-del" @click="removeViewItem(item.id)" title="Remove from view"><i class="ti ti-trash"></i></button>
+                  </div>
+                </template>
               </div>
             </div>
-            <button class="view-item-del" @click="removeViewItem(item.id)" title="Remove from view">
-              <i class="ti ti-trash"></i>
-            </button>
-          </div>
+          </template>
         </div>
 
       </div><!-- /.view-author-layout -->
@@ -2639,152 +2772,418 @@ select.prop-val { padding: 3px 4px; }
           <span>No properties in this view yet.</span>
           <span style="font-size:11.5px">Switch to <strong>Author</strong> mode and add properties from the left panel.</span>
         </div>
-        <div v-else class="view-render-grid">
-          <div
-            v-for="item in scene.view.items"
-            :key="item.id"
-            class="view-field"
-            :class="item.width === 'half' ? 'half' : 'full'"
-          >
+        <div v-else class="view-render-body">
 
-            <!-- ── Console output field ── -->
-            <template v-if="item.kind === 'console'">
-              <div class="view-field-meta">
-                <span class="view-field-label">[[ item.label || 'Console Output' ]]</span>
-              </div>
-              <pre
-                class="view-field-pre view-field-console"
-                v-if="execText"
-                v-html="execHighlighted"
-              ></pre>
-              <pre class="view-field-pre view-field-console empty" v-else>(no output — click Play to run the scene)</pre>
-            </template>
-
-            <!-- ── Text file field ── -->
-            <template v-else-if="item.kind === 'text_file'">
-              <div class="view-field-meta">
-                <span class="view-field-label">[[ item.label || 'Text File' ]]</span>
-                <div class="view-field-actions">
-                  <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
-                    <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
-                    Refresh
-                  </button>
-                </div>
-              </div>
-              <div v-if="viewFileData[item.id]?.error" class="view-field-err">
-                <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
-              </div>
-              <pre
-                class="view-field-pre"
-                v-else-if="viewFileData[item.id]?.text"
-              >[[ viewFileData[item.id].text ]]</pre>
-              <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
-              <pre class="view-field-pre empty" v-else>(click Refresh or run the scene to load)</pre>
-            </template>
-
-            <!-- ── CSV file field ── -->
-            <template v-else-if="item.kind === 'csv_file'">
-              <div class="view-field-meta">
-                <span class="view-field-label">[[ item.label || 'CSV File' ]]</span>
-                <div class="view-field-actions">
-                  <button
-                    class="view-field-refresh"
-                    @click="downloadViewFile(item)"
-                    title="Download CSV"
-                    :disabled="!viewFileData[item.id]?.text"
-                  >
-                    <i class="ti ti-download"></i>
-                    Download
-                  </button>
-                  <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
-                    <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
-                    Refresh
-                  </button>
-                </div>
-              </div>
-              <div v-if="viewFileData[item.id]?.error" class="view-field-err">
-                <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
-              </div>
-              <div v-else-if="viewFileData[item.id]?.text" class="view-csv-wrap">
-                <table class="view-csv-table">
-                  <thead v-if="parseCsvRows(viewFileData[item.id].text).length > 0">
-                    <tr>
-                      <th v-for="(col, ci) in parseCsvRows(viewFileData[item.id].text)[0]" :key="ci">
-                        [[ col ]]
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(row, ri) in parseCsvRows(viewFileData[item.id].text).slice(1)" :key="ri">
-                      <td v-for="(cell, ci) in row" :key="ci" :title="cell">[[ cell ]]</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div v-if="parseCsvRows(viewFileData[item.id].text).length <= 1" class="view-csv-empty">CSV file is empty or has only a header row.</div>
-              </div>
-              <div v-else-if="!item.address?.trim()" class="view-csv-wrap">
-                <div class="view-csv-empty">(no address set — configure in Author mode)</div>
-              </div>
-              <div v-else class="view-csv-wrap">
-                <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
-              </div>
-            </template>
-
-            <!-- ── Embedded web app field ── -->
-            <template v-else-if="item.kind === 'html_app'">
-              <div class="view-field-meta">
-                <span class="view-field-label">[[ item.label || 'Web App' ]]</span>
-                <div class="view-field-actions">
-                  <button class="view-field-refresh" @click="toggleAppFullscreen(item)" title="Fullscreen" :disabled="!viewFileData[item.id]?.html">
-                    <i class="ti ti-arrows-maximize"></i>
-                  </button>
-                  <button class="view-field-refresh" @click="fetchAppHtml(item)" title="Reload app">
-                    <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
-                    Refresh
-                  </button>
-                </div>
-              </div>
-              <div v-if="viewFileData[item.id]?.error" class="view-field-err">
-                <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
-              </div>
-              <iframe
-                v-else-if="viewFileData[item.id]?.html"
-                :ref="el => setAppFrameRef(item.id, el)"
-                sandbox="allow-scripts allow-forms allow-modals allow-popups"
-                allow="fullscreen"
-                :srcdoc="viewFileData[item.id].html"
-                class="view-app-frame"
-              ></iframe>
-              <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
-              <pre class="view-field-pre empty" v-else>(click Refresh to load the app)</pre>
-            </template>
-
-            <!-- ── Editable property field (default) ── -->
-            <template v-else>
-              <label class="view-field-label">[[ item.label || item.property ]]</label>
-              <textarea
-                v-if="viewPropKind(item) === 'text'"
-                class="view-field-textarea"
-                :value="getViewPropValue(item)"
-                @change="setViewPropValue(item, $event.target.value, 'string')"
-              ></textarea>
-              <input
-                v-else-if="viewPropIsBoolean(item)"
-                type="checkbox"
-                class="view-field-checkbox"
-                :checked="getViewPropValue(item)"
-                @change="setViewPropValue(item, $event.target.checked, 'boolean')"
-              >
-              <input
-                v-else
-                class="view-field-input"
-                :type="viewPropIsNumber(item) ? 'number' : 'text'"
-                :value="getViewPropValue(item)"
-                @change="setViewPropValue(item, $event.target.value, viewPropIsNumber(item) ? 'number' : 'string')"
-              >
-            </template>
-
+          <!-- Column toolbar: persistent controls to collapse/expand either column,
+               regardless of which row block it currently has items in. -->
+          <div class="view-col-toolbar" v-if="viewCol1Items.length || viewCol2Items.length">
+            <button class="view-col-toggle-btn" @click="toggleRenderColumn(1)">
+              <i class="ti" :class="renderColCollapsed[1] ? 'ti-layout-sidebar-left-expand' : 'ti-layout-sidebar-left-collapse'"></i>
+              [[ renderColCollapsed[1] ? 'Show column 1' : 'Hide column 1' ]]
+            </button>
+            <button class="view-col-toggle-btn" @click="toggleRenderColumn(2)">
+              <i class="ti" :class="renderColCollapsed[2] ? 'ti-layout-sidebar-right-expand' : 'ti-layout-sidebar-right-collapse'"></i>
+              [[ renderColCollapsed[2] ? 'Show column 2' : 'Hide column 2' ]]
+            </button>
           </div>
+
+          <template v-for="(row, ri) in viewRows" :key="ri">
+
+            <!-- ── Full-width block ── -->
+            <template v-if="row.type === 'full'">
+              <template v-for="item in [row.item]" :key="item.id">
+                <div class="view-field full-span">
+
+                  <!-- ── Console output field ── -->
+                  <template v-if="item.kind === 'console'">
+                    <div class="view-field-meta">
+                      <span class="view-field-label">[[ item.label || 'Console Output' ]]</span>
+                    </div>
+                    <pre class="view-field-pre view-field-console" v-if="execText" v-html="execHighlighted"></pre>
+                    <pre class="view-field-pre view-field-console empty" v-else>(no output — click Play to run the scene)</pre>
+                  </template>
+
+                  <!-- ── Text file field ── -->
+                  <template v-else-if="item.kind === 'text_file'">
+                    <div class="view-field-meta">
+                      <span class="view-field-label">[[ item.label || 'Text File' ]]</span>
+                      <div class="view-field-actions">
+                        <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                          <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                          Refresh
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                      <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                    </div>
+                    <pre class="view-field-pre" v-else-if="viewFileData[item.id]?.text">[[ viewFileData[item.id].text ]]</pre>
+                    <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
+                    <pre class="view-field-pre empty" v-else>(click Refresh or run the scene to load)</pre>
+                  </template>
+
+                  <!-- ── CSV file field ── -->
+                  <template v-else-if="item.kind === 'csv_file'">
+                    <div class="view-field-meta">
+                      <span class="view-field-label">[[ item.label || 'CSV File' ]]</span>
+                      <div class="view-field-actions">
+                        <button class="view-field-refresh" @click="downloadViewFile(item)" title="Download CSV" :disabled="!viewFileData[item.id]?.text">
+                          <i class="ti ti-download"></i>
+                          Download
+                        </button>
+                        <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                          <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                          Refresh
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                      <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                    </div>
+                    <div v-else-if="viewFileData[item.id]?.text" class="view-csv-wrap">
+                      <table class="view-csv-table">
+                        <thead v-if="parseCsvRows(viewFileData[item.id].text).length > 0">
+                          <tr>
+                            <th v-for="(col, ci) in parseCsvRows(viewFileData[item.id].text)[0]" :key="ci">[[ col ]]</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(csvRow, ri2) in parseCsvRows(viewFileData[item.id].text).slice(1)" :key="ri2">
+                            <td v-for="(cell, ci) in csvRow" :key="ci" :title="cell">[[ cell ]]</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div v-if="parseCsvRows(viewFileData[item.id].text).length <= 1" class="view-csv-empty">CSV file is empty or has only a header row.</div>
+                    </div>
+                    <div v-else-if="!item.address?.trim()" class="view-csv-wrap">
+                      <div class="view-csv-empty">(no address set — configure in Author mode)</div>
+                    </div>
+                    <div v-else class="view-csv-wrap">
+                      <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
+                    </div>
+                  </template>
+
+                  <!-- ── Embedded web app field ── -->
+                  <template v-else-if="item.kind === 'html_app'">
+                    <div class="view-field-meta">
+                      <span class="view-field-label">[[ item.label || 'Web App' ]]</span>
+                      <div class="view-field-actions">
+                        <button class="view-field-refresh" @click="toggleAppFullscreen(item)" title="Fullscreen" :disabled="!viewFileData[item.id]?.html">
+                          <i class="ti ti-arrows-maximize"></i>
+                        </button>
+                        <button class="view-field-refresh" @click="fetchAppHtml(item)" title="Reload app">
+                          <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                          Refresh
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                      <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                    </div>
+                    <iframe
+                      v-else-if="viewFileData[item.id]?.html"
+                      :ref="el => setAppFrameRef(item.id, el)"
+                      sandbox="allow-scripts allow-forms allow-modals allow-popups"
+                      allow="fullscreen"
+                      :srcdoc="viewFileData[item.id].html"
+                      class="view-app-frame"
+                    ></iframe>
+                    <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
+                    <pre class="view-field-pre empty" v-else>(click Refresh to load the app)</pre>
+                  </template>
+
+                  <!-- ── Editable property field (default) ── -->
+                  <template v-else>
+                    <label class="view-field-label">[[ item.label || item.property ]]</label>
+                    <textarea
+                      v-if="viewPropKind(item) === 'text'"
+                      class="view-field-textarea"
+                      :value="getViewPropValue(item)"
+                      @change="setViewPropValue(item, $event.target.value, 'string')"
+                    ></textarea>
+                    <input
+                      v-else-if="viewPropIsBoolean(item)"
+                      type="checkbox"
+                      class="view-field-checkbox"
+                      :checked="getViewPropValue(item)"
+                      @change="setViewPropValue(item, $event.target.checked, 'boolean')"
+                    >
+                    <input
+                      v-else
+                      class="view-field-input"
+                      :type="viewPropIsNumber(item) ? 'number' : 'text'"
+                      :value="getViewPropValue(item)"
+                      @change="setViewPropValue(item, $event.target.value, viewPropIsNumber(item) ? 'number' : 'string')"
+                    >
+                  </template>
+
+                </div>
+              </template>
+            </template>
+
+            <!-- ── Two-column block: each column stacks independently ── -->
+            <template v-else>
+              <div class="view-columns-row">
+                <div class="view-column" v-show="!renderColCollapsed[1] && row.col1.length">
+                  <div v-for="item in row.col1" :key="item.id" class="view-field">
+
+                    <!-- ── Console output field ── -->
+                    <template v-if="item.kind === 'console'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'Console Output' ]]</span>
+                      </div>
+                      <pre class="view-field-pre view-field-console" v-if="execText" v-html="execHighlighted"></pre>
+                      <pre class="view-field-pre view-field-console empty" v-else>(no output — click Play to run the scene)</pre>
+                    </template>
+
+                    <!-- ── Text file field ── -->
+                    <template v-else-if="item.kind === 'text_file'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'Text File' ]]</span>
+                        <div class="view-field-actions">
+                          <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                            <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
+                      <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                        <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                      </div>
+                      <pre class="view-field-pre" v-else-if="viewFileData[item.id]?.text">[[ viewFileData[item.id].text ]]</pre>
+                      <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
+                      <pre class="view-field-pre empty" v-else>(click Refresh or run the scene to load)</pre>
+                    </template>
+
+                    <!-- ── CSV file field ── -->
+                    <template v-else-if="item.kind === 'csv_file'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'CSV File' ]]</span>
+                        <div class="view-field-actions">
+                          <button class="view-field-refresh" @click="downloadViewFile(item)" title="Download CSV" :disabled="!viewFileData[item.id]?.text">
+                            <i class="ti ti-download"></i>
+                            Download
+                          </button>
+                          <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                            <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
+                      <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                        <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                      </div>
+                      <div v-else-if="viewFileData[item.id]?.text" class="view-csv-wrap">
+                        <table class="view-csv-table">
+                          <thead v-if="parseCsvRows(viewFileData[item.id].text).length > 0">
+                            <tr>
+                              <th v-for="(col, ci) in parseCsvRows(viewFileData[item.id].text)[0]" :key="ci">[[ col ]]</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(csvRow, ri2) in parseCsvRows(viewFileData[item.id].text).slice(1)" :key="ri2">
+                              <td v-for="(cell, ci) in csvRow" :key="ci" :title="cell">[[ cell ]]</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <div v-if="parseCsvRows(viewFileData[item.id].text).length <= 1" class="view-csv-empty">CSV file is empty or has only a header row.</div>
+                      </div>
+                      <div v-else-if="!item.address?.trim()" class="view-csv-wrap">
+                        <div class="view-csv-empty">(no address set — configure in Author mode)</div>
+                      </div>
+                      <div v-else class="view-csv-wrap">
+                        <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
+                      </div>
+                    </template>
+
+                    <!-- ── Embedded web app field ── -->
+                    <template v-else-if="item.kind === 'html_app'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'Web App' ]]</span>
+                        <div class="view-field-actions">
+                          <button class="view-field-refresh" @click="toggleAppFullscreen(item)" title="Fullscreen" :disabled="!viewFileData[item.id]?.html">
+                            <i class="ti ti-arrows-maximize"></i>
+                          </button>
+                          <button class="view-field-refresh" @click="fetchAppHtml(item)" title="Reload app">
+                            <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
+                      <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                        <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                      </div>
+                      <iframe
+                        v-else-if="viewFileData[item.id]?.html"
+                        :ref="el => setAppFrameRef(item.id, el)"
+                        sandbox="allow-scripts allow-forms allow-modals allow-popups"
+                        allow="fullscreen"
+                        :srcdoc="viewFileData[item.id].html"
+                        class="view-app-frame"
+                      ></iframe>
+                      <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
+                      <pre class="view-field-pre empty" v-else>(click Refresh to load the app)</pre>
+                    </template>
+
+                    <!-- ── Editable property field (default) ── -->
+                    <template v-else>
+                      <label class="view-field-label">[[ item.label || item.property ]]</label>
+                      <textarea
+                        v-if="viewPropKind(item) === 'text'"
+                        class="view-field-textarea"
+                        :value="getViewPropValue(item)"
+                        @change="setViewPropValue(item, $event.target.value, 'string')"
+                      ></textarea>
+                      <input
+                        v-else-if="viewPropIsBoolean(item)"
+                        type="checkbox"
+                        class="view-field-checkbox"
+                        :checked="getViewPropValue(item)"
+                        @change="setViewPropValue(item, $event.target.checked, 'boolean')"
+                      >
+                      <input
+                        v-else
+                        class="view-field-input"
+                        :type="viewPropIsNumber(item) ? 'number' : 'text'"
+                        :value="getViewPropValue(item)"
+                        @change="setViewPropValue(item, $event.target.value, viewPropIsNumber(item) ? 'number' : 'string')"
+                      >
+                    </template>
+
+                  </div>
+                </div>
+                <div class="view-column" v-show="!renderColCollapsed[2] && row.col2.length">
+                  <div v-for="item in row.col2" :key="item.id" class="view-field">
+
+                    <!-- ── Console output field ── -->
+                    <template v-if="item.kind === 'console'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'Console Output' ]]</span>
+                      </div>
+                      <pre class="view-field-pre view-field-console" v-if="execText" v-html="execHighlighted"></pre>
+                      <pre class="view-field-pre view-field-console empty" v-else>(no output — click Play to run the scene)</pre>
+                    </template>
+
+                    <!-- ── Text file field ── -->
+                    <template v-else-if="item.kind === 'text_file'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'Text File' ]]</span>
+                        <div class="view-field-actions">
+                          <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                            <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
+                      <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                        <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                      </div>
+                      <pre class="view-field-pre" v-else-if="viewFileData[item.id]?.text">[[ viewFileData[item.id].text ]]</pre>
+                      <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
+                      <pre class="view-field-pre empty" v-else>(click Refresh or run the scene to load)</pre>
+                    </template>
+
+                    <!-- ── CSV file field ── -->
+                    <template v-else-if="item.kind === 'csv_file'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'CSV File' ]]</span>
+                        <div class="view-field-actions">
+                          <button class="view-field-refresh" @click="downloadViewFile(item)" title="Download CSV" :disabled="!viewFileData[item.id]?.text">
+                            <i class="ti ti-download"></i>
+                            Download
+                          </button>
+                          <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                            <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
+                      <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                        <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                      </div>
+                      <div v-else-if="viewFileData[item.id]?.text" class="view-csv-wrap">
+                        <table class="view-csv-table">
+                          <thead v-if="parseCsvRows(viewFileData[item.id].text).length > 0">
+                            <tr>
+                              <th v-for="(col, ci) in parseCsvRows(viewFileData[item.id].text)[0]" :key="ci">[[ col ]]</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(csvRow, ri2) in parseCsvRows(viewFileData[item.id].text).slice(1)" :key="ri2">
+                              <td v-for="(cell, ci) in csvRow" :key="ci" :title="cell">[[ cell ]]</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <div v-if="parseCsvRows(viewFileData[item.id].text).length <= 1" class="view-csv-empty">CSV file is empty or has only a header row.</div>
+                      </div>
+                      <div v-else-if="!item.address?.trim()" class="view-csv-wrap">
+                        <div class="view-csv-empty">(no address set — configure in Author mode)</div>
+                      </div>
+                      <div v-else class="view-csv-wrap">
+                        <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
+                      </div>
+                    </template>
+
+                    <!-- ── Embedded web app field ── -->
+                    <template v-else-if="item.kind === 'html_app'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'Web App' ]]</span>
+                        <div class="view-field-actions">
+                          <button class="view-field-refresh" @click="toggleAppFullscreen(item)" title="Fullscreen" :disabled="!viewFileData[item.id]?.html">
+                            <i class="ti ti-arrows-maximize"></i>
+                          </button>
+                          <button class="view-field-refresh" @click="fetchAppHtml(item)" title="Reload app">
+                            <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
+                      <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                        <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                      </div>
+                      <iframe
+                        v-else-if="viewFileData[item.id]?.html"
+                        :ref="el => setAppFrameRef(item.id, el)"
+                        sandbox="allow-scripts allow-forms allow-modals allow-popups"
+                        allow="fullscreen"
+                        :srcdoc="viewFileData[item.id].html"
+                        class="view-app-frame"
+                      ></iframe>
+                      <pre class="view-field-pre empty" v-else-if="!item.address?.trim()">(no address set — configure in Author mode)</pre>
+                      <pre class="view-field-pre empty" v-else>(click Refresh to load the app)</pre>
+                    </template>
+
+                    <!-- ── Editable property field (default) ── -->
+                    <template v-else>
+                      <label class="view-field-label">[[ item.label || item.property ]]</label>
+                      <textarea
+                        v-if="viewPropKind(item) === 'text'"
+                        class="view-field-textarea"
+                        :value="getViewPropValue(item)"
+                        @change="setViewPropValue(item, $event.target.value, 'string')"
+                      ></textarea>
+                      <input
+                        v-else-if="viewPropIsBoolean(item)"
+                        type="checkbox"
+                        class="view-field-checkbox"
+                        :checked="getViewPropValue(item)"
+                        @change="setViewPropValue(item, $event.target.checked, 'boolean')"
+                      >
+                      <input
+                        v-else
+                        class="view-field-input"
+                        :type="viewPropIsNumber(item) ? 'number' : 'text'"
+                        :value="getViewPropValue(item)"
+                        @change="setViewPropValue(item, $event.target.value, viewPropIsNumber(item) ? 'number' : 'string')"
+                      >
+                    </template>
+
+                  </div>
+                </div>
+              </div>
+            </template>
+
+          </template>
         </div>
       </div><!-- /.view-render-outer -->
 
@@ -3110,8 +3509,6 @@ createApp({
 
     /* ── View mode ── */
     const viewMode    = ref('author');  // 'author' | 'render'
-    let   viewDragIdx = null;
-    const viewDragOver = ref(null);
 
     const showExecPanel  = ref(false);
     const verbosePlay    = ref(false);
@@ -4035,10 +4432,34 @@ createApp({
       view.value = v;
     }
 
+    function switchViewMode(mode) {
+      viewMode.value = mode;
+      if (mode === 'render') _initRenderCollapse();
+    }
+
     /* ── View helpers ── */
+    // A view item's column lives on `item.column`: 1, 2, or 'full' (spans both).
+    // Any other/missing value is treated as column 1 — keeps old or malformed
+    // data (e.g. a hand-edited scene.json) from breaking the layout.
+    function _normalizeColumn(col) {
+      if (col === 2 || col === 'full') return col;
+      return 1;
+    }
+
     function _ensureView() {
       if (!scene.value.view) scene.value.view = { items: [] };
       if (!Array.isArray(scene.value.view.items)) scene.value.view.items = [];
+      // Only rewrite `columns` when it's actually missing/malformed. This is called
+      // from template-bound getters (e.g. isColumnDefaultCollapsed) during render —
+      // unconditionally assigning a fresh array here would write to reactive state
+      // that the same render depends on, on every single render, forever.
+      const cols = scene.value.view.columns;
+      const isNormalized = Array.isArray(cols) && cols.length === 2 &&
+        cols.every(c => c && typeof c.collapsed === 'boolean');
+      if (!isNormalized) {
+        const existing = Array.isArray(cols) ? cols : [];
+        scene.value.view.columns = [0, 1].map(i => ({ collapsed: !!existing[i]?.collapsed }));
+      }
     }
 
     function compViewProps(comp) {
@@ -4061,7 +4482,7 @@ createApp({
         component_id: compId,
         property: propKey,
         label,
-        width: 'full',
+        column: 1,
       });
     }
 
@@ -4070,19 +4491,109 @@ createApp({
       scene.value.view.items = scene.value.view.items.filter(x => x.id !== id);
     }
 
-    function onViewDragStart(idx) { viewDragIdx = idx; }
-    function onViewDragOver(idx)  { viewDragOver.value = idx; }
-    function onViewDrop(toIdx) {
-      const fromIdx = viewDragIdx;
-      viewDragIdx = null;
-      viewDragOver.value = null;
-      if (fromIdx === null || fromIdx === toIdx) return;
+    function setViewItemColumn(item, col) { item.column = col; }
+    function viewItemColumn(item) { return _normalizeColumn(item.column); }
+
+    /* Author-mode zone buckets (full-width strip, column 1, column 2) */
+    const viewFullItems = computed(() =>
+      (scene.value.view?.items || []).filter(i => _normalizeColumn(i.column) === 'full')
+    );
+    const viewCol1Items = computed(() =>
+      (scene.value.view?.items || []).filter(i => _normalizeColumn(i.column) === 1)
+    );
+    const viewCol2Items = computed(() =>
+      (scene.value.view?.items || []).filter(i => _normalizeColumn(i.column) === 2)
+    );
+
+    /* Drag-and-drop: reassigning column + reordering both happen by item id,
+       since each zone now renders a filtered subset of the flat items array
+       (a local zone index no longer maps to a global array index). */
+    let   viewDragId    = null;
+    const viewDragOverId  = ref(null);   // card-level highlight
+    const viewZoneDragOver = ref(null);  // zone-level highlight: 'full' | 1 | 2
+
+    function onViewItemDragStart(id) { viewDragId = id; }
+    function onViewItemDragOverCard(id) { viewDragOverId.value = id; }
+    function onViewItemDragLeaveCard() { viewDragOverId.value = null; }
+
+    function onViewItemDropOnCard(targetId) {
+      const draggedId = viewDragId;
+      viewDragId = null;
+      viewDragOverId.value = null;
+      if (!draggedId || draggedId === targetId) return;
       _ensureView();
       const items = [...scene.value.view.items];
+      const fromIdx = items.findIndex(x => x.id === draggedId);
+      const targetItem = items.find(x => x.id === targetId);
+      if (fromIdx === -1 || !targetItem) return;
       const [moved] = items.splice(fromIdx, 1);
-      items.splice(toIdx, 0, moved);
+      moved.column = targetItem.column;
+      const insertAt = items.indexOf(targetItem);
+      items.splice(insertAt, 0, moved);
       scene.value.view.items = items;
     }
+
+    function onViewZoneDrop(col) {
+      const draggedId = viewDragId;
+      viewDragId = null;
+      viewDragOverId.value = null;
+      viewZoneDragOver.value = null;
+      if (!draggedId) return;
+      _ensureView();
+      const items = [...scene.value.view.items];
+      const fromIdx = items.findIndex(x => x.id === draggedId);
+      if (fromIdx === -1) return;
+      const [moved] = items.splice(fromIdx, 1);
+      moved.column = col;
+      items.push(moved);
+      scene.value.view.items = items;
+    }
+
+    /* ── Column collapse: persisted default (Author mode) + session override (Preview) ── */
+    const renderColCollapsed = reactive({ 1: false, 2: false });
+
+    function _initRenderCollapse() {
+      _ensureView();
+      renderColCollapsed[1] = !!scene.value.view.columns[0]?.collapsed;
+      renderColCollapsed[2] = !!scene.value.view.columns[1]?.collapsed;
+    }
+
+    function toggleRenderColumn(col) {
+      renderColCollapsed[col] = !renderColCollapsed[col];
+    }
+
+    function isColumnDefaultCollapsed(col) {
+      _ensureView();
+      return !!scene.value.view.columns[col - 1]?.collapsed;
+    }
+
+    function setColumnDefaultCollapsed(col, collapsed) {
+      _ensureView();
+      scene.value.view.columns[col - 1] = { collapsed };
+    }
+
+    /* Render-mode layout: split items into ordered blocks — a 'full' item is
+       its own full-width block; consecutive column 1/2 items are grouped into
+       a two-column block so each column stacks independently within it. */
+    const viewRows = computed(() => {
+      const items = scene.value.view?.items || [];
+      const rows = [];
+      let colsBlock = null;
+      for (const item of items) {
+        const col = _normalizeColumn(item.column);
+        if (col === 'full') {
+          rows.push({ type: 'full', item });
+          colsBlock = null;
+        } else {
+          if (!colsBlock) {
+            colsBlock = { type: 'cols', col1: [], col2: [] };
+            rows.push(colsBlock);
+          }
+          colsBlock[col === 2 ? 'col2' : 'col1'].push(item);
+        }
+      }
+      return rows;
+    });
 
     function _viewCompEntry(item) {
       const comp = scene.value.components.find(c => c.id === item.component_id);
@@ -4141,7 +4652,7 @@ createApp({
         id: `vi_${Date.now()}`,
         kind,
         label: labels[kind] || kind,
-        width: 'full',
+        column: 1,
       };
       if (kind === 'text_file' || kind === 'csv_file' || kind === 'html_app') item.address = '';
       if (kind === 'html_app') item.allow_shared_write = false;
@@ -4629,9 +5140,16 @@ createApp({
       onTimeoutModeChange, onTimeoutHmsChange,
       showPlayWarning, playWarnings, proceedPlay,
       fileInput,
-      viewMode, viewDragOver,
+      viewMode, switchViewMode,
       compViewProps, isViewPropAdded, addViewItem, removeViewItem,
-      onViewDragStart, onViewDragOver, onViewDrop,
+      setViewItemColumn, viewItemColumn,
+      viewFullItems, viewCol1Items, viewCol2Items,
+      viewDragOverId, viewZoneDragOver,
+      onViewItemDragStart, onViewItemDragOverCard, onViewItemDragLeaveCard,
+      onViewItemDropOnCard, onViewZoneDrop,
+      renderColCollapsed, toggleRenderColumn,
+      isColumnDefaultCollapsed, setColumnDefaultCollapsed,
+      viewRows,
       viewPropKind, viewPropIsBoolean, viewPropIsNumber,
       getViewPropValue, setViewPropValue,
       viewFileData, hasConsoleField,

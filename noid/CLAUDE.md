@@ -8,6 +8,12 @@ on a dedicated GPU machine (Processing Machine).
 Full human-readable documentation lives in `docs/`. Read `docs/architecture.md`
 before making any structural change.
 
+> **`noid/temp/` is scratch input, not project state.** The user drops example
+> files there (HTML, CSV, captures, etc.) purely to give Claude something
+> concrete to look at when discussing a request. Nothing under `temp/` may be
+> referenced from or copied into any permanent implementation (code, docs,
+> fixtures, tests) — treat its contents as disposable, ephemeral context only.
+
 ---
 
 ## Settled decisions — do not re-propose alternatives
