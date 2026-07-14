@@ -1690,6 +1690,7 @@ select.prop-val { padding: 3px 4px; }
   flex-direction: column;
   gap: 16px;
 }
+.view-column-divided { padding-left: 16px; border-left: 0.5px solid var(--c-border); }
 .view-field { display: flex; flex-direction: column; gap: 5px; }
 .view-field.full-span { width: 100%; }
 .view-field-label {
@@ -1778,6 +1779,7 @@ select.prop-val { padding: 3px 4px; }
 .view-item-kind-badge.kind-console { background: #1e1a14; color: #c8a84a; }
 .view-item-kind-badge.kind-text_file { background: var(--c-tag-char-bg); color: var(--c-tag-char); }
 .view-item-kind-badge.kind-csv_file { background: var(--c-tag-place-bg); color: var(--c-tag-place); }
+.view-item-kind-badge.kind-csv_cell { background: var(--c-tag-trans-bg); color: var(--c-tag-trans); }
 
 /* Address input inside an authoring card */
 .view-item-addr-input {
@@ -1917,6 +1919,33 @@ select.prop-val { padding: 3px 4px; }
 }
 .view-csv-table tr:hover td { background: var(--c-accent-light); }
 .view-csv-empty { padding: 24px; text-align: center; color: var(--c-muted); font-size: 12px; font-style: italic; }
+
+/* CSV field (single cell, one row at a time) */
+.view-csv-cell-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.view-csv-cell-pos {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-muted);
+}
+.view-csv-cell-body {
+  font-family: var(--font-doc);
+  font-size: 15px;
+  line-height: 1.7;
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 18px 22px;
+  overflow: auto;
+  max-height: 420px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--c-text);
+}
 </style>
 </head>
 <body>
@@ -2633,6 +2662,10 @@ select.prop-val { padding: 3px 4px; }
             <button class="avail-add-btn" @click="addOutputItem('csv_file')">+ Add</button>
           </div>
           <div class="avail-out-row">
+            <span class="avail-out-label"><i class="ti ti-align-left"></i> CSV field</span>
+            <button class="avail-add-btn" @click="addOutputItem('csv_cell')">+ Add</button>
+          </div>
+          <div class="avail-out-row">
             <span class="avail-out-label"><i class="ti ti-apps"></i> Web app</span>
             <button class="avail-add-btn" @click="addOutputItem('html_app')">+ Add</button>
           </div>
@@ -2677,11 +2710,18 @@ select.prop-val { padding: 3px 4px; }
                       <span v-else class="view-item-ref">[[ item.component_id ]].[[ item.property ]]</span>
                     </div>
                     <input
-                      v-if="item.kind === 'text_file' || item.kind === 'csv_file' || item.kind === 'html_app'"
+                      v-if="item.kind === 'text_file' || item.kind === 'csv_file' || item.kind === 'csv_cell' || item.kind === 'html_app'"
                       class="view-item-addr-input"
                       type="text"
                       v-model="item.address"
                       :placeholder="item.kind === 'html_app' ? 'address: scope:path/app.html  e.g. scene:tools/app.html' : 'address: scope:path/file.ext  e.g. scene:output.txt'"
+                    >
+                    <input
+                      v-if="item.kind === 'csv_cell'"
+                      class="view-item-addr-input"
+                      type="text"
+                      v-model="item.csv_column"
+                      placeholder="CSV column name to display, e.g. text"
                     >
                     <label v-if="item.kind === 'html_app'" class="view-item-shared-write-toggle">
                       <input type="checkbox" v-model="item.allow_shared_write">
@@ -2739,11 +2779,18 @@ select.prop-val { padding: 3px 4px; }
                         <span v-else class="view-item-ref">[[ item.component_id ]].[[ item.property ]]</span>
                       </div>
                       <input
-                        v-if="item.kind === 'text_file' || item.kind === 'csv_file' || item.kind === 'html_app'"
+                        v-if="item.kind === 'text_file' || item.kind === 'csv_file' || item.kind === 'csv_cell' || item.kind === 'html_app'"
                         class="view-item-addr-input"
                         type="text"
                         v-model="item.address"
                         :placeholder="item.kind === 'html_app' ? 'address: scope:path/app.html  e.g. scene:tools/app.html' : 'address: scope:path/file.ext  e.g. scene:output.txt'"
+                      >
+                      <input
+                        v-if="item.kind === 'csv_cell'"
+                        class="view-item-addr-input"
+                        type="text"
+                        v-model="item.csv_column"
+                        placeholder="CSV column name to display, e.g. text"
                       >
                       <label v-if="item.kind === 'html_app'" class="view-item-shared-write-toggle">
                         <input type="checkbox" v-model="item.allow_shared_write">
@@ -2861,6 +2908,49 @@ select.prop-val { padding: 3px 4px; }
                     <div v-else class="view-csv-wrap">
                       <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
                     </div>
+                  </template>
+
+                  <!-- ── CSV field (single cell) ── -->
+                  <template v-else-if="item.kind === 'csv_cell'">
+                    <div class="view-field-meta">
+                      <span class="view-field-label">[[ item.label || 'CSV Field' ]]</span>
+                      <div class="view-field-actions">
+                        <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                          <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                          Refresh
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                      <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                    </div>
+                    <div v-else-if="!item.address?.trim()" class="view-csv-cell-wrap">
+                      <div class="view-csv-empty">(no address set — configure in Author mode)</div>
+                    </div>
+                    <div v-else-if="!item.csv_column?.trim()" class="view-csv-cell-wrap">
+                      <div class="view-csv-empty">(no column set — configure in Author mode)</div>
+                    </div>
+                    <div v-else-if="!viewFileData[item.id]?.text" class="view-csv-cell-wrap">
+                      <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
+                    </div>
+                    <div v-else-if="csvCellColumnIndex(item) === -1" class="view-csv-cell-wrap">
+                      <div class="view-csv-empty">Column "[[ item.csv_column ]]" not found in CSV header.</div>
+                    </div>
+                    <div v-else-if="!csvCellDataRows(item).length" class="view-csv-cell-wrap">
+                      <div class="view-csv-empty">CSV file has no data rows.</div>
+                    </div>
+                    <template v-else>
+                      <div class="view-csv-cell-nav">
+                        <button class="view-field-refresh" @click="csvCellGoto(item, -1)" :disabled="csvCellRowIndex(item) === 0" title="Previous row">
+                          <i class="ti ti-chevron-left"></i> Prev
+                        </button>
+                        <span class="view-csv-cell-pos">Row [[ csvCellRowIndex(item) + 1 ]] of [[ csvCellDataRows(item).length ]] — [[ item.csv_column ]]</span>
+                        <button class="view-field-refresh" @click="csvCellGoto(item, 1)" :disabled="csvCellRowIndex(item) >= csvCellDataRows(item).length - 1" title="Next row">
+                          Next <i class="ti ti-chevron-right"></i>
+                        </button>
+                      </div>
+                      <div class="view-csv-cell-body">[[ csvCellValue(item) ]]</div>
+                    </template>
                   </template>
 
                   <!-- ── Embedded web app field ── -->
@@ -2996,6 +3086,49 @@ select.prop-val { padding: 3px 4px; }
                       </div>
                     </template>
 
+                    <!-- ── CSV field (single cell) ── -->
+                    <template v-else-if="item.kind === 'csv_cell'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'CSV Field' ]]</span>
+                        <div class="view-field-actions">
+                          <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                            <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
+                      <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                        <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                      </div>
+                      <div v-else-if="!item.address?.trim()" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">(no address set — configure in Author mode)</div>
+                      </div>
+                      <div v-else-if="!item.csv_column?.trim()" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">(no column set — configure in Author mode)</div>
+                      </div>
+                      <div v-else-if="!viewFileData[item.id]?.text" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
+                      </div>
+                      <div v-else-if="csvCellColumnIndex(item) === -1" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">Column "[[ item.csv_column ]]" not found in CSV header.</div>
+                      </div>
+                      <div v-else-if="!csvCellDataRows(item).length" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">CSV file has no data rows.</div>
+                      </div>
+                      <template v-else>
+                        <div class="view-csv-cell-nav">
+                          <button class="view-field-refresh" @click="csvCellGoto(item, -1)" :disabled="csvCellRowIndex(item) === 0" title="Previous row">
+                            <i class="ti ti-chevron-left"></i> Prev
+                          </button>
+                          <span class="view-csv-cell-pos">Row [[ csvCellRowIndex(item) + 1 ]] of [[ csvCellDataRows(item).length ]] — [[ item.csv_column ]]</span>
+                          <button class="view-field-refresh" @click="csvCellGoto(item, 1)" :disabled="csvCellRowIndex(item) >= csvCellDataRows(item).length - 1" title="Next row">
+                            Next <i class="ti ti-chevron-right"></i>
+                          </button>
+                        </div>
+                        <div class="view-csv-cell-body">[[ csvCellValue(item) ]]</div>
+                      </template>
+                    </template>
+
                     <!-- ── Embedded web app field ── -->
                     <template v-else-if="item.kind === 'html_app'">
                       <div class="view-field-meta">
@@ -3052,7 +3185,11 @@ select.prop-val { padding: 3px 4px; }
 
                   </div>
                 </div>
-                <div class="view-column" v-show="!renderColCollapsed[2] && row.col2.length">
+                <div
+                  class="view-column"
+                  :class="{'view-column-divided': !renderColCollapsed[1] && row.col1.length}"
+                  v-show="!renderColCollapsed[2] && row.col2.length"
+                >
                   <div v-for="item in row.col2" :key="item.id" class="view-field">
 
                     <!-- ── Console output field ── -->
@@ -3122,6 +3259,49 @@ select.prop-val { padding: 3px 4px; }
                       <div v-else class="view-csv-wrap">
                         <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
                       </div>
+                    </template>
+
+                    <!-- ── CSV field (single cell) ── -->
+                    <template v-else-if="item.kind === 'csv_cell'">
+                      <div class="view-field-meta">
+                        <span class="view-field-label">[[ item.label || 'CSV Field' ]]</span>
+                        <div class="view-field-actions">
+                          <button class="view-field-refresh" @click="fetchViewFileContent(item)" title="Reload file">
+                            <i class="ti" :class="viewFileData[item.id]?.loading ? 'ti-loader-2' : 'ti-refresh'"></i>
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
+                      <div v-if="viewFileData[item.id]?.error" class="view-field-err">
+                        <i class="ti ti-alert-circle"></i> [[ viewFileData[item.id].error ]]
+                      </div>
+                      <div v-else-if="!item.address?.trim()" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">(no address set — configure in Author mode)</div>
+                      </div>
+                      <div v-else-if="!item.csv_column?.trim()" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">(no column set — configure in Author mode)</div>
+                      </div>
+                      <div v-else-if="!viewFileData[item.id]?.text" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">(click Refresh or run the scene to load)</div>
+                      </div>
+                      <div v-else-if="csvCellColumnIndex(item) === -1" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">Column "[[ item.csv_column ]]" not found in CSV header.</div>
+                      </div>
+                      <div v-else-if="!csvCellDataRows(item).length" class="view-csv-cell-wrap">
+                        <div class="view-csv-empty">CSV file has no data rows.</div>
+                      </div>
+                      <template v-else>
+                        <div class="view-csv-cell-nav">
+                          <button class="view-field-refresh" @click="csvCellGoto(item, -1)" :disabled="csvCellRowIndex(item) === 0" title="Previous row">
+                            <i class="ti ti-chevron-left"></i> Prev
+                          </button>
+                          <span class="view-csv-cell-pos">Row [[ csvCellRowIndex(item) + 1 ]] of [[ csvCellDataRows(item).length ]] — [[ item.csv_column ]]</span>
+                          <button class="view-field-refresh" @click="csvCellGoto(item, 1)" :disabled="csvCellRowIndex(item) >= csvCellDataRows(item).length - 1" title="Next row">
+                            Next <i class="ti ti-chevron-right"></i>
+                          </button>
+                        </div>
+                        <div class="view-csv-cell-body">[[ csvCellValue(item) ]]</div>
+                      </template>
                     </template>
 
                     <!-- ── Embedded web app field ── -->
@@ -4643,28 +4823,29 @@ createApp({
       (scene.value.view?.items || []).some(x => x.kind === 'console')
     );
 
-    const OUTPUT_KINDS = { console: 'console', text_file: 'text_file', csv_file: 'csv_file', html_app: 'html_app' };
+    const OUTPUT_KINDS = { console: 'console', text_file: 'text_file', csv_file: 'csv_file', csv_cell: 'csv_cell', html_app: 'html_app' };
 
     function addOutputItem(kind) {
       _ensureView();
-      const labels = { console: 'Console Output', text_file: 'Text File', csv_file: 'CSV Table', html_app: 'Web App' };
+      const labels = { console: 'Console Output', text_file: 'Text File', csv_file: 'CSV Table', csv_cell: 'CSV Field', html_app: 'Web App' };
       const item = {
         id: `vi_${Date.now()}`,
         kind,
         label: labels[kind] || kind,
         column: 1,
       };
-      if (kind === 'text_file' || kind === 'csv_file' || kind === 'html_app') item.address = '';
+      if (kind === 'text_file' || kind === 'csv_file' || kind === 'csv_cell' || kind === 'html_app') item.address = '';
+      if (kind === 'csv_cell') item.csv_column = '';
       if (kind === 'html_app') item.allow_shared_write = false;
       scene.value.view.items.push(item);
     }
 
     function viewKindIcon(kind) {
-      return { console: 'ti-terminal-2', text_file: 'ti-file-text', csv_file: 'ti-table', html_app: 'ti-apps' }[kind] || 'ti-puzzle';
+      return { console: 'ti-terminal-2', text_file: 'ti-file-text', csv_file: 'ti-table', csv_cell: 'ti-align-left', html_app: 'ti-apps' }[kind] || 'ti-puzzle';
     }
 
     function viewKindLabel(kind) {
-      return { console: 'console', text_file: 'text file', csv_file: 'csv file', html_app: 'web app' }[kind] || kind;
+      return { console: 'console', text_file: 'text file', csv_file: 'csv file', csv_cell: 'csv field', html_app: 'web app' }[kind] || kind;
     }
 
     async function fetchViewFileContent(item) {
@@ -4796,12 +4977,41 @@ createApp({
     function refreshAllFileItems() {
       const items = scene.value.view?.items || [];
       for (const item of items) {
-        if (item.kind === 'text_file' || item.kind === 'csv_file') {
+        if (item.kind === 'text_file' || item.kind === 'csv_file' || item.kind === 'csv_cell') {
           fetchViewFileContent(item);
         } else if (item.kind === 'html_app') {
           fetchAppHtml(item);
         }
       }
+    }
+
+    /* ── CSV field: shows one column, one row at a time ── */
+    const viewCsvCellRow = reactive({});   // { [item.id]: current data-row index }
+
+    function csvCellHeader(item) {
+      return parseCsvRows(viewFileData[item.id]?.text)[0] || [];
+    }
+    function csvCellDataRows(item) {
+      return parseCsvRows(viewFileData[item.id]?.text).slice(1);
+    }
+    function csvCellColumnIndex(item) {
+      return csvCellHeader(item).indexOf(item.csv_column);
+    }
+    function csvCellRowIndex(item) {
+      const rows = csvCellDataRows(item);
+      if (!rows.length) return 0;
+      return Math.min(Math.max(viewCsvCellRow[item.id] || 0, 0), rows.length - 1);
+    }
+    function csvCellValue(item) {
+      const rows = csvCellDataRows(item);
+      const ci = csvCellColumnIndex(item);
+      if (ci === -1 || !rows.length) return '';
+      return rows[csvCellRowIndex(item)][ci] ?? '';
+    }
+    function csvCellGoto(item, delta) {
+      const rows = csvCellDataRows(item);
+      if (!rows.length) return;
+      viewCsvCellRow[item.id] = Math.min(Math.max(csvCellRowIndex(item) + delta, 0), rows.length - 1);
     }
 
     function parseCsvRows(text) {
@@ -5155,6 +5365,8 @@ createApp({
       viewFileData, hasConsoleField,
       addOutputItem, viewKindIcon, viewKindLabel,
       fetchViewFileContent, parseCsvRows, downloadViewFile,
+      viewCsvCellRow, csvCellHeader, csvCellDataRows,
+      csvCellColumnIndex, csvCellRowIndex, csvCellValue, csvCellGoto,
       fetchAppHtml, setAppFrameRef, toggleAppFullscreen,
       addComponent, deleteComponent,
       onIdChange, setProp,

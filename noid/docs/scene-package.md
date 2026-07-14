@@ -129,9 +129,12 @@ not part of the executable spec.
 }
 ```
 
-Item kinds: `console`, `text_file`, `csv_file` (all read-only, via `GET
-/api/resources/read/`), a bare component-property reference (`component_id` +
-`property`, editable), and `html_app`.
+Item kinds: `console`, `text_file`, `csv_file`, `csv_cell` (all read-only, via
+`GET /api/resources/read/`), a bare component-property reference
+(`component_id` + `property`, editable), and `html_app`. `csv_cell` renders a
+single column (`csv_column`) of a CSV `address`, one data row at a time, with
+prev/next controls in the Preview view — useful for long free-text columns
+(e.g. `lm-agent` output) that don't fit in the `csv_file` table view.
 
 #### `html_app` — embedded third-party web apps
 

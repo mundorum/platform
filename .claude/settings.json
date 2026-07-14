@@ -26,7 +26,15 @@
       "Bash(curl -s -H \"Authorization: Token c49b5e9375060a48444408a6c78d6821cf1a301a\" http://localhost:8000/api/catalog/)",
       "Bash(NOID_TOKEN=c49b5e9375060a48444408a6c78d6821cf1a301a node drive2.js)",
       "Bash(NOID_TOKEN=c49b5e9375060a48444408a6c78d6821cf1a301a timeout 60 node drive2.js)",
-      "Bash(NOID_TOKEN=c49b5e9375060a48444408a6c78d6821cf1a301a timeout 45 node drive3_drag.js)"
+      "Bash(NOID_TOKEN=c49b5e9375060a48444408a6c78d6821cf1a301a timeout 45 node drive3_drag.js)",
+      "Bash(python3)",
+      "Bash(awk '/^    return \\\\{$/{print NR\": \"$0; found=1} found && /^    \\\\};?$/{print NR\": \"$0; exit}' /home/santanche/git/mundorum/platform/noid/authoring/static/editor.html)",
+      "Bash(grep -n \"^\\\\s*};\\\\s*$\" /home/santanche/git/mundorum/platform/noid/authoring/static/editor.html)",
+      "Bash(pg_isready)",
+      "Bash(curl -s http://localhost:8000/ -o /tmp/index.html -w \"%{http_code}\\\\n\")",
+      "Bash(node --check /tmp/claude-1000/-home-santanche-git-mundorum-platform/a51e3291-ff72-4279-b2cf-cf2bc1e10b1f/scratchpad/app.js)",
+      "Bash(jobs -l)",
+      "Bash(rm -f /tmp/index.html)"
     ],
     "additionalDirectories": [
       "/tmp"
