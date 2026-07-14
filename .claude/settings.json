@@ -38,7 +38,11 @@
       "Bash(sed -n '3564,5379p' editor.html)",
       "Bash(node --check /tmp/claude-1000/-home-santanche-git-mundorum-platform/a51e3291-ff72-4279-b2cf-cf2bc1e10b1f/scratchpad/app2.js)",
       "Bash(grep -n \"^<script>$\\\\|^</script>$\" /home/santanche/git/mundorum/platform/noid/authoring/static/editor.html)",
-      "Bash(node --check /tmp/claude-1000/-home-santanche-git-mundorum-platform/a51e3291-ff72-4279-b2cf-cf2bc1e10b1f/scratchpad/app3.js)"
+      "Bash(node --check /tmp/claude-1000/-home-santanche-git-mundorum-platform/a51e3291-ff72-4279-b2cf-cf2bc1e10b1f/scratchpad/app3.js)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"require.resolve\\('playwright'\\)\")",
+      "Bash(~/.local/bin/playwright --version)",
+      "Bash(python3 test_entities.py)"
     ],
     "additionalDirectories": [
       "/tmp"
@@ -46,6 +50,7 @@
   },
   "additionalDirectories": [
     "~/git/mundorum/noid",
-    "~/git/mundorum/noid-collections"
+    "~/git/mundorum/noid-collections",
+    "~/git/escritos/_marginalium"
   ]
 }

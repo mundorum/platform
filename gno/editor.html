@@ -28,6 +28,8 @@
   --c-tag-trans-bg:  #daf5ee;
   --c-tag-text:      #3a4a1a;
   --c-tag-text-bg:   #e8eedd;
+  --c-tag-state:     #7a5a1a;
+  --c-tag-state-bg:  #f0e8d4;
   --c-bq-border:     #c8a86a;
   --c-scene-node:    #fffef9;
   --c-scene-border:  rgba(60,50,30,0.30);
@@ -56,6 +58,8 @@
     --c-tag-trans-bg:  #0e201a;
     --c-tag-text:      #a0c070;
     --c-tag-text-bg:   #182010;
+    --c-tag-state:     #c4a056;
+    --c-tag-state-bg:  #2c2416;
     --c-bq-border:     #806040;
     --c-scene-node:    #211f17;
     --c-scene-border:  rgba(200,180,140,0.35);
@@ -132,6 +136,19 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   white-space: nowrap;
   max-width: 220px;
 }
+.entity-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--c-muted);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+.entity-toggle-label input { accent-color: var(--c-accent); cursor: pointer; }
+
 .tb-sep { flex: 1; }
 
 .view-tabs {
@@ -211,6 +228,74 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 }
 .scene-item:hover  { background: var(--c-accent-light); color: var(--c-accent); border-left-color: var(--c-accent); }
 .scene-item.active { background: var(--c-accent-light); color: var(--c-accent); border-left-color: var(--c-accent); font-weight: 500; }
+
+/* ── Nav tabs (Scenes / Entities) ── */
+.nav-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 10px 12px 8px;
+}
+.nav-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 0;
+  border: none;
+  background: var(--c-bg);
+  color: var(--c-muted);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.nav-tab i { font-size: 13px; }
+.nav-tab.active { background: var(--c-accent-light); color: var(--c-accent); }
+.nav-tab:hover:not(.active) { color: var(--c-text); }
+
+/* ── Entities panel ── */
+.entity-entry { border-bottom: 0.5px solid var(--c-border); }
+.entity-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+.entity-header:hover { background: var(--c-accent-light); }
+.entity-toggle { font-size: 12px; color: var(--c-muted); transition: transform 0.18s; flex-shrink: 0; }
+.entity-entry.open .entity-toggle { transform: rotate(0deg); }
+.entity-entry:not(.open) .entity-toggle { transform: rotate(-90deg); }
+.entity-id {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-tag-char);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--c-muted);
+  background: var(--c-bg);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+.entity-occurrences { padding: 2px 14px 10px 30px; display: flex; flex-direction: column; gap: 6px; }
+.entity-states { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; }
+.entity-occ-row { display: flex; gap: 6px; cursor: pointer; font-size: 11.5px; line-height: 1.4; }
+.entity-occ-row:hover .entity-occ-ctx { color: var(--c-accent); }
+.entity-occ-num { font-family: var(--font-mono); color: var(--c-tag-char); opacity: 0.6; flex-shrink: 0; }
+.entity-occ-ctx { color: var(--c-muted); }
+.entity-occ-ctx em { color: var(--c-tag-state); font-style: normal; }
 
 /* ── Main content area ── */
 #main-area {
@@ -449,6 +534,73 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   align-self: flex-start;
 }
 
+/* ── Entity mentions in preview ── */
+.pill-entity, .pill-entity-inline {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--c-tag-char);
+  background: var(--c-tag-char-bg);
+  padding: 1px 7px;
+  border-radius: 4px;
+}
+.pill-entity { font-size: 12px; }
+.pill-entity-inline { font-size: 0.85em; padding: 0px 5px; }
+
+.state-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-tag-state);
+  background: var(--c-tag-state-bg);
+  padding: 1px 8px;
+  border-radius: 3px 10px 10px 3px;
+}
+
+.entity-line, .dialog-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0.7em 0;
+  padding: 8px 14px;
+  background: var(--c-accent-light);
+  border-left: 3px solid var(--c-tag-char);
+  border-radius: 0 6px 6px 0;
+  font-family: var(--font-doc);
+  font-size: 15.5px;
+  scroll-margin-top: 24px;
+}
+.dialog-line .dialog-text { color: var(--c-text); }
+
+@keyframes flash-anim {
+  0% { outline: 2px solid var(--c-accent); background: var(--c-accent-light); }
+  100% { outline: 2px solid transparent; }
+}
+.flash { animation: flash-anim 1.1s ease-out; }
+
+/* plain-text mode: strip pill/chip decoration, read as prose */
+#preview-content.entities-plain .pill-entity,
+#preview-content.entities-plain .pill-entity-inline,
+#preview-content.entities-plain .state-chip {
+  background: none;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+#preview-content.entities-plain .entity-line,
+#preview-content.entities-plain .dialog-line {
+  background: none;
+  border-left: none;
+  padding: 0;
+}
+
 /* ── hidden file input ── */
 #file-input { display: none; }
 
@@ -472,6 +624,11 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
     <input type="file" id="file-input" ref="fileInput" accept=".md,.gno,.txt" @change="onFileUpload">
     <span id="filename-display">{{ filename }}</span>
 
+    <label class="entity-toggle-label" v-if="view === 'editor'">
+      <input type="checkbox" v-model="showEntitiesDecorated">
+      Show entities
+    </label>
+
     <div class="tb-sep"></div>
 
     <div class="view-tabs">
@@ -486,32 +643,77 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 
   <!-- Left nav -->
   <nav id="nav-panel" aria-label="Narrative structure">
-    <div class="nav-section-label">Scenarios &amp; Scenes</div>
-    <div v-if="scenarios.length === 0" style="padding: 10px 16px; font-size:12.5px; color:var(--c-muted); font-style:italic;">
-      No scenes yet.<br>Write a heading like:<br><code style="font-size:11px">## Scene: Scenario</code>
+    <div class="nav-tabs">
+      <button class="nav-tab" :class="{active: navTab === 'scenes'}" @click="navTab = 'scenes'">
+        <i class="ti ti-map"></i> Scenes
+      </button>
+      <button class="nav-tab" :class="{active: navTab === 'entities'}" @click="navTab = 'entities'">
+        <i class="ti ti-users"></i> Entities
+      </button>
     </div>
-    <div v-for="sc in scenarios" :key="sc.name" class="scenario-group">
-      <div
-        class="scenario-header"
-        :class="{collapsed: sc.collapsed}"
-        @click="sc.collapsed = !sc.collapsed"
-      >
-        <i class="ti ti-chevron-down chevron"></i>
-        <i class="ti ti-map"></i>
-        {{ sc.name }}
+
+    <template v-if="navTab === 'scenes'">
+      <div class="nav-section-label">Scenarios &amp; Scenes</div>
+      <div v-if="scenarios.length === 0" style="padding: 10px 16px; font-size:12.5px; color:var(--c-muted); font-style:italic;">
+        No scenes yet.<br>Write a heading like:<br><code style="font-size:11px">## Scene: Scenario</code>
       </div>
-      <template v-if="!sc.collapsed">
-        <button
-          v-for="scene in sc.scenes"
-          :key="scene.id"
-          class="scene-item"
-          :class="{active: activeSceneId === scene.id}"
-          @click="scrollToScene(scene.id)"
+      <div v-for="sc in scenarios" :key="sc.name" class="scenario-group">
+        <div
+          class="scenario-header"
+          :class="{collapsed: sc.collapsed}"
+          @click="sc.collapsed = !sc.collapsed"
         >
-          {{ scene.title }}
-        </button>
-      </template>
-    </div>
+          <i class="ti ti-chevron-down chevron"></i>
+          <i class="ti ti-map"></i>
+          {{ sc.name }}
+        </div>
+        <template v-if="!sc.collapsed">
+          <button
+            v-for="scene in sc.scenes"
+            :key="scene.id"
+            class="scene-item"
+            :class="{active: activeSceneId === scene.id}"
+            @click="scrollToScene(scene.id)"
+          >
+            {{ scene.title }}
+          </button>
+        </template>
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="nav-section-label">Entities</div>
+      <div v-if="entityList.length === 0" style="padding: 10px 16px; font-size:12.5px; color:var(--c-muted); font-style:italic;">
+        No entities yet.<br>Reference one with:<br><code style="font-size:11px">@name</code>
+      </div>
+      <div v-for="ent in entityList" :key="ent.id" class="entity-entry" :class="{open: openEntities.has(ent.id)}">
+        <div class="entity-header" @click="toggleEntity(ent.id)">
+          <i class="ti ti-chevron-down entity-toggle"></i>
+          <span class="entity-id">{{ ent.id }}</span>
+          <span class="entity-count">{{ ent.occurrences.length }}</span>
+        </div>
+        <div class="entity-occurrences" v-if="openEntities.has(ent.id)">
+          <div class="entity-states" v-if="ent.states.length">
+            <span class="state-chip" v-for="s in ent.states" :key="s">{{ s }}</span>
+          </div>
+          <div
+            v-for="(occ, i) in ent.occurrences"
+            :key="occ.n"
+            class="entity-occ-row"
+            @click="scrollToEntityOccurrence(occ.n)"
+          >
+            <span class="entity-occ-num">#{{ i + 1 }}</span>
+            <span class="entity-occ-ctx">
+              <template v-if="occ.type === 'dialog'">
+                <em v-if="occ.state">({{ occ.state }})</em> &ldquo;{{ occ.dialogLines.join(' ') }}&rdquo;
+              </template>
+              <template v-else-if="occ.type === 'state'">{{ occ.state || '—' }}</template>
+              <template v-else>{{ occ.context }}</template>
+            </span>
+          </div>
+        </div>
+      </div>
+    </template>
   </nav>
 
   <!-- Main -->
@@ -529,7 +731,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
         ></textarea>
       </div>
       <div id="preview-pane" ref="previewPane">
-        <div id="preview-content" v-html="renderedHtml"></div>
+        <div id="preview-content" :class="{ 'entities-plain': !showEntitiesDecorated }" v-html="renderedHtml"></div>
       </div>
     </div>
 
@@ -589,7 +791,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script>
-const { createApp, ref, computed, nextTick } = Vue;
+const { createApp, ref, reactive, computed, nextTick } = Vue;
 
 /* ── GNO PARSER ── */
 function parseGno(source) {
@@ -627,15 +829,123 @@ function slugify(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+/* ── ENTITY PARSER ── */
+// Detects @entity mentions in three forms:
+//  1. standalone: "@prince right sad"  (whole line, optional state words)
+//  2. dialog: "-- @king left happy: Hello!" or "-- @king:\n...\n..." (state, then dialog until a blank line)
+//  3. inline: "@king" appearing anywhere inside ordinary prose (no state captured)
+function analyzeEntities(source) {
+  const lines = source.split('\n');
+  const occurrences = [];
+  const entityIndex = new Map(); // id -> { states: string[], occurrenceIdx: number[] }
+
+  const SCENE_RE  = /^#{1,6}\s+(.+?)\s*:\s*(.+)$/;
+  const DIALOG_RE = /^--\s*(.+)$/;
+  const FORM1_RE  = /^@([\w'-]+)((?:\s+[^\s:@]+)*)$/;
+  const ID_RE     = /^@([\w'-]+)/;
+  const INLINE_RE = /@([\w'-]+)/g;
+
+  let currentScene = null;
+
+  function register(entityId, type, extra) {
+    const n = occurrences.length;
+    const occ = Object.assign({ n, entityId, type, state: '', dialogLines: [], context: '', scene: currentScene }, extra);
+    occurrences.push(occ);
+    if (!entityIndex.has(entityId)) entityIndex.set(entityId, { states: [], occurrenceIdx: [] });
+    const data = entityIndex.get(entityId);
+    data.occurrenceIdx.push(n);
+    if (occ.state && !data.states.includes(occ.state)) data.states.push(occ.state);
+    return occ;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+    if (trimmed === '') continue;
+
+    const sm = trimmed.match(SCENE_RE);
+    if (sm) { currentScene = sm[1].trim(); continue; }
+
+    if (trimmed.startsWith('*')) continue;
+
+    const dm = trimmed.match(DIALOG_RE);
+    if (dm) {
+      const header = dm[1];
+      const colonIdx = header.indexOf(':');
+      const headPart = (colonIdx >= 0 ? header.slice(0, colonIdx) : header).trim();
+      const idMatch = headPart.match(ID_RE);
+      if (idMatch) {
+        const entityId = '@' + idMatch[1];
+        const state = headPart.slice(idMatch[0].length).trim();
+        const sameLine = colonIdx >= 0 ? header.slice(colonIdx + 1).trim() : '';
+        const dialogLines = sameLine ? [sameLine] : [];
+        let j = i + 1;
+        // stop at a blank line, or at another dialog cue that immediately follows with no separator
+        while (j < lines.length && lines[j].trim() !== '' && !DIALOG_RE.test(lines[j].trim())) { dialogLines.push(lines[j].trim()); j++; }
+        register(entityId, 'dialog', { state, dialogLines, lineStart: i, lineEnd: j - 1 });
+        i = j - 1;
+      }
+      continue;
+    }
+
+    const wm = trimmed.match(FORM1_RE);
+    if (wm) {
+      register('@' + wm[1], 'state', { state: (wm[2] || '').trim(), lineStart: i, lineEnd: i });
+      continue;
+    }
+
+    let m;
+    INLINE_RE.lastIndex = 0;
+    while ((m = INLINE_RE.exec(raw))) {
+      register('@' + m[1], 'mention', { context: trimmed, lineStart: i, lineEnd: i, matchIndex: m.index, matchText: m[0] });
+    }
+  }
+
+  return { occurrences, entityIndex };
+}
+
 /* ── MARKDOWN RENDERER ── */
-function renderGno(source, scenes) {
+function entityBlockHtml(occ) {
+  const parts = [`<span class="pill-entity">${escH(occ.entityId)}</span>`];
+  if (occ.state) parts.push(`<span class="state-chip">${escH(occ.state)}</span>`);
+  if (occ.type === 'dialog') parts.push(`<span class="dialog-text">${escH(occ.dialogLines.join(' '))}</span>`);
+  const cls = occ.type === 'dialog' ? 'dialog-line' : 'entity-line';
+  return `<div class="${cls}" id="entity-occ-${occ.n}">${parts.join('')}</div>`;
+}
+
+// Wraps each @id inline mention in a span, leaving surrounding markdown untouched
+// so marked.js still processes emphasis/links/etc. in the rest of the line.
+function substituteMentions(rawLine, mentionOccs) {
+  let result = '';
+  let cursor = 0;
+  mentionOccs.forEach(occ => {
+    result += rawLine.slice(cursor, occ.matchIndex);
+    result += `<span class="pill-entity-inline" id="entity-occ-${occ.n}">${escH(occ.matchText)}</span>`;
+    cursor = occ.matchIndex + occ.matchText.length;
+  });
+  result += rawLine.slice(cursor);
+  return result;
+}
+
+function renderGno(source, scenes, entities) {
   // Build a map of title -> scene id for preview anchors
   const titleToId = {};
   scenes.forEach(s => {
     titleToId[s.title.toLowerCase()] = s.id;
   });
 
-  // Pre-process: replace scene headings and divert lines
+  const blockByLine = new Map();    // lineStart -> entity 'dialog'/'state' occurrence
+  const mentionsByLine = new Map(); // lineIndex -> inline 'mention' occurrences, in order
+  entities.occurrences.forEach(occ => {
+    if (occ.type === 'mention') {
+      if (!mentionsByLine.has(occ.lineStart)) mentionsByLine.set(occ.lineStart, []);
+      mentionsByLine.get(occ.lineStart).push(occ);
+    } else {
+      blockByLine.set(occ.lineStart, occ);
+    }
+  });
+
+  // Pre-process: replace scene headings, divert lines, and entity forms
   const lines = source.split('\n');
   const out = [];
 
@@ -643,7 +953,9 @@ function renderGno(source, scenes) {
   const DIVERT_RE = /^\*\s+(.+?)\s*->\s*(.+)$/;
   let sceneIdx = 0;
 
-  lines.forEach(line => {
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+
     const sm = line.match(SCENE_RE);
     if (sm) {
       const title = sm[2].trim();
@@ -657,7 +969,7 @@ function renderGno(source, scenes) {
       out.push(`<span class="scene-scenario">Scenario: ${escH(scenario)}</span>`);
       out.push(`</div>`);
       out.push('');
-      return;
+      continue;
     }
     const dm = line.match(DIVERT_RE);
     if (dm) {
@@ -671,10 +983,22 @@ function renderGno(source, scenes) {
       out.push(`<a class="divert-arrow" href="${href}">→ ${escH(target)}</a>`);
       out.push(`</div>`);
       out.push('');
-      return;
+      continue;
+    }
+    if (blockByLine.has(idx)) {
+      const occ = blockByLine.get(idx);
+      out.push('');
+      out.push(entityBlockHtml(occ));
+      out.push('');
+      idx = occ.lineEnd;
+      continue;
+    }
+    if (mentionsByLine.has(idx)) {
+      out.push(substituteMentions(line, mentionsByLine.get(idx)));
+      continue;
     }
     out.push(line);
-  });
+  }
 
   return marked.parse(out.join('\n'), { gfm: true, breaks: false });
 }
@@ -830,12 +1154,24 @@ Smoke from chimneys. Children playing. A merchant waves from a stall.
 `);
     const filename = ref('untitled.gno');
     const view = ref('editor');
+    const navTab = ref('scenes');
     const activeSceneId = ref('');
+    const showEntitiesDecorated = ref(true);
+    const openEntities = reactive(new Set());
     const fileInput = ref(null);
     const editorTextarea = ref(null);
     const previewPane = ref(null);
 
     const scenes = computed(() => parseGno(source.value));
+    const entities = computed(() => analyzeEntities(source.value));
+    const entityList = computed(() => {
+      const { entityIndex, occurrences } = entities.value;
+      return [...entityIndex.entries()].map(([id, data]) => ({
+        id,
+        states: data.states,
+        occurrences: data.occurrenceIdx.map(n => occurrences[n]),
+      }));
+    });
 
     const scenarios = computed(() => {
       const map = new Map();
@@ -846,7 +1182,7 @@ Smoke from chimneys. Children playing. A merchant waves from a stall.
       return [...map.values()];
     });
 
-    const renderedHtml = computed(() => renderGno(source.value, scenes.value));
+    const renderedHtml = computed(() => renderGno(source.value, scenes.value, entities.value));
 
     const graphLayout = computed(() => layoutGraph(scenes.value));
     const graphNodes  = computed(() => graphLayout.value.nodes);
@@ -873,6 +1209,22 @@ Write your scene description here.
       nextTick(() => {
         const el = document.getElementById(id);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+
+    function toggleEntity(id) {
+      if (openEntities.has(id)) openEntities.delete(id);
+      else openEntities.add(id);
+    }
+
+    function scrollToEntityOccurrence(n) {
+      view.value = 'editor';
+      nextTick(() => {
+        const el = document.getElementById('entity-occ-' + n);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('flash');
+        setTimeout(() => el.classList.remove('flash'), 1200);
       });
     }
 
@@ -909,12 +1261,14 @@ Write your scene description here.
     }
 
     return {
-      ready, source, filename, view, activeSceneId,
+      ready, source, filename, view, navTab, activeSceneId,
+      showEntitiesDecorated, openEntities,
       fileInput, editorTextarea, previewPane,
-      scenes, scenarios, renderedHtml,
+      scenes, scenarios, entities, entityList, renderedHtml,
       graphNodes, graphEdges, graphCanvasStyle,
       arrowColor, labelColor, placeholder,
       scrollToScene, syncPreviewScroll,
+      toggleEntity, scrollToEntityOccurrence,
       triggerUpload, onFileUpload, downloadFile,
     };
   }

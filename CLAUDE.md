@@ -1,5 +1,14 @@
 # Mundorum Platform — CLAUDE.md
 
+## App Isolation: `noid/` vs `gno/`
+
+This repository contains two apps, `noid/` and `gno/`, that are (for now) **completely separate** from each other and from the rest of the platform (backend/, frontend/). They do not share code.
+
+**Rule: when a request targets one app, do not make changes in the other app, unless the user explicitly says otherwise.** If a request is ambiguous about which app it concerns, ask before touching files in either.
+
+- `noid/` — has its own `CLAUDE.md`; read it first for anything noid-related (see "noid Sub-project" section below).
+- `gno/` — narrative scene/divert format described in `gno/README.md`; no dedicated CLAUDE.md yet.
+
 ## Project Purpose
 
 An **authoring platform for interactive narrative compositions** written in an extended Markdown dialect. Authors write stories, adventures, or structured text using conventional Markdown enriched with `>>` mark lines that tag characters, places, transitions, and other narrative elements. The platform provides a source editor with live syntax highlighting of marks and a reader/player view.
