@@ -1933,6 +1933,9 @@ select.prop-val { padding: 3px 4px; }
   color: var(--c-muted);
 }
 .view-csv-cell-body {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   font-family: var(--font-doc);
   font-size: 15px;
   line-height: 1.7;
@@ -1940,12 +1943,17 @@ select.prop-val { padding: 3px 4px; }
   border: 0.5px solid var(--c-border-strong);
   border-radius: 6px;
   padding: 18px 22px;
+  height: 220px;
+  min-height: 100px;
+  max-height: 70vh;
+  resize: vertical;
+  outline: none;
   overflow: auto;
-  max-height: 420px;
-  white-space: pre-wrap;
   word-break: break-word;
   color: var(--c-text);
+  transition: border-color 0.15s;
 }
+.view-csv-cell-body:focus { border-color: var(--c-accent); }
 </style>
 </head>
 <body>
@@ -2949,7 +2957,7 @@ select.prop-val { padding: 3px 4px; }
                           Next <i class="ti ti-chevron-right"></i>
                         </button>
                       </div>
-                      <div class="view-csv-cell-body">[[ csvCellValue(item) ]]</div>
+                      <textarea readonly class="view-csv-cell-body" :value="csvCellValue(item)"></textarea>
                     </template>
                   </template>
 
@@ -3125,7 +3133,7 @@ select.prop-val { padding: 3px 4px; }
                             Next <i class="ti ti-chevron-right"></i>
                           </button>
                         </div>
-                        <div class="view-csv-cell-body">[[ csvCellValue(item) ]]</div>
+                        <textarea readonly class="view-csv-cell-body" :value="csvCellValue(item)"></textarea>
                       </template>
                     </template>
 
@@ -3300,7 +3308,7 @@ select.prop-val { padding: 3px 4px; }
                             Next <i class="ti ti-chevron-right"></i>
                           </button>
                         </div>
-                        <div class="view-csv-cell-body">[[ csvCellValue(item) ]]</div>
+                        <textarea readonly class="view-csv-cell-body" :value="csvCellValue(item)"></textarea>
                       </template>
                     </template>
 

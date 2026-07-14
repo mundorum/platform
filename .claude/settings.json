@@ -34,7 +34,11 @@
       "Bash(curl -s http://localhost:8000/ -o /tmp/index.html -w \"%{http_code}\\\\n\")",
       "Bash(node --check /tmp/claude-1000/-home-santanche-git-mundorum-platform/a51e3291-ff72-4279-b2cf-cf2bc1e10b1f/scratchpad/app.js)",
       "Bash(jobs -l)",
-      "Bash(rm -f /tmp/index.html)"
+      "Bash(rm -f /tmp/index.html)",
+      "Bash(sed -n '3564,5379p' editor.html)",
+      "Bash(node --check /tmp/claude-1000/-home-santanche-git-mundorum-platform/a51e3291-ff72-4279-b2cf-cf2bc1e10b1f/scratchpad/app2.js)",
+      "Bash(grep -n \"^<script>$\\\\|^</script>$\" /home/santanche/git/mundorum/platform/noid/authoring/static/editor.html)",
+      "Bash(node --check /tmp/claude-1000/-home-santanche-git-mundorum-platform/a51e3291-ff72-4279-b2cf-cf2bc1e10b1f/scratchpad/app3.js)"
     ],
     "additionalDirectories": [
       "/tmp"
