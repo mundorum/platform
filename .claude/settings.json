@@ -42,7 +42,10 @@
       "Bash(node -e ' *)",
       "Bash(node -e \"require.resolve\\('playwright'\\)\")",
       "Bash(~/.local/bin/playwright --version)",
-      "Bash(python3 test_entities.py)"
+      "Bash(python3 test_entities.py)",
+      "Bash(python3 test_v2.py)",
+      "Bash(python3 test_v3.py)",
+      "Bash(grep -n \"^</div>$\\\\|mount\\('#app'\\)\\\\|<script src=\\\\\"https://cdnjs\" /home/santanche/git/mundorum/platform/gno/editor.html)"
     ],
     "additionalDirectories": [
       "/tmp"
