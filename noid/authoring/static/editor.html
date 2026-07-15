@@ -1684,7 +1684,11 @@ select.prop-val { padding: 3px 4px; }
   align-items: flex-start;
 }
 .view-column {
-  flex: 1 1 0;
+  /* Fixed 50% basis with no grow: when the sibling column is empty and
+     hidden via v-show (display:none, removed from flex layout), a lone
+     visible column must not stretch to fill the row and look like a
+     full-width block — it stays pinned at half width either way. */
+  flex: 0 1 calc(50% - 12px);
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1954,6 +1958,12 @@ select.prop-val { padding: 3px 4px; }
   transition: border-color 0.15s;
 }
 .view-csv-cell-body:focus { border-color: var(--c-accent); }
+.view-csv-cell-markdown :first-child { margin-top: 0; }
+.view-csv-cell-markdown :last-child { margin-bottom: 0; }
+.view-csv-cell-markdown p, .view-csv-cell-markdown ul, .view-csv-cell-markdown ol { margin: 0 0 12px; }
+.view-csv-cell-markdown pre { background: var(--c-accent-light); padding: 8px 10px; border-radius: 4px; overflow-x: auto; }
+.view-csv-cell-markdown code { font-family: var(--font-mono); font-size: 0.9em; }
+.view-csv-cell-markdown a { color: var(--c-accent); }
 </style>
 </head>
 <body>
@@ -2735,6 +2745,10 @@ select.prop-val { padding: 3px 4px; }
                       <input type="checkbox" v-model="item.allow_shared_write">
                       Allow this app to write shared: resources
                     </label>
+                    <label v-if="item.kind === 'csv_cell'" class="view-item-shared-write-toggle">
+                      <input type="checkbox" v-model="item.render_markdown">
+                      Render content as Markdown
+                    </label>
                     <div class="view-item-controls" style="margin-top:6px">
                       <button class="view-item-width-btn" :class="{active: viewItemColumn(item) === 1}" @click="setViewItemColumn(item, 1)" title="Place in column 1">1</button>
                       <button class="view-item-width-btn" :class="{active: viewItemColumn(item) === 2}" @click="setViewItemColumn(item, 2)" title="Place in column 2">2</button>
@@ -2803,6 +2817,10 @@ select.prop-val { padding: 3px 4px; }
                       <label v-if="item.kind === 'html_app'" class="view-item-shared-write-toggle">
                         <input type="checkbox" v-model="item.allow_shared_write">
                         Allow this app to write shared: resources
+                      </label>
+                      <label v-if="item.kind === 'csv_cell'" class="view-item-shared-write-toggle">
+                        <input type="checkbox" v-model="item.render_markdown">
+                        Render content as Markdown
                       </label>
                       <div class="view-item-controls" style="margin-top:6px">
                         <button class="view-item-width-btn" :class="{active: viewItemColumn(item) === 1}" @click="setViewItemColumn(item, 1)" title="Place in column 1">1</button>
@@ -2957,7 +2975,8 @@ select.prop-val { padding: 3px 4px; }
                           Next <i class="ti ti-chevron-right"></i>
                         </button>
                       </div>
-                      <textarea readonly class="view-csv-cell-body" :value="csvCellValue(item)"></textarea>
+                      <div v-if="item.render_markdown" class="view-csv-cell-body view-csv-cell-markdown" v-html="csvCellMarkdownHtml(item)"></div>
+                      <textarea v-else readonly class="view-csv-cell-body" :value="csvCellValue(item)"></textarea>
                     </template>
                   </template>
 
@@ -3133,7 +3152,8 @@ select.prop-val { padding: 3px 4px; }
                             Next <i class="ti ti-chevron-right"></i>
                           </button>
                         </div>
-                        <textarea readonly class="view-csv-cell-body" :value="csvCellValue(item)"></textarea>
+                        <div v-if="item.render_markdown" class="view-csv-cell-body view-csv-cell-markdown" v-html="csvCellMarkdownHtml(item)"></div>
+                        <textarea v-else readonly class="view-csv-cell-body" :value="csvCellValue(item)"></textarea>
                       </template>
                     </template>
 
@@ -3308,7 +3328,8 @@ select.prop-val { padding: 3px 4px; }
                             Next <i class="ti ti-chevron-right"></i>
                           </button>
                         </div>
-                        <textarea readonly class="view-csv-cell-body" :value="csvCellValue(item)"></textarea>
+                        <div v-if="item.render_markdown" class="view-csv-cell-body view-csv-cell-markdown" v-html="csvCellMarkdownHtml(item)"></div>
+                        <textarea v-else readonly class="view-csv-cell-body" :value="csvCellValue(item)"></textarea>
                       </template>
                     </template>
 
@@ -3568,6 +3589,8 @@ select.prop-val { padding: 3px 4px; }
 </div>
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <script>
 const { createApp, ref, reactive, computed, watch, nextTick, onMounted } = Vue;
 
@@ -4843,7 +4866,7 @@ createApp({
         column: 1,
       };
       if (kind === 'text_file' || kind === 'csv_file' || kind === 'csv_cell' || kind === 'html_app') item.address = '';
-      if (kind === 'csv_cell') item.csv_column = '';
+      if (kind === 'csv_cell') { item.csv_column = ''; item.render_markdown = false; }
       if (kind === 'html_app') item.allow_shared_write = false;
       scene.value.view.items.push(item);
     }
@@ -5020,6 +5043,9 @@ createApp({
       const rows = csvCellDataRows(item);
       if (!rows.length) return;
       viewCsvCellRow[item.id] = Math.min(Math.max(csvCellRowIndex(item) + delta, 0), rows.length - 1);
+    }
+    function csvCellMarkdownHtml(item) {
+      return DOMPurify.sanitize(marked.parse(csvCellValue(item)));
     }
 
     function parseCsvRows(text) {
@@ -5374,7 +5400,7 @@ createApp({
       addOutputItem, viewKindIcon, viewKindLabel,
       fetchViewFileContent, parseCsvRows, downloadViewFile,
       viewCsvCellRow, csvCellHeader, csvCellDataRows,
-      csvCellColumnIndex, csvCellRowIndex, csvCellValue, csvCellGoto,
+      csvCellColumnIndex, csvCellRowIndex, csvCellValue, csvCellGoto, csvCellMarkdownHtml,
       fetchAppHtml, setAppFrameRef, toggleAppFullscreen,
       addComponent, deleteComponent,
       onIdChange, setProp,
