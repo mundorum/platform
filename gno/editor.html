@@ -974,9 +974,77 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script>
-const { createApp, ref, reactive, computed, nextTick } = Vue;
+const { createApp, ref, reactive, computed, watch, nextTick } = Vue;
 
 const STORAGE_PREFIX = 'gno-narrative:';
+const CURRENT_KEY = 'gno-current-draft';
+
+// Shown on first load when no current draft is found in browser storage.
+// Demonstrates every construct documented in README.md: scenarios/scenes,
+// diverts, and all three entity forms (standalone+state, dialog, inline).
+const DEMO_SOURCE = `# The Council Chamber: Castle
+
+The @king paces before the tall windows, restless.
+
+@advisor left worried
+
+-- @king center troubled: The northern villages have gone silent. No word in three days.
+
+-- @advisor left worried: Perhaps only a lost courier, my king. The storms have been fierce.
+
+-- @king:
+No. I feel it in my bones. Something is wrong.
+Send for my daughter.
+
+* Summon the princess -> The Garden
+* Consult the old maps -> The Map Room
+
+# The Garden: Castle
+
+@princess right curious
+
+The @princess kneels beside the fountain, sketching the koi beneath the surface.
+
+-- @guard middle formal: Princess, your father asks for you in the council chamber.
+-- @princess right curious: Did he say why?
+-- @guard middle formal: Only that it concerns the northern villages.
+
+@princess right worried
+
+* Return to the council chamber -> The Council Chamber
+
+# The Map Room: Castle
+
+Dusty scrolls cover every surface. The @king unrolls a weathered map of the northern border.
+
+@advisor left thoughtful
+
+-- @advisor left thoughtful: If the scouts crossed into the old forest, there are older dangers than silence.
+
+* Ride north to investigate -> The Old Forest
+
+# The Old Forest: Wilderness
+
+The trees grow close here, their branches knitting out the sun.
+
+@king center resolute
+
+-- @advisor left afraid: My king, I do not like this place.
+-- @king center resolute: Nor do I. Stay close.
+
+A distant howl echoes through the woods.
+
+* Return to the castle, shaken -> The Council Chamber
+`;
+
+function loadCurrentDraft() {
+  try {
+    const raw = localStorage.getItem(CURRENT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 /* ── GNO PARSER ── */
 function parseGno(source) {
@@ -1374,35 +1442,11 @@ function layoutGraph(scenes) {
 createApp({
   setup() {
     const ready = ref(true);
-    const source = ref(`# The Awakening: Forest
-The old manor looms at the edge of the clearing. Mist clings to the stones.
-
-* Enter the manor -> The Dark Hall
-* Follow the trail -> The Crossroads
-
-# The Dark Hall: Manor
-Flickering candlelight reveals dusty portraits and a locked iron door.
-
-* Try the iron door -> The Vault
-* Go back outside -> The Awakening
-
-# The Crossroads: Forest
-Three paths diverge here. An old signpost reads faded names.
-
-* Take the northern road -> The Village
-* Return to the manor -> The Awakening
-
-# The Vault: Manor
-Behind the iron door: stacked ledgers, a brass key, and an old photograph.
-
-* Take the key -> The Dark Hall
-
-# The Village: Settlement
-Smoke from chimneys. Children playing. A merchant waves from a stall.
-
-* Ask about the manor -> The Crossroads
-`);
-    const filename = ref('untitled.gno');
+    // A current-draft record (autosaved below) survives reloads even if the
+    // user never explicitly saves — restore it here, falling back to the demo.
+    const draft = loadCurrentDraft();
+    const source = ref(draft ? draft.source : DEMO_SOURCE);
+    const filename = ref(draft ? draft.filename : 'untitled.gno');
     const view = ref('editor');
     const navTab = ref('scenes');
     const activeSceneId = ref('');
@@ -1414,7 +1458,7 @@ Smoke from chimneys. Children playing. A merchant waves from a stall.
     const editorTextarea = ref(null);
     const previewPane = ref(null);
     const highlightPre = ref(null);
-    const loadedNarrativeName = ref(null);
+    const loadedNarrativeName = ref(draft ? draft.loadedNarrativeName || null : null);
     const loadMenuOpen = ref(false);
     const storageVersion = ref(0);
 
@@ -1627,6 +1671,30 @@ Write your scene description here.
       loadedNarrativeName.value = name;
       loadMenuOpen.value = false;
     }
+
+    // Autosave: so a reload/closed tab never loses work even if the user
+    // never explicitly clicks Save. Debounced ~600ms after the last edit so
+    // rapid typing doesn't hit localStorage on every keystroke, with an
+    // immediate flush when the tab is hidden/closed as a safety net.
+    function saveCurrentDraft() {
+      try {
+        localStorage.setItem(CURRENT_KEY, JSON.stringify({
+          source: source.value,
+          filename: filename.value,
+          loadedNarrativeName: loadedNarrativeName.value,
+          savedAt: Date.now(),
+        }));
+      } catch (e) { /* storage unavailable/full — draft recovery is best-effort */ }
+    }
+    let autosaveTimer = null;
+    watch([source, filename, loadedNarrativeName], () => {
+      if (autosaveTimer) clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(saveCurrentDraft, 600);
+    });
+    window.addEventListener('beforeunload', saveCurrentDraft);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') saveCurrentDraft();
+    });
 
     return {
       ready, source, filename, view, navTab, activeSceneId,
