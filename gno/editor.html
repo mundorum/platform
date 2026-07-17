@@ -1088,7 +1088,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
               <span class="scene-scenario">Scenario: {{ playerCurrentScene.scenario }}</span>
             </div>
 
-            <div v-for="(html, i) in playerVisibleBeats" :key="i" v-html="html"></div>
+            <div :key="playerCurrentScene.id + ':' + playerRevealCount" v-html="playerCurrentBeat"></div>
 
             <div class="player-controls">
               <button
@@ -1766,8 +1766,7 @@ createApp({
 
     /* ── Player state ── */
     const playerSceneId = ref(null);
-    const playerRevealCount = ref(1);   // how many beats of the current scene are shown
-    const playerMenuRevealed = ref(false); // has the diverts/end pause been advanced past?
+    const playerRevealCount = ref(1);   // 1-based index of the beat currently on screen
 
     const scenesWithBounds = computed(() => {
       const list = scenes.value;
@@ -1794,26 +1793,24 @@ createApp({
       return buildScenePlayback(scene, scene.bodyEnd, source.value, entities.value);
     });
 
-    const playerVisibleBeats = computed(() => playerBeats.value.slice(0, playerRevealCount.value));
+    // Only the current beat is shown — each pause clears the screen rather
+    // than appending, so the reader always sees just what's new.
+    const playerCurrentBeat = computed(() => playerBeats.value[playerRevealCount.value - 1] || '');
 
-    // True once every beat of the scene has been revealed AND the player has
-    // advanced past that final pause — i.e. it's time to show diverts / the end screen.
-    const playerShowMenu = computed(() =>
-      playerRevealCount.value >= playerBeats.value.length && playerMenuRevealed.value
-    );
+    // True once the last beat of the scene is on screen — diverts (or the end
+    // screen) appear right alongside it; picking a divert is itself the pause,
+    // so no separate advance is needed to reveal them.
+    const playerShowMenu = computed(() => playerRevealCount.value >= playerBeats.value.length);
 
     function initPlayer() {
       const s = startScene.value;
       playerSceneId.value = s ? s.id : null;
       playerRevealCount.value = 1;
-      playerMenuRevealed.value = false;
     }
 
     function playerAdvance() {
       if (playerRevealCount.value < playerBeats.value.length) {
         playerRevealCount.value++;
-      } else if (!playerMenuRevealed.value) {
-        playerMenuRevealed.value = true;
       }
     }
 
@@ -1822,7 +1819,6 @@ createApp({
       if (!target) return;
       playerSceneId.value = target.id;
       playerRevealCount.value = 1;
-      playerMenuRevealed.value = false;
     }
 
     function playerRestart() {
@@ -2021,7 +2017,7 @@ Write your scene description here.
       entitiesInScene, firstOccInScene,
       graphNodes, graphEdges, graphCanvasStyle,
       arrowColor, labelColor, placeholder,
-      hasExplicitStart, playerCurrentScene, playerVisibleBeats, playerShowMenu,
+      hasExplicitStart, playerCurrentScene, playerCurrentBeat, playerRevealCount, playerShowMenu,
       playerAdvance, playerChoose, playerRestart,
       scrollToScene, newScene, renameScene,
       onEditorScroll, onEditorInput,

@@ -105,13 +105,14 @@ If no scene is marked `(Start)`, the player falls back to the first scene in the
 
 ### Pauses
 
-While playing a scene, the player reveals its content a little at a time, stopping at each pause to show a "continue" icon (or button); pressing `space` also advances. A pause happens in three situations:
+While playing a scene, the player reveals its content a little at a time, clearing the screen at each pause so only the newly-revealed text and dialogs are shown (not a growing transcript). It stops at each pause to show a "continue" icon (or button); pressing `space` also advances. A pause happens in two situations:
 
 1. **After a dialog.** Once a single dialog line, or an unbroken run of consecutive dialog lines (a *dialog set*), has been shown, the player pauses before continuing.
 2. **At a lone `---` line.** A line containing only `---` forces a pause at that point. The `---` itself is never shown to the reader — it is a pure pause marker.
-3. **At the end of a scene.** After all of a scene's content has been shown, the player pauses once more; advancing past this final pause reveals the scene's diverts, so the reader can pick where to go next, or — for an `(End)` scene — reveals that the narrative is finished.
 
 Plain prose, standalone entity lines (`@princess right curious`), and inline mentions do **not** cause a pause by themselves; they simply accumulate into whatever is shown at the next pause.
+
+At the end of a scene, once its last bit of content is on screen, the scene's diverts appear right alongside it — reaching them doesn't need a pause of its own, since presenting the diverts is already a wait for the reader to pick one. For an `(End)` scene, that same moment shows that the narrative is finished instead of a divert list.
 
 For example, given this scene:
 
@@ -138,16 +139,17 @@ The @princess kneels beside the fountain, sketching the koi beneath the surface.
 * Return to the council chamber -> The Council Chamber
 ~~~
 
-the player stops at the following points (`<pause>` marks are shown here only to illustrate — they are never part of the actual output):
+the player shows the following screens in turn (`<pause>` marks the point where the reader must continue; each screen below replaces the previous one rather than piling up):
 
 ~~~gno
 # The Garden: Castle
 
 The castle garden is bright and cold.
 
----
-
 <pause>
+~~~
+
+~~~gno
 The fountain has things moving under its waters.
 
 @princess right curious
@@ -158,17 +160,19 @@ The @princess kneels beside the fountain, sketching the koi beneath the surface.
 -- @princess right curious: Did he say why?
 
 <pause>
+~~~
 
+~~~gno
 -- @guard middle formal: Only that it concerns the northern villages.
 
 <pause>
+~~~
 
+~~~gno
 @princess right worried
 
 * Return to the council chamber -> The Council Chamber
-
-<pause waiting for the user to click>
 ~~~
 
-Note that the two consecutive `-- @guard` / `-- @princess` lines form a single dialog set and share one pause, while the later lone `-- @guard` line gets its own.
+Note that the two consecutive `-- @guard` / `-- @princess` lines form a single dialog set and share one pause, while the later lone `-- @guard` line gets its own. The final screen needs no pause of its own — the divert button is already there waiting to be picked.
 
