@@ -667,6 +667,28 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   align-items: center;
   gap: 12px;
 }
+#player-entities-panel {
+  width: 220px;
+  flex-shrink: 0;
+  border-left: 0.5px solid var(--c-border);
+  background: var(--c-surface);
+  overflow-y: auto;
+  padding: 18px 16px;
+}
+#player-entities-panel .nav-section-label { padding: 0 0 12px; }
+.player-entities-empty {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--c-muted);
+  font-style: italic;
+}
+.player-entity-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
 
 /* ── Graph view ── */
 #graph-view {
@@ -1123,6 +1145,16 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
           </template>
         </div>
       </div>
+
+      <!-- Entities on stage: separate from the narrative text, scoped to the current scene -->
+      <aside id="player-entities-panel" v-if="playerCurrentScene">
+        <div class="nav-section-label">In this scene</div>
+        <div v-if="playerEntityRoster.length === 0" class="player-entities-empty">No entities on stage yet.</div>
+        <div v-for="e in playerEntityRoster" :key="e.id" class="player-entity-row">
+          <span class="pill-entity">{{ e.id }}</span>
+          <span class="state-chip" v-if="e.state">{{ e.state }}</span>
+        </div>
+      </aside>
     </div>
 
   </div>
@@ -1444,14 +1476,33 @@ function escH(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// True if every non-blank line from fromIdx..toIdx is a divert line — i.e.
+// nothing but the scene's choice list follows a given point.
+function restIsOnlyDiverts(lines, fromIdx, toIdx) {
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const t = lines[i].trim();
+    if (t === '') continue;
+    if (DIVERT_RE.test(t)) continue;
+    return false;
+  }
+  return true;
+}
+
 /* ── PLAYER: splits a scene's body into pause-delimited "beats" ── */
 // A new beat starts after:
 //   - a lone "---" line (the line itself is dropped, not shown), or
-//   - the last line of a dialog (or an unbroken run of dialog lines).
+//   - the last line of a dialog (or an unbroken run of dialog lines) —
+//     *unless* nothing but the scene's diverts follow it, since presenting
+//     the diverts is already a wait and doesn't need a pause of its own.
 // Everything else (prose, state lines, inline mentions) just accumulates into
 // the current beat. The final beat — whatever is left when the scene body
-// ends — is shown together with the scene's diverts / end screen, since that
-// pause is "wait for the player to pick a divert or end the narrative".
+// ends — is shown together with the scene's diverts / end screen.
+//
+// Alongside each beat, this also tracks which entities are "on stage": an
+// entity becomes present the moment it's first mentioned (any form) and stays
+// present — carrying its most recently given state — until either the scene
+// ends or a standalone "@entity left" line (state text of exactly "left")
+// marks it as having exited.
 function buildScenePlayback(scene, bodyEnd, source, entities) {
   const lines = source.split('\n');
   const bodyStart = scene.lineStart + 1;
@@ -1469,34 +1520,60 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
   });
 
   const beats = [];
+  const rosters = [];
   let current = [];
+  const roster = new Map(); // entityId -> latest known state ('' = present, no known state)
+
+  function applyEntityOccurrence(occ) {
+    if (occ.type === 'state' && occ.state.trim().toLowerCase() === 'left') {
+      roster.delete(occ.entityId);
+      return;
+    }
+    if (occ.state) {
+      roster.set(occ.entityId, occ.state);
+    } else if (!roster.has(occ.entityId)) {
+      roster.set(occ.entityId, '');
+    }
+  }
+
+  function flushBeat() {
+    beats.push(current);
+    rosters.push([...roster.entries()].map(([id, state]) => ({ id, state })));
+    current = [];
+  }
 
   for (let idx = bodyStart; idx <= bodyEnd; idx++) {
     const line = lines[idx];
     const trimmed = line.trim();
 
-    if (trimmed === '---') { beats.push(current); current = []; continue; }
+    if (trimmed === '---') { flushBeat(); continue; }
     if (DIVERT_RE.test(trimmed)) continue; // diverts are presented separately, not as beat content
 
     if (blockByLine.has(idx)) {
       const occ = blockByLine.get(idx);
       current.push('', entityBlockHtml(occ), '');
+      applyEntityOccurrence(occ);
       idx = occ.lineEnd;
       if (occ.type === 'dialog') {
         const nextIsDialog = blockByLine.has(idx + 1) && blockByLine.get(idx + 1).type === 'dialog';
-        if (!nextIsDialog) { beats.push(current); current = []; }
+        if (!nextIsDialog && !restIsOnlyDiverts(lines, idx + 1, bodyEnd)) { flushBeat(); }
       }
       continue;
     }
     if (mentionsByLine.has(idx)) {
-      current.push(substituteMentions(line, mentionsByLine.get(idx)));
+      const occs = mentionsByLine.get(idx);
+      occs.forEach(applyEntityOccurrence);
+      current.push(substituteMentions(line, occs));
       continue;
     }
     current.push(line);
   }
-  beats.push(current);
+  flushBeat();
 
-  return beats.map(ls => marked.parse(ls.join('\n'), { gfm: true, breaks: false }).trim());
+  return {
+    beatsHtml: beats.map(ls => marked.parse(ls.join('\n'), { gfm: true, breaks: false }).trim()),
+    rosters,
+  };
 }
 
 /* ── SOURCE EDITOR SYNTAX HIGHLIGHTING ── */
@@ -1787,15 +1864,20 @@ createApp({
       scenesWithBounds.value.find(s => s.id === playerSceneId.value) || startScene.value
     );
 
-    const playerBeats = computed(() => {
+    const playerPlayback = computed(() => {
       const scene = playerCurrentScene.value;
-      if (!scene) return [];
+      if (!scene) return { beatsHtml: [], rosters: [] };
       return buildScenePlayback(scene, scene.bodyEnd, source.value, entities.value);
     });
+    const playerBeats = computed(() => playerPlayback.value.beatsHtml);
 
     // Only the current beat is shown — each pause clears the screen rather
     // than appending, so the reader always sees just what's new.
     const playerCurrentBeat = computed(() => playerBeats.value[playerRevealCount.value - 1] || '');
+
+    // Which entities are "on stage" as of the currently-revealed beat — a
+    // separate, scene-scoped roster independent of the scene text itself.
+    const playerEntityRoster = computed(() => playerPlayback.value.rosters[playerRevealCount.value - 1] || []);
 
     // True once the last beat of the scene is on screen — diverts (or the end
     // screen) appear right alongside it; picking a divert is itself the pause,
@@ -2018,6 +2100,7 @@ Write your scene description here.
       graphNodes, graphEdges, graphCanvasStyle,
       arrowColor, labelColor, placeholder,
       hasExplicitStart, playerCurrentScene, playerCurrentBeat, playerRevealCount, playerShowMenu,
+      playerEntityRoster,
       playerAdvance, playerChoose, playerRestart,
       scrollToScene, newScene, renameScene,
       onEditorScroll, onEditorInput,

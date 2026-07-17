@@ -107,12 +107,22 @@ If no scene is marked `(Start)`, the player falls back to the first scene in the
 
 While playing a scene, the player reveals its content a little at a time, clearing the screen at each pause so only the newly-revealed text and dialogs are shown (not a growing transcript). It stops at each pause to show a "continue" icon (or button); pressing `space` also advances. A pause happens in two situations:
 
-1. **After a dialog.** Once a single dialog line, or an unbroken run of consecutive dialog lines (a *dialog set*), has been shown, the player pauses before continuing.
+1. **After a dialog.** Once a single dialog line, or an unbroken run of consecutive dialog lines (a *dialog set*), has been shown, the player pauses before continuing — **unless** nothing but the scene's diverts follow that dialog. In that case there's no pause: the dialog stays on screen together with the divert options, since offering the diverts is already a wait for the reader to pick one.
 2. **At a lone `---` line.** A line containing only `---` forces a pause at that point. The `---` itself is never shown to the reader — it is a pure pause marker.
 
 Plain prose, standalone entity lines (`@princess right curious`), and inline mentions do **not** cause a pause by themselves; they simply accumulate into whatever is shown at the next pause.
 
-At the end of a scene, once its last bit of content is on screen, the scene's diverts appear right alongside it — reaching them doesn't need a pause of its own, since presenting the diverts is already a wait for the reader to pick one. For an `(End)` scene, that same moment shows that the narrative is finished instead of a divert list.
+At the end of a scene, once its last bit of content is on screen, the scene's diverts appear right alongside it. For an `(End)` scene, that same moment shows that the narrative is finished instead of a divert list.
+
+### Entities on stage
+
+The Player shows a separate panel — independent of the narrative text — listing which entities are currently "on stage" in the scene and their state, updated as the scene is revealed.
+
+- An entity becomes present in this panel the moment it's first mentioned, in any of the three forms (standalone, dialog, or inline).
+- It stays present, keeping whatever state it was last given, even as the scene moves on to other content — until either the scene ends or it's explicitly marked as having left.
+- A standalone line whose entire state is the single word `left` — e.g. `@guard left` — marks that entity as having exited: it's removed from the panel from that point on. (This is distinct from a state like `left worried`, which still means "positioned on the left, worried" as usual — only a bare `left` with no other words triggers a departure.) An entity that's mentioned again after leaving simply becomes present again.
+- Each entity appears only once in the panel, showing its most recent state — not a history of every state it's had.
+- The panel is scoped to the current scene: it always starts empty when a new scene begins.
 
 For example, given this scene:
 
