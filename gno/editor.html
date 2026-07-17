@@ -543,6 +543,17 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   font-size: 11px;
   color: var(--c-muted);
 }
+.scene-marker-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--c-tag-trans-bg);
+  color: var(--c-tag-trans);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
 
 /* divert pill in preview */
 .divert-line {
@@ -568,6 +579,93 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   padding: 2px 9px;
   border-radius: 4px;
   white-space: nowrap;
+}
+
+/* ── Player view ── */
+#player-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+#player-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 44px;
+}
+#player-content {
+  max-width: 640px;
+  margin: 0 auto;
+  font-family: var(--font-doc);
+  font-size: 16.5px;
+  line-height: 1.82;
+  color: var(--c-text);
+}
+#player-content p { margin: 0.65em 0; }
+.player-empty, .player-end-title {
+  text-align: center;
+  color: var(--c-muted);
+  font-style: italic;
+}
+.player-empty { padding: 40px 0; }
+.player-warning {
+  background: var(--c-tag-state-bg);
+  color: var(--c-tag-state);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  margin-bottom: 18px;
+}
+.player-controls {
+  display: flex;
+  justify-content: center;
+  margin: 1.6em 0 2.4em;
+}
+.player-continue-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0.5px solid var(--c-border-strong);
+  background: var(--c-surface);
+  color: var(--c-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.player-continue-btn:hover { background: var(--c-accent-light); box-shadow: 0 2px 10px rgba(0,0,0,0.10); }
+.player-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+.player-choice-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 0.5px solid var(--c-border-strong);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.player-choice-btn:hover { border-color: var(--c-accent); background: var(--c-accent-light); color: var(--c-accent); }
+.player-end-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
 /* ── Graph view ── */
@@ -796,6 +894,9 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
       <button class="view-tab" :class="{active: view==='graph'}" @click="view='graph'">
         <i class="ti ti-hierarchy-2"></i> Graph
       </button>
+      <button class="view-tab" :class="{active: view==='player'}" @click="view='player'">
+        <i class="ti ti-player-play"></i> Player
+      </button>
     </div>
   </header>
 
@@ -967,6 +1068,63 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
       </div>
     </div>
 
+    <!-- Player view -->
+    <div id="player-view" v-show="view === 'player'">
+      <div id="player-scroll">
+        <div id="player-content">
+          <div v-if="!playerCurrentScene" class="player-empty">
+            No scenes to play yet.
+          </div>
+          <template v-else>
+            <div class="player-warning" v-if="!hasExplicitStart">
+              No scene marked <code>(Start)</code> was found — beginning at the first scene instead.
+            </div>
+            <div class="scene-heading-block">
+              <span class="scene-label">
+                Scene
+                <span class="scene-marker-badge" v-if="playerCurrentScene.marker">{{ playerCurrentScene.marker }}</span>
+              </span>
+              <span class="scene-title">{{ playerCurrentScene.title }}</span>
+              <span class="scene-scenario">Scenario: {{ playerCurrentScene.scenario }}</span>
+            </div>
+
+            <div v-for="(html, i) in playerVisibleBeats" :key="i" v-html="html"></div>
+
+            <div class="player-controls">
+              <button
+                v-if="!playerShowMenu"
+                class="player-continue-btn"
+                title="Continue (Space)"
+                @click="playerAdvance"
+              >
+                <i class="ti ti-player-play"></i>
+              </button>
+              <template v-else-if="playerCurrentScene.marker === 'end'">
+                <div class="player-end-panel">
+                  <div class="player-end-title">— The End —</div>
+                  <button class="tb-btn ghost" @click="playerRestart"><i class="ti ti-refresh"></i> Restart</button>
+                </div>
+              </template>
+              <div class="player-choices" v-else-if="playerCurrentScene.diverts.length">
+                <button
+                  v-for="d in playerCurrentScene.diverts"
+                  :key="d.target"
+                  class="player-choice-btn"
+                  @click="playerChoose(d.target)"
+                >
+                  {{ d.label }} <i class="ti ti-arrow-right"></i>
+                </button>
+              </div>
+              <div class="player-end-panel" v-else>
+                <div class="player-end-title">No diverts lead out of this scene.</div>
+                <button class="tb-btn ghost" @click="playerRestart"><i class="ti ti-refresh"></i> Restart</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 </div>
@@ -981,8 +1139,10 @@ const CURRENT_KEY = 'gno-current-draft';
 
 // Shown on first load when no current draft is found in browser storage.
 // Demonstrates every construct documented in README.md: scenarios/scenes,
-// diverts, and all three entity forms (standalone+state, dialog, inline).
-const DEMO_SOURCE = `# The Council Chamber: Castle
+// diverts, all three entity forms (standalone+state, dialog, inline), the
+// (Start)/(End) markers, and all three Player pause triggers ("---", a
+// dialog or dialog set, and the end-of-scene divert/end pause).
+const DEMO_SOURCE = `# The Council Chamber: Castle (Start)
 
 The @king paces before the tall windows, restless.
 
@@ -1001,12 +1161,19 @@ Send for my daughter.
 
 # The Garden: Castle
 
+The castle garden is bright and cold.
+
+---
+
+The fountain has things moving under its waters.
+
 @princess right curious
 
 The @princess kneels beside the fountain, sketching the koi beneath the surface.
 
 -- @guard middle formal: Princess, your father asks for you in the council chamber.
 -- @princess right curious: Did he say why?
+
 -- @guard middle formal: Only that it concerns the northern villages.
 
 @princess right worried
@@ -1034,7 +1201,20 @@ The trees grow close here, their branches knitting out the sun.
 
 A distant howl echoes through the woods.
 
-* Return to the castle, shaken -> The Council Chamber
+* Return to the castle, shaken -> The Aftermath
+
+# The Aftermath: Castle (End)
+
+The @king and @advisor return through the gates in silence, the howl still echoing in memory.
+
+---
+
+@princess right relieved
+
+-- @princess right relieved: You're back. Thank the stars.
+-- @king center resolute: For now. But this isn't over.
+
+The gates close behind them, and the castle settles into an uneasy quiet.
 `;
 
 function loadCurrentDraft() {
@@ -1047,23 +1227,26 @@ function loadCurrentDraft() {
 }
 
 /* ── GNO PARSER ── */
+// Scene heading: "# Title: Scenario" with an optional trailing "(Start)" / "(End)"
+// marker used by the Player to find where the narrative begins and ends.
+const SCENE_RE = /^(#{1,6})\s+(.+?)\s*:\s*(.+?)\s*(?:\(\s*(start|end)\s*\))?\s*$/i;
+const DIVERT_RE = /^\*\s+(.+?)\s*->\s*(.+)$/;
+
 function parseGno(source) {
-  // Returns: { scenes: [{id, title, scenario, body, diverts:[{label,target}], lineStart}] }
+  // Returns: { scenes: [{id, title, scenario, marker, body, diverts:[{label,target}], lineStart}] }
   const lines = source.split('\n');
   const scenes = [];
   let current = null;
-
-  const SCENE_RE = /^#{1,6}\s+(.+?)\s*:\s*(.+)$/;
-  const DIVERT_RE = /^\*\s+(.+?)\s*->\s*(.+)$/;
 
   lines.forEach((line, idx) => {
     const sm = line.match(SCENE_RE);
     if (sm) {
       if (current) scenes.push(current);
-      const title = sm[1].trim();
-      const scenario = sm[2].trim();
+      const title = sm[2].trim();
+      const scenario = sm[3].trim();
+      const marker = sm[4] ? sm[4].toLowerCase() : null;
       const id = slugify(title + '-' + scenario + '-' + idx);
-      current = { id, title, scenario, body: [], diverts: [], lineStart: idx };
+      current = { id, title, scenario, marker, body: [], diverts: [], lineStart: idx };
       return;
     }
     if (current) {
@@ -1204,8 +1387,6 @@ function renderGno(source, scenes, entities) {
   const lines = source.split('\n');
   const out = [];
 
-  const SCENE_RE = /^(#{1,6})\s+(.+?)\s*:\s*(.+)$/;
-  const DIVERT_RE = /^\*\s+(.+?)\s*->\s*(.+)$/;
   let sceneIdx = 0;
 
   for (let idx = 0; idx < lines.length; idx++) {
@@ -1215,11 +1396,12 @@ function renderGno(source, scenes, entities) {
     if (sm) {
       const title = sm[2].trim();
       const scenario = sm[3].trim();
+      const marker = sm[4] ? sm[4].toLowerCase() : null;
       const id = scenes[sceneIdx] ? scenes[sceneIdx].id : slugify(title + scenario);
       sceneIdx++;
       out.push('');
       out.push(`<div class="scene-heading-block" id="${escH(id)}">`);
-      out.push(`<span class="scene-label">Scene</span>`);
+      out.push(`<span class="scene-label">Scene${marker ? ` <span class="scene-marker-badge">${escH(marker)}</span>` : ''}</span>`);
       out.push(`<span class="scene-title">${escH(title)}</span>`);
       out.push(`<span class="scene-scenario">Scenario: ${escH(scenario)}</span>`);
       out.push(`</div>`);
@@ -1260,6 +1442,61 @@ function renderGno(source, scenes, entities) {
 
 function escH(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── PLAYER: splits a scene's body into pause-delimited "beats" ── */
+// A new beat starts after:
+//   - a lone "---" line (the line itself is dropped, not shown), or
+//   - the last line of a dialog (or an unbroken run of dialog lines).
+// Everything else (prose, state lines, inline mentions) just accumulates into
+// the current beat. The final beat — whatever is left when the scene body
+// ends — is shown together with the scene's diverts / end screen, since that
+// pause is "wait for the player to pick a divert or end the narrative".
+function buildScenePlayback(scene, bodyEnd, source, entities) {
+  const lines = source.split('\n');
+  const bodyStart = scene.lineStart + 1;
+
+  const blockByLine = new Map();    // lineStart -> dialog/state occurrence
+  const mentionsByLine = new Map(); // lineIndex -> inline mention occurrences
+  entities.occurrences.forEach(occ => {
+    if (occ.lineStart < bodyStart || occ.lineStart > bodyEnd) return;
+    if (occ.type === 'mention') {
+      if (!mentionsByLine.has(occ.lineStart)) mentionsByLine.set(occ.lineStart, []);
+      mentionsByLine.get(occ.lineStart).push(occ);
+    } else {
+      blockByLine.set(occ.lineStart, occ);
+    }
+  });
+
+  const beats = [];
+  let current = [];
+
+  for (let idx = bodyStart; idx <= bodyEnd; idx++) {
+    const line = lines[idx];
+    const trimmed = line.trim();
+
+    if (trimmed === '---') { beats.push(current); current = []; continue; }
+    if (DIVERT_RE.test(trimmed)) continue; // diverts are presented separately, not as beat content
+
+    if (blockByLine.has(idx)) {
+      const occ = blockByLine.get(idx);
+      current.push('', entityBlockHtml(occ), '');
+      idx = occ.lineEnd;
+      if (occ.type === 'dialog') {
+        const nextIsDialog = blockByLine.has(idx + 1) && blockByLine.get(idx + 1).type === 'dialog';
+        if (!nextIsDialog) { beats.push(current); current = []; }
+      }
+      continue;
+    }
+    if (mentionsByLine.has(idx)) {
+      current.push(substituteMentions(line, mentionsByLine.get(idx)));
+      continue;
+    }
+    current.push(line);
+  }
+  beats.push(current);
+
+  return beats.map(ls => marked.parse(ls.join('\n'), { gfm: true, breaks: false }).trim());
 }
 
 /* ── SOURCE EDITOR SYNTAX HIGHLIGHTING ── */
@@ -1527,6 +1764,84 @@ createApp({
     const arrowColor  = ref('var(--c-divert)');
     const labelColor  = ref('var(--c-muted)');
 
+    /* ── Player state ── */
+    const playerSceneId = ref(null);
+    const playerRevealCount = ref(1);   // how many beats of the current scene are shown
+    const playerMenuRevealed = ref(false); // has the diverts/end pause been advanced past?
+
+    const scenesWithBounds = computed(() => {
+      const list = scenes.value;
+      const totalLines = source.value.split('\n').length;
+      return list.map((s, i) => ({
+        ...s,
+        bodyEnd: (i + 1 < list.length ? list[i + 1].lineStart : totalLines) - 1,
+      }));
+    });
+
+    const hasExplicitStart = computed(() => scenesWithBounds.value.some(s => s.marker === 'start'));
+
+    const startScene = computed(() =>
+      scenesWithBounds.value.find(s => s.marker === 'start') || scenesWithBounds.value[0] || null
+    );
+
+    const playerCurrentScene = computed(() =>
+      scenesWithBounds.value.find(s => s.id === playerSceneId.value) || startScene.value
+    );
+
+    const playerBeats = computed(() => {
+      const scene = playerCurrentScene.value;
+      if (!scene) return [];
+      return buildScenePlayback(scene, scene.bodyEnd, source.value, entities.value);
+    });
+
+    const playerVisibleBeats = computed(() => playerBeats.value.slice(0, playerRevealCount.value));
+
+    // True once every beat of the scene has been revealed AND the player has
+    // advanced past that final pause — i.e. it's time to show diverts / the end screen.
+    const playerShowMenu = computed(() =>
+      playerRevealCount.value >= playerBeats.value.length && playerMenuRevealed.value
+    );
+
+    function initPlayer() {
+      const s = startScene.value;
+      playerSceneId.value = s ? s.id : null;
+      playerRevealCount.value = 1;
+      playerMenuRevealed.value = false;
+    }
+
+    function playerAdvance() {
+      if (playerRevealCount.value < playerBeats.value.length) {
+        playerRevealCount.value++;
+      } else if (!playerMenuRevealed.value) {
+        playerMenuRevealed.value = true;
+      }
+    }
+
+    function playerChoose(targetTitle) {
+      const target = scenesWithBounds.value.find(s => s.title.toLowerCase() === targetTitle.toLowerCase());
+      if (!target) return;
+      playerSceneId.value = target.id;
+      playerRevealCount.value = 1;
+      playerMenuRevealed.value = false;
+    }
+
+    function playerRestart() {
+      initPlayer();
+    }
+
+    watch(view, (v) => {
+      if (v === 'player' && playerSceneId.value === null) initPlayer();
+    });
+
+    function onPlayerKeydown(e) {
+      if (view.value !== 'player' || e.code !== 'Space') return;
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      playerAdvance();
+    }
+    window.addEventListener('keydown', onPlayerKeydown);
+
     const placeholder = `# Scene Title: Scenario Name
 Write your scene description here.
 
@@ -1706,6 +2021,8 @@ Write your scene description here.
       entitiesInScene, firstOccInScene,
       graphNodes, graphEdges, graphCanvasStyle,
       arrowColor, labelColor, placeholder,
+      hasExplicitStart, playerCurrentScene, playerVisibleBeats, playerShowMenu,
+      playerAdvance, playerChoose, playerRestart,
       scrollToScene, newScene, renameScene,
       onEditorScroll, onEditorInput,
       toggleEntity, scrollToEntityOccurrence,
