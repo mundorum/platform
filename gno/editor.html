@@ -1172,8 +1172,9 @@ const CURRENT_KEY = 'gno-current-draft';
 // Shown on first load when no current draft is found in browser storage.
 // Demonstrates every construct documented in README.md: scenarios/scenes,
 // diverts, all three entity forms (standalone+state, dialog, inline), the
-// (Start)/(End) markers, and all three Player pause triggers ("---", a
-// dialog or dialog set, and the end-of-scene divert/end pause).
+// (Start)/(End) markers, the Player's pause triggers ("---" and a dialog or
+// dialog set), and an entity leaving the scene (`@guard leaves`) partway
+// through, so it drops out of the entities-on-stage panel.
 const DEMO_SOURCE = `# The Council Chamber: Castle (Start)
 
 The @king paces before the tall windows, restless.
@@ -1207,6 +1208,8 @@ The @princess kneels beside the fountain, sketching the koi beneath the surface.
 -- @princess right curious: Did he say why?
 
 -- @guard middle formal: Only that it concerns the northern villages.
+
+@guard leaves
 
 @princess right worried
 
@@ -1501,7 +1504,7 @@ function restIsOnlyDiverts(lines, fromIdx, toIdx) {
 // Alongside each beat, this also tracks which entities are "on stage": an
 // entity becomes present the moment it's first mentioned (any form) and stays
 // present — carrying its most recently given state — until either the scene
-// ends or a standalone "@entity left" line (state text of exactly "left")
+// ends or a standalone "@entity leaves" line (state text of exactly "leaves")
 // marks it as having exited.
 function buildScenePlayback(scene, bodyEnd, source, entities) {
   const lines = source.split('\n');
@@ -1525,7 +1528,7 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
   const roster = new Map(); // entityId -> latest known state ('' = present, no known state)
 
   function applyEntityOccurrence(occ) {
-    if (occ.type === 'state' && occ.state.trim().toLowerCase() === 'left') {
+    if (occ.type === 'state' && occ.state.trim().toLowerCase() === 'leaves') {
       roster.delete(occ.entityId);
       return;
     }
