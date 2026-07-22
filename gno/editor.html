@@ -163,6 +163,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   gap: 2px;
 }
 .load-menu-empty { padding: 8px 10px; font-size: 12px; color: var(--c-muted); font-style: italic; }
+.load-menu-divider { height: 0.5px; background: var(--c-border-strong); margin: 4px 6px; }
 .load-menu-item {
   text-align: left;
   padding: 6px 10px;
@@ -859,6 +860,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
       gnō-
     </div>
 
+    <button class="tb-btn ghost" @click="newNarrative" title="Start a new, empty narrative"><i class="ti ti-file-plus"></i> New</button>
     <button class="tb-btn" @click="triggerUpload"><i class="ti ti-upload"></i> Upload</button>
     <button class="tb-btn ghost" @click="downloadFile"><i class="ti ti-download"></i> Download</button>
     <input type="file" id="file-input" ref="fileInput" accept=".md,.gno,.txt" @change="onFileUpload">
@@ -879,6 +881,12 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
       </button>
       <div class="load-menu-backdrop" v-if="loadMenuOpen" @click="loadMenuOpen = false"></div>
       <div class="load-menu" v-if="loadMenuOpen">
+        <button
+          class="load-menu-item"
+          :class="{active: loadedNarrativeName === demoMarker}"
+          @click="loadDemoNarrative"
+        >Demo: The Council Chamber</button>
+        <div class="load-menu-divider"></div>
         <div v-if="savedNarratives.length === 0" class="load-menu-empty">No saved narratives yet.</div>
         <button
           v-for="name in savedNarratives"
@@ -1168,13 +1176,17 @@ const { createApp, ref, reactive, computed, watch, nextTick } = Vue;
 
 const STORAGE_PREFIX = 'gno-narrative:';
 const CURRENT_KEY = 'gno-current-draft';
+// Sentinel stored in loadedNarrativeName while the bundled demo is loaded —
+// it isn't a real localStorage entry, so it can never collide with a saved name.
+const DEMO_MARKER = '__demo__';
 
-// Shown on first load when no current draft is found in browser storage.
+// Loadable on demand from the "Load" menu ("Demo: The Council Chamber") —
+// never shown automatically, so a blank editor always starts truly empty.
 // Demonstrates every construct documented in README.md: scenarios/scenes,
 // diverts, all three entity forms (standalone+state, dialog, inline), the
 // (Start)/(End) markers, the Player's pause triggers ("---" and a dialog or
-// dialog set), and an entity leaving the scene (`@guard leaves`) partway
-// through, so it drops out of the entities-on-stage panel.
+// dialog set), and an entity leaving the scene (`@guard ->`) partway through,
+// so it drops out of the entities-on-stage panel.
 const DEMO_SOURCE = `# The Council Chamber: Castle (Start)
 
 The @king paces before the tall windows, restless.
@@ -1209,7 +1221,7 @@ The @princess kneels beside the fountain, sketching the koi beneath the surface.
 
 -- @guard middle formal: Only that it concerns the northern villages.
 
-@guard leaves
+@guard ->
 
 @princess right worried
 
@@ -1504,8 +1516,8 @@ function restIsOnlyDiverts(lines, fromIdx, toIdx) {
 // Alongside each beat, this also tracks which entities are "on stage": an
 // entity becomes present the moment it's first mentioned (any form) and stays
 // present — carrying its most recently given state — until either the scene
-// ends or a standalone "@entity leaves" line (state text of exactly "leaves")
-// marks it as having exited.
+// ends or a standalone "@entity ->" line (state text of exactly "->") marks
+// it as having exited.
 function buildScenePlayback(scene, bodyEnd, source, entities) {
   const lines = source.split('\n');
   const bodyStart = scene.lineStart + 1;
@@ -1528,7 +1540,7 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
   const roster = new Map(); // entityId -> latest known state ('' = present, no known state)
 
   function applyEntityOccurrence(occ) {
-    if (occ.type === 'state' && occ.state.trim().toLowerCase() === 'leaves') {
+    if (occ.type === 'state' && occ.state.trim() === '->') {
       roster.delete(occ.entityId);
       return;
     }
@@ -1760,9 +1772,10 @@ createApp({
   setup() {
     const ready = ref(true);
     // A current-draft record (autosaved below) survives reloads even if the
-    // user never explicitly saves — restore it here, falling back to the demo.
+    // user never explicitly saves — restore it here, falling back to a blank
+    // narrative (the demo is available on demand from the Load menu instead).
     const draft = loadCurrentDraft();
-    const source = ref(draft ? draft.source : DEMO_SOURCE);
+    const source = ref(draft ? draft.source : '');
     const filename = ref(draft ? draft.filename : 'untitled.gno');
     const view = ref('editor');
     const navTab = ref('scenes');
@@ -1927,7 +1940,8 @@ createApp({
 Write your scene description here.
 
 * Choice label -> Target Scene Title
-`;
+
+(Or click "Load" above and pick "Demo: The Council Chamber" to see a full example.)`;
 
     function scrollToScene(id) {
       activeSceneId.value = id;
@@ -2035,6 +2049,7 @@ Write your scene description here.
       reader.onload = ev => { source.value = ev.target.result; };
       reader.readAsText(file, 'UTF-8');
       e.target.value = '';
+      resetPlayerProgress();
     }
 
     function downloadFile() {
@@ -2059,6 +2074,14 @@ Write your scene description here.
       storageVersion.value++;
     }
 
+    // Player progress references a specific scene id from the narrative that
+    // was on screen; swapping in a different narrative makes that id stale,
+    // so every "load a (different) narrative" action resets it.
+    function resetPlayerProgress() {
+      playerSceneId.value = null;
+      playerRevealCount.value = 1;
+    }
+
     function loadNarrative(name) {
       const content = localStorage.getItem(STORAGE_PREFIX + name);
       if (content === null) return;
@@ -2066,6 +2089,30 @@ Write your scene description here.
       filename.value = name + '.gno';
       loadedNarrativeName.value = name;
       loadMenuOpen.value = false;
+      resetPlayerProgress();
+    }
+
+    function loadDemoNarrative() {
+      source.value = DEMO_SOURCE;
+      filename.value = 'council-chamber-demo.gno';
+      loadedNarrativeName.value = DEMO_MARKER;
+      loadMenuOpen.value = false;
+      resetPlayerProgress();
+    }
+
+    // Starts a clean, empty narrative — offering to save the current one
+    // first if there's anything in it.
+    function newNarrative() {
+      if (source.value.trim().length > 0) {
+        if (window.confirm('Save the current narrative before starting a new one?')) {
+          saveNarrative();
+        }
+      }
+      source.value = '';
+      filename.value = 'untitled.gno';
+      loadedNarrativeName.value = null;
+      activeSceneId.value = '';
+      resetPlayerProgress();
     }
 
     // Autosave: so a reload/closed tab never loses work even if the user
@@ -2109,7 +2156,8 @@ Write your scene description here.
       onEditorScroll, onEditorInput,
       toggleEntity, scrollToEntityOccurrence,
       triggerUpload, onFileUpload, downloadFile,
-      saveNarrative, loadNarrative,
+      saveNarrative, loadNarrative, loadDemoNarrative, newNarrative,
+      demoMarker: DEMO_MARKER,
     };
   }
 }).mount('#vue-mount');

@@ -120,7 +120,7 @@ The Player shows a separate panel — independent of the narrative text — list
 
 - An entity becomes present in this panel the moment it's first mentioned, in any of the three forms (standalone, dialog, or inline).
 - It stays present, keeping whatever state it was last given, even as the scene moves on to other content — until either the scene ends or it's explicitly marked as having left.
-- A standalone line whose entire state is the single word `leaves` — e.g. `@guard leaves` — marks that entity as having exited: it's removed from the panel from that point on. (This is a separate keyword from position words like `left`/`right`, so it never gets confused with a state like `left worried`.) An entity that's mentioned again after leaving simply becomes present again.
+- A standalone line whose entire state is the symbol `->` — e.g. `@guard ->` — marks that entity as having exited: it's removed from the panel from that point on. Being a symbol rather than a word, it reads the same regardless of the narrative's language. An entity that's mentioned again after leaving simply becomes present again.
 - Each entity appears only once in the panel, showing its most recent state — not a history of every state it's had.
 - The panel is scoped to the current scene: it always starts empty when a new scene begins.
 
