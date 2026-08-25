@@ -19,6 +19,7 @@ collections:
       - noid_collections.data.csv_source.csv_source
       - noid_collections.data.text_writer.text_writer
       - noid_collections.data.sql.sql
+      - noid_collections.data.progress_tracker.progress_tracker
 
   - label: "PDF"
     modules:
