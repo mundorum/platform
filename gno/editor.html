@@ -803,6 +803,74 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   white-space: nowrap;
 }
 .graph-panel-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+.graph-panel-style-row, .graph-panel-comment-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 0.5px solid var(--c-border);
+  flex-shrink: 0;
+}
+.graph-panel-style-label {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  color: var(--c-muted);
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+.color-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--c-border-strong);
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.1s;
+}
+.color-swatch:hover { transform: scale(1.15); }
+.color-swatch.selected { box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 3.5px var(--c-text); }
+.color-swatch-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-bg);
+  color: var(--c-muted);
+  font-size: 10px;
+}
+.color-swatch-custom {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--c-border-strong);
+  border-radius: 50%;
+  cursor: pointer;
+  background: none;
+  flex-shrink: 0;
+}
+.color-swatch-custom::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
+.color-swatch-custom::-webkit-color-swatch { border: none; border-radius: 50%; }
+.color-swatch-custom::-moz-color-swatch { border: none; border-radius: 50%; }
+
+.graph-panel-comment-input {
+  flex: 1;
+  min-height: 20px;
+  max-height: 70px;
+  resize: vertical;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-family: var(--font-doc);
+  font-size: 12px;
+  font-style: italic;
+  color: var(--c-text);
+  background: var(--c-bg);
+  line-height: 1.4;
+}
+.graph-panel-comment-input:focus { outline: none; border-color: var(--c-accent); background: var(--c-surface); }
+.graph-panel-comment-input::placeholder { color: var(--c-muted); font-style: italic; }
+
 .graph-panel-body { position: relative; flex: 1; overflow: hidden; }
 .gnp-highlight, .gnp-textarea {
   position: absolute;
@@ -840,6 +908,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   width: 220px;
   background: var(--c-scene-node);
   border: 1px solid var(--c-scene-border);
+  border-left-width: 4px; /* accent bar — colored per-node via inline style */
   border-radius: 8px;
   box-shadow: 0 1px 6px rgba(0,0,0,0.07);
   overflow: hidden;
@@ -907,6 +976,25 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   align-self: flex-start;
 }
 
+/* A node comment reads as a marginal note, in keeping with the app's
+   manuscript-marginalia aesthetic — not narrative content, so it's set off
+   like the preview's blockquotes rather than folded into the excerpt. */
+.node-comment {
+  margin: 0 11px 7px;
+  padding: 4px 8px;
+  border-left: 2px solid var(--c-bq-border);
+  background: var(--c-accent-light);
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-family: var(--font-doc);
+  font-size: 10.5px;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--c-muted);
+}
+.node-comment i { flex-shrink: 0; margin-top: 1px; font-size: 11px; }
+
 /* ── Entity mentions in preview ── */
 .pill-entity, .pill-entity-inline {
   display: inline-flex;
@@ -955,14 +1043,17 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 .flash { animation: flash-anim 1.1s ease-out; }
 
 /* ── Source editor syntax highlighting ── */
-#editor-highlight .hl-scene { color: var(--c-accent); }
-#editor-highlight .hl-scene-title { font-weight: 600; }
-#editor-highlight .hl-scene-scenario { color: var(--c-accent); opacity: 0.75; }
-#editor-highlight .hl-divert { color: var(--c-tag-trans); }
-#editor-highlight .hl-divert-arrow { font-weight: 600; }
-#editor-highlight .hl-entity { color: var(--c-tag-char); font-weight: 500; }
-#editor-highlight .hl-dialog-prefix { color: var(--c-muted); }
-#editor-highlight .hl-dialog-text { color: var(--c-muted); font-style: italic; }
+/* Shared by the main editor's highlight overlay (#editor-highlight) and the
+   graph side panel's (.gnp-highlight) — both render the same highlightGno()
+   span markup and must color it identically. */
+.gno-highlight .hl-scene { color: var(--c-accent); }
+.gno-highlight .hl-scene-title { font-weight: 600; }
+.gno-highlight .hl-scene-scenario { color: var(--c-accent); opacity: 0.75; }
+.gno-highlight .hl-divert { color: var(--c-tag-trans); }
+.gno-highlight .hl-divert-arrow { font-weight: 600; }
+.gno-highlight .hl-entity { color: var(--c-tag-char); font-weight: 500; }
+.gno-highlight .hl-dialog-prefix { color: var(--c-muted); }
+.gno-highlight .hl-dialog-text { color: var(--c-muted); font-style: italic; }
 
 /* ── hidden file input ── */
 #file-input { display: none; }
@@ -1155,7 +1246,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
     <div id="editor-view" v-show="view === 'editor'">
       <div id="editor-pane">
         <div class="editor-highlight-wrap">
-          <pre id="editor-highlight" ref="highlightPre" aria-hidden="true" v-html="highlightedSource"></pre>
+          <pre id="editor-highlight" class="gno-highlight" ref="highlightPre" aria-hidden="true" v-html="highlightedSource"></pre>
           <textarea
             ref="editorTextarea"
             v-model="source"
@@ -1213,14 +1304,15 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
             :key="node.id"
             class="graph-node"
             :class="{'active-node': selectedNodeIndex === nodeIdx}"
-            :style="{left: node.x + 'px', top: node.y + 'px'}"
+            :style="{left: node.x + 'px', top: node.y + 'px', borderLeftColor: node.color || 'var(--c-scene-border)'}"
             @mousedown="onNodeMouseDown(nodeIdx, node, $event)"
           >
-            <div class="node-header">
+            <div class="node-header" :style="node.color ? {background: nodeTint(node.color)} : {}">
               <div class="node-scenario">{{ node.scenario }}</div>
               <div class="node-title">{{ node.title }}</div>
             </div>
             <div class="node-body">{{ node.excerpt }}</div>
+            <div class="node-comment" v-if="node.comment"><i class="ti ti-note"></i> {{ node.comment }}</div>
             <div class="node-diverts" v-if="node.diverts.length">
               <span v-for="d in node.diverts" :key="d.target" class="node-divert-chip">→ {{ d.target }}</span>
             </div>
@@ -1248,8 +1340,41 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
             <button class="nav-icon-btn" title="Close" @click="selectedNodeIndex = null"><i class="ti ti-x"></i></button>
           </div>
         </div>
+        <div class="graph-panel-style-row">
+          <span class="graph-panel-style-label">Color</span>
+          <button
+            v-for="c in paletteColors"
+            :key="c"
+            class="color-swatch"
+            :class="{selected: nodeColor === c}"
+            :style="{background: c}"
+            :title="c"
+            @click="nodeColor = c"
+          ></button>
+          <input
+            type="color"
+            class="color-swatch-custom"
+            :value="nodeColor || '#7a3e1a'"
+            title="Custom color"
+            @input="nodeColor = $event.target.value"
+          >
+          <button
+            class="color-swatch color-swatch-none"
+            :class="{selected: !nodeColor}"
+            title="No color"
+            @click="nodeColor = null"
+          ><i class="ti ti-x"></i></button>
+        </div>
+        <div class="graph-panel-comment-row">
+          <textarea
+            class="graph-panel-comment-input"
+            rows="1"
+            placeholder="Add a note about this scene… (saved in the layout YAML, not the script)"
+            v-model="nodeComment"
+          ></textarea>
+        </div>
         <div class="graph-panel-body">
-          <pre class="gnp-highlight" ref="panelHighlightPre" aria-hidden="true" v-html="panelHighlightedSource"></pre>
+          <pre class="gnp-highlight gno-highlight" ref="panelHighlightPre" aria-hidden="true" v-html="panelHighlightedSource"></pre>
           <textarea
             class="gnp-textarea"
             v-model="selectedNodeSource"
@@ -1963,11 +2088,41 @@ createApp({
     const loadMenuOpen = ref(false);
     const storageVersion = ref(0);
 
-    // Manual graph-view node positions, keyed by scene title (the same
-    // identity diverts already resolve by). Survives in the session autosave
-    // draft and in the downloadable layout YAML; NOT in named browser-storage
-    // saves, which stay plain narrative text for backward compatibility.
-    const manualPositions = reactive(draft && draft.layout ? { ...draft.layout } : {});
+    // Manual graph-view node metadata — position (from dragging), color, and
+    // a free-text comment — keyed by scene title (the same identity diverts
+    // already resolve by). Each entry only carries the keys actually set
+    // ({x,y} and/or color and/or comment), so an untouched node has no entry
+    // at all. Survives in the session autosave draft and in the downloadable
+    // layout YAML; NOT in named browser-storage saves (nor the .gno file
+    // itself), which stay plain narrative text for backward compatibility.
+    const nodeMeta = reactive(draft && draft.layout ? { ...draft.layout } : {});
+
+    function ensureNodeMeta(title) {
+      if (!nodeMeta[title]) nodeMeta[title] = {};
+      return nodeMeta[title];
+    }
+    function pruneNodeMetaIfEmpty(title) {
+      const m = nodeMeta[title];
+      if (m && m.x === undefined && m.y === undefined && !m.color && !m.comment) {
+        delete nodeMeta[title];
+      }
+    }
+    function setNodeColor(title, color) {
+      if (color) {
+        ensureNodeMeta(title).color = color;
+      } else if (nodeMeta[title]) {
+        delete nodeMeta[title].color;
+        pruneNodeMetaIfEmpty(title);
+      }
+    }
+    function setNodeComment(title, text) {
+      if (text) {
+        ensureNodeMeta(title).comment = text;
+      } else if (nodeMeta[title]) {
+        delete nodeMeta[title].comment;
+        pruneNodeMetaIfEmpty(title);
+      }
+    }
 
     const narrativeName = computed(() => filename.value.replace(/\.(gno|md|txt)$/i, '').trim() || 'untitled');
     const savedNarratives = computed(() => {
@@ -2021,10 +2176,20 @@ createApp({
     const highlightedSource = computed(() => highlightGno(source.value, entities.value));
 
     const autoGraphNodes = computed(() => layoutGraphNodes(scenes.value));
-    // Manual drag positions (by title) override the auto-layout position.
+    // A manual drag position (by title) overrides the auto-layout position;
+    // color/comment are always taken from meta when present, independent of
+    // whether the node has also been manually positioned.
     const graphNodes = computed(() => autoGraphNodes.value.map(n => {
-      const manual = manualPositions[n.title];
-      return manual ? { ...n, x: manual.x, y: manual.y } : n;
+      const meta = nodeMeta[n.title];
+      if (!meta) return { ...n, color: null, comment: '' };
+      const hasPos = typeof meta.x === 'number' && typeof meta.y === 'number';
+      return {
+        ...n,
+        x: hasPos ? meta.x : n.x,
+        y: hasPos ? meta.y : n.y,
+        color: meta.color || null,
+        comment: meta.comment || '',
+      };
     }));
     // Edges are derived from nodes' *final* positions, so a dragged node's
     // divert arrows follow it instead of staying anchored to the auto layout.
@@ -2080,10 +2245,21 @@ createApp({
     function zoomIn() { const c = zoomButtonCenter(); zoomAt(c.x, c.y, 1.25); }
     function zoomOut() { const c = zoomButtonCenter(); zoomAt(c.x, c.y, 1 / 1.25); }
     function resetView() { graphZoom.value = 1; graphPan.x = 0; graphPan.y = 0; }
+    // "Reset manual layout" only clears dragged positions, not color/comment —
+    // a user re-arranging the graph shouldn't lose their color-coding or notes.
     function resetLayout() {
-      Object.keys(manualPositions).forEach(k => delete manualPositions[k]);
+      Object.keys(nodeMeta).forEach(title => {
+        const m = nodeMeta[title];
+        delete m.x;
+        delete m.y;
+        pruneNodeMetaIfEmpty(title);
+      });
     }
-    function clearManualPositions() { resetLayout(); }
+    // Used when swapping in an entirely different narrative, where none of
+    // the previous positions/colors/comments (keyed by title) still apply.
+    function clearNodeMeta() {
+      Object.keys(nodeMeta).forEach(k => delete nodeMeta[k]);
+    }
 
     /* ── Node dragging, canvas panning, and panel resizing share one pair of
        window-level mouse handlers (mirrors the single keydown listener
@@ -2120,7 +2296,9 @@ createApp({
         const dx = (e.clientX - d.startX) / graphZoom.value;
         const dy = (e.clientY - d.startY) / graphZoom.value;
         if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > 4) d.moved = true;
-        manualPositions[d.title] = { x: Math.max(0, d.origX + dx), y: Math.max(0, d.origY + dy) };
+        const meta = ensureNodeMeta(d.title);
+        meta.x = Math.max(0, d.origX + dx);
+        meta.y = Math.max(0, d.origY + dy);
         return;
       }
       if (canvasPanState.value) {
@@ -2157,6 +2335,55 @@ createApp({
     const panelScene = computed(() =>
       selectedNodeIndex.value != null ? (scenesWithBounds.value[selectedNodeIndex.value] || null) : null
     );
+
+    // Preset swatches read from the app's own design tokens (so they're
+    // already dark-mode aware and stay "in family" with the rest of the UI)
+    // plus a native color input for anything else. Recomputed once per
+    // panel-open since these don't change without a page reload.
+    const PALETTE_TOKENS = ['--c-accent', '--c-tag-char', '--c-tag-place', '--c-tag-trans', '--c-tag-text', '--c-tag-state', '--c-bq-border'];
+    const paletteColors = computed(() => {
+      if (!panelScene.value) return [];
+      const style = getComputedStyle(document.documentElement);
+      return PALETTE_TOKENS.map(v => style.getPropertyValue(v).trim()).filter(Boolean);
+    });
+
+    const nodeColor = computed({
+      get() {
+        const scene = panelScene.value;
+        if (!scene) return null;
+        const meta = nodeMeta[scene.title];
+        return (meta && meta.color) || null;
+      },
+      set(color) {
+        const scene = panelScene.value;
+        if (scene) setNodeColor(scene.title, color);
+      },
+    });
+
+    const nodeComment = computed({
+      get() {
+        const scene = panelScene.value;
+        if (!scene) return '';
+        const meta = nodeMeta[scene.title];
+        return (meta && meta.comment) || '';
+      },
+      set(text) {
+        const scene = panelScene.value;
+        if (scene) setNodeComment(scene.title, text);
+      },
+    });
+
+    function hexToRgba(hex, alpha) {
+      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+      if (!m) return null;
+      const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    // Soft tint for a node's header background — the color itself reads as
+    // the left accent bar, this just echoes it faintly behind the title.
+    function nodeTint(color) {
+      return hexToRgba(color, 0.16) || null;
+    }
 
     const selectedNodeSource = computed({
       get() {
@@ -2381,20 +2608,28 @@ Write your scene description here.
       fileInput.value.click();
     }
 
-    // Layout YAML: { version: 1, nodes: { "<scene title>": { x, y } } }.
+    // Layout YAML: { version: 1, nodes: { "<scene title>": { x, y, color, comment } } }.
     // Keyed by scene title — the same identity diverts already resolve by —
     // so the file stays readable and round-trips even if scenes are reordered.
+    // Each entry only includes the keys actually set on that node.
     function layoutToYaml() {
       const nodes = {};
-      Object.keys(manualPositions).forEach(title => {
-        const p = manualPositions[title];
-        nodes[title] = { x: Math.round(p.x), y: Math.round(p.y) };
+      Object.keys(nodeMeta).forEach(title => {
+        const m = nodeMeta[title];
+        const entry = {};
+        if (typeof m.x === 'number' && typeof m.y === 'number') {
+          entry.x = Math.round(m.x);
+          entry.y = Math.round(m.y);
+        }
+        if (m.color) entry.color = m.color;
+        if (m.comment) entry.comment = m.comment;
+        if (Object.keys(entry).length) nodes[title] = entry;
       });
       return jsyaml.dump({ version: 1, nodes }, { lineWidth: -1 });
     }
 
     function applyLayoutYaml(text) {
-      clearManualPositions();
+      clearNodeMeta();
       let data;
       try {
         data = jsyaml.load(text);
@@ -2405,9 +2640,15 @@ Write your scene description here.
       if (data && data.nodes && typeof data.nodes === 'object') {
         Object.keys(data.nodes).forEach(title => {
           const n = data.nodes[title];
-          if (n && typeof n.x === 'number' && typeof n.y === 'number') {
-            manualPositions[title] = { x: n.x, y: n.y };
+          if (!n || typeof n !== 'object') return;
+          const entry = {};
+          if (typeof n.x === 'number' && typeof n.y === 'number') {
+            entry.x = n.x;
+            entry.y = n.y;
           }
+          if (typeof n.color === 'string') entry.color = n.color;
+          if (typeof n.comment === 'string') entry.comment = n.comment;
+          if (Object.keys(entry).length) nodeMeta[title] = entry;
         });
       }
     }
@@ -2426,7 +2667,7 @@ Write your scene description here.
           if (yamlEntries.length) {
             applyLayoutYaml(await yamlEntries[0].async('string'));
           } else {
-            clearManualPositions();
+            clearNodeMeta();
           }
           loadedNarrativeName.value = null; // came from disk, not from browser storage
           resetPlayerProgress();
@@ -2436,7 +2677,7 @@ Write your scene description here.
       } else {
         filename.value = file.name;
         loadedNarrativeName.value = null;
-        clearManualPositions();
+        clearNodeMeta();
         const reader = new FileReader();
         reader.onload = ev => { source.value = ev.target.result; };
         reader.readAsText(file, 'UTF-8');
@@ -2488,7 +2729,7 @@ Write your scene description here.
       filename.value = name + '.gno';
       loadedNarrativeName.value = name;
       loadMenuOpen.value = false;
-      clearManualPositions();
+      clearNodeMeta();
       resetPlayerProgress();
     }
 
@@ -2497,7 +2738,7 @@ Write your scene description here.
       filename.value = 'council-chamber-demo.gno';
       loadedNarrativeName.value = DEMO_MARKER;
       loadMenuOpen.value = false;
-      clearManualPositions();
+      clearNodeMeta();
       resetPlayerProgress();
     }
 
@@ -2513,7 +2754,7 @@ Write your scene description here.
       filename.value = 'untitled.gno';
       loadedNarrativeName.value = null;
       activeSceneId.value = '';
-      clearManualPositions();
+      clearNodeMeta();
       resetPlayerProgress();
     }
 
@@ -2527,13 +2768,13 @@ Write your scene description here.
           source: source.value,
           filename: filename.value,
           loadedNarrativeName: loadedNarrativeName.value,
-          layout: { ...manualPositions },
+          layout: { ...nodeMeta },
           savedAt: Date.now(),
         }));
       } catch (e) { /* storage unavailable/full — draft recovery is best-effort */ }
     }
     let autosaveTimer = null;
-    watch([source, filename, loadedNarrativeName, manualPositions], () => {
+    watch([source, filename, loadedNarrativeName, nodeMeta], () => {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       autosaveTimer = setTimeout(saveCurrentDraft, 600);
     });
@@ -2555,6 +2796,7 @@ Write your scene description here.
       zoomIn, zoomOut, resetView, resetLayout,
       selectedNodeIndex, panelScene, selectedNodeSource, panelHighlightedSource,
       panelHighlightPre, nodePanelWidth, onPanelResizeDown, onPanelScroll, openPanelInEditor,
+      paletteColors, nodeColor, nodeComment, nodeTint,
       arrowColor, labelColor, placeholder,
       hasExplicitStart, playerCurrentScene, playerCurrentBeat, playerRevealCount, playerShowMenu,
       playerEntityRoster,
