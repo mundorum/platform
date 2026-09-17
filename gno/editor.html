@@ -804,7 +804,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 }
 .graph-panel-actions { display: flex; gap: 2px; flex-shrink: 0; }
 
-.graph-panel-style-row, .graph-panel-comment-row {
+.graph-panel-style-row, .graph-panel-annotation-row {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -831,7 +831,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 }
 .color-swatch:hover { transform: scale(1.15); }
 .color-swatch.selected { box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 3.5px var(--c-text); }
-.color-swatch-none {
+.color-swatch-none, .color-swatch-custom-trigger {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -839,21 +839,22 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   color: var(--c-muted);
   font-size: 10px;
 }
-.color-swatch-custom {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 1px solid var(--c-border-strong);
-  border-radius: 50%;
-  cursor: pointer;
-  background: none;
-  flex-shrink: 0;
+/* Distinct icon-button trigger (not a plain color-filled circle) so it reads
+   as "pick any color" rather than looking like just another preset swatch —
+   a solid custom swatch defaulting to the accent color was indistinguishable
+   from the accent preset next to it. Opens the actual <input type="color">,
+   which stays hidden since its native swatch face is what was confusing. */
+.color-swatch-custom-trigger { border-style: dashed; font-size: 11px; }
+.color-swatch-custom-trigger:hover { color: var(--c-accent); border-color: var(--c-accent); }
+.color-swatch-custom-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
-.color-swatch-custom::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
-.color-swatch-custom::-webkit-color-swatch { border: none; border-radius: 50%; }
-.color-swatch-custom::-moz-color-swatch { border: none; border-radius: 50%; }
 
-.graph-panel-comment-input {
+.graph-panel-annotation-input {
   flex: 1;
   min-height: 20px;
   max-height: 70px;
@@ -868,8 +869,8 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   background: var(--c-bg);
   line-height: 1.4;
 }
-.graph-panel-comment-input:focus { outline: none; border-color: var(--c-accent); background: var(--c-surface); }
-.graph-panel-comment-input::placeholder { color: var(--c-muted); font-style: italic; }
+.graph-panel-annotation-input:focus { outline: none; border-color: var(--c-accent); background: var(--c-surface); }
+.graph-panel-annotation-input::placeholder { color: var(--c-muted); font-style: italic; }
 
 .graph-panel-body { position: relative; flex: 1; overflow: hidden; }
 .gnp-highlight, .gnp-textarea {
@@ -976,10 +977,10 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   align-self: flex-start;
 }
 
-/* A node comment reads as a marginal note, in keeping with the app's
+/* A node annotation reads as a marginal note, in keeping with the app's
    manuscript-marginalia aesthetic — not narrative content, so it's set off
    like the preview's blockquotes rather than folded into the excerpt. */
-.node-comment {
+.node-annotation {
   margin: 0 11px 7px;
   padding: 4px 8px;
   border-left: 2px solid var(--c-bq-border);
@@ -993,7 +994,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   line-height: 1.4;
   color: var(--c-muted);
 }
-.node-comment i { flex-shrink: 0; margin-top: 1px; font-size: 11px; }
+.node-annotation i { flex-shrink: 0; margin-top: 1px; font-size: 11px; }
 
 /* ── Entity mentions in preview ── */
 .pill-entity, .pill-entity-inline {
@@ -1312,7 +1313,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
               <div class="node-title">{{ node.title }}</div>
             </div>
             <div class="node-body">{{ node.excerpt }}</div>
-            <div class="node-comment" v-if="node.comment"><i class="ti ti-note"></i> {{ node.comment }}</div>
+            <div class="node-annotation" v-if="node.annotation"><i class="ti ti-note"></i> {{ node.annotation }}</div>
             <div class="node-diverts" v-if="node.diverts.length">
               <span v-for="d in node.diverts" :key="d.target" class="node-divert-chip">→ {{ d.target }}</span>
             </div>
@@ -1351,11 +1352,18 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
             :title="c"
             @click="nodeColor = c"
           ></button>
+          <button
+            class="color-swatch color-swatch-custom-trigger"
+            :class="{selected: nodeColor && !paletteColors.includes(nodeColor)}"
+            :style="(nodeColor && !paletteColors.includes(nodeColor)) ? {background: nodeColor} : {}"
+            title="Pick a custom color"
+            @click="triggerCustomColorPicker"
+          ><i class="ti ti-palette" v-if="!nodeColor || paletteColors.includes(nodeColor)"></i></button>
           <input
             type="color"
-            class="color-swatch-custom"
+            class="color-swatch-custom-input"
+            ref="customColorInput"
             :value="nodeColor || '#7a3e1a'"
-            title="Custom color"
             @input="nodeColor = $event.target.value"
           >
           <button
@@ -1365,12 +1373,12 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
             @click="nodeColor = null"
           ><i class="ti ti-x"></i></button>
         </div>
-        <div class="graph-panel-comment-row">
+        <div class="graph-panel-annotation-row">
           <textarea
-            class="graph-panel-comment-input"
+            class="graph-panel-annotation-input"
             rows="1"
-            placeholder="Add a note about this scene… (saved in the layout YAML, not the script)"
-            v-model="nodeComment"
+            placeholder="Add an annotation about this scene… (saved in the layout YAML, not the script)"
+            v-model="nodeAnnotation"
           ></textarea>
         </div>
         <div class="graph-panel-body">
@@ -2089,10 +2097,10 @@ createApp({
     const storageVersion = ref(0);
 
     // Manual graph-view node metadata — position (from dragging), color, and
-    // a free-text comment — keyed by scene title (the same identity diverts
-    // already resolve by). Each entry only carries the keys actually set
-    // ({x,y} and/or color and/or comment), so an untouched node has no entry
-    // at all. Survives in the session autosave draft and in the downloadable
+    // a free-text annotation — keyed by scene title (the same identity
+    // diverts already resolve by). Each entry only carries the keys actually
+    // set ({x,y} and/or color and/or annotation), so an untouched node has no
+    // entry at all. Survives in the session autosave draft and in the downloadable
     // layout YAML; NOT in named browser-storage saves (nor the .gno file
     // itself), which stay plain narrative text for backward compatibility.
     const nodeMeta = reactive(draft && draft.layout ? { ...draft.layout } : {});
@@ -2103,7 +2111,7 @@ createApp({
     }
     function pruneNodeMetaIfEmpty(title) {
       const m = nodeMeta[title];
-      if (m && m.x === undefined && m.y === undefined && !m.color && !m.comment) {
+      if (m && m.x === undefined && m.y === undefined && !m.color && !m.annotation) {
         delete nodeMeta[title];
       }
     }
@@ -2115,11 +2123,11 @@ createApp({
         pruneNodeMetaIfEmpty(title);
       }
     }
-    function setNodeComment(title, text) {
+    function setNodeAnnotation(title, text) {
       if (text) {
-        ensureNodeMeta(title).comment = text;
+        ensureNodeMeta(title).annotation = text;
       } else if (nodeMeta[title]) {
-        delete nodeMeta[title].comment;
+        delete nodeMeta[title].annotation;
         pruneNodeMetaIfEmpty(title);
       }
     }
@@ -2177,18 +2185,18 @@ createApp({
 
     const autoGraphNodes = computed(() => layoutGraphNodes(scenes.value));
     // A manual drag position (by title) overrides the auto-layout position;
-    // color/comment are always taken from meta when present, independent of
-    // whether the node has also been manually positioned.
+    // color/annotation are always taken from meta when present, independent
+    // of whether the node has also been manually positioned.
     const graphNodes = computed(() => autoGraphNodes.value.map(n => {
       const meta = nodeMeta[n.title];
-      if (!meta) return { ...n, color: null, comment: '' };
+      if (!meta) return { ...n, color: null, annotation: '' };
       const hasPos = typeof meta.x === 'number' && typeof meta.y === 'number';
       return {
         ...n,
         x: hasPos ? meta.x : n.x,
         y: hasPos ? meta.y : n.y,
         color: meta.color || null,
-        comment: meta.comment || '',
+        annotation: meta.annotation || '',
       };
     }));
     // Edges are derived from nodes' *final* positions, so a dragged node's
@@ -2245,7 +2253,7 @@ createApp({
     function zoomIn() { const c = zoomButtonCenter(); zoomAt(c.x, c.y, 1.25); }
     function zoomOut() { const c = zoomButtonCenter(); zoomAt(c.x, c.y, 1 / 1.25); }
     function resetView() { graphZoom.value = 1; graphPan.x = 0; graphPan.y = 0; }
-    // "Reset manual layout" only clears dragged positions, not color/comment —
+    // "Reset manual layout" only clears dragged positions, not color/annotation —
     // a user re-arranging the graph shouldn't lose their color-coding or notes.
     function resetLayout() {
       Object.keys(nodeMeta).forEach(title => {
@@ -2256,7 +2264,7 @@ createApp({
       });
     }
     // Used when swapping in an entirely different narrative, where none of
-    // the previous positions/colors/comments (keyed by title) still apply.
+    // the previous positions/colors/annotations (keyed by title) still apply.
     function clearNodeMeta() {
       Object.keys(nodeMeta).forEach(k => delete nodeMeta[k]);
     }
@@ -2329,6 +2337,10 @@ createApp({
     const selectedNodeIndex = ref(null);
     const nodePanelWidth = ref(380);
     const panelHighlightPre = ref(null);
+    const customColorInput = ref(null);
+    function triggerCustomColorPicker() {
+      if (customColorInput.value) customColorInput.value.click();
+    }
 
     // graphNodes / scenesWithBounds share the same array order as scenes.value,
     // so an index picked in one lines up with the other.
@@ -2360,16 +2372,16 @@ createApp({
       },
     });
 
-    const nodeComment = computed({
+    const nodeAnnotation = computed({
       get() {
         const scene = panelScene.value;
         if (!scene) return '';
         const meta = nodeMeta[scene.title];
-        return (meta && meta.comment) || '';
+        return (meta && meta.annotation) || '';
       },
       set(text) {
         const scene = panelScene.value;
-        if (scene) setNodeComment(scene.title, text);
+        if (scene) setNodeAnnotation(scene.title, text);
       },
     });
 
@@ -2608,7 +2620,7 @@ Write your scene description here.
       fileInput.value.click();
     }
 
-    // Layout YAML: { version: 1, nodes: { "<scene title>": { x, y, color, comment } } }.
+    // Layout YAML: { version: 1, nodes: { "<scene title>": { x, y, color, annotation } } }.
     // Keyed by scene title — the same identity diverts already resolve by —
     // so the file stays readable and round-trips even if scenes are reordered.
     // Each entry only includes the keys actually set on that node.
@@ -2622,7 +2634,7 @@ Write your scene description here.
           entry.y = Math.round(m.y);
         }
         if (m.color) entry.color = m.color;
-        if (m.comment) entry.comment = m.comment;
+        if (m.annotation) entry.annotation = m.annotation;
         if (Object.keys(entry).length) nodes[title] = entry;
       });
       return jsyaml.dump({ version: 1, nodes }, { lineWidth: -1 });
@@ -2647,7 +2659,7 @@ Write your scene description here.
             entry.y = n.y;
           }
           if (typeof n.color === 'string') entry.color = n.color;
-          if (typeof n.comment === 'string') entry.comment = n.comment;
+          if (typeof n.annotation === 'string') entry.annotation = n.annotation;
           if (Object.keys(entry).length) nodeMeta[title] = entry;
         });
       }
@@ -2796,7 +2808,7 @@ Write your scene description here.
       zoomIn, zoomOut, resetView, resetLayout,
       selectedNodeIndex, panelScene, selectedNodeSource, panelHighlightedSource,
       panelHighlightPre, nodePanelWidth, onPanelResizeDown, onPanelScroll, openPanelInEditor,
-      paletteColors, nodeColor, nodeComment, nodeTint,
+      paletteColors, nodeColor, nodeAnnotation, nodeTint, customColorInput, triggerCustomColorPicker,
       arrowColor, labelColor, placeholder,
       hasExplicitStart, playerCurrentScene, playerCurrentBeat, playerRevealCount, playerShowMenu,
       playerEntityRoster,
