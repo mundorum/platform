@@ -694,10 +694,17 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 /* ── Graph view ── */
 #graph-view {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   position: relative;
-  padding: 24px;
+  display: flex;
 }
+.graph-canvas-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+}
+.graph-canvas-viewport:active { cursor: grabbing; }
 #graph-canvas {
   position: relative;
   min-width: 600px;
@@ -710,6 +717,122 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   height: 100%;
   pointer-events: none;
   overflow: visible;
+}
+
+/* floating zoom/layout toolbar over the graph canvas */
+.graph-toolbar {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+  z-index: 5;
+}
+.graph-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--c-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.12s, color 0.12s;
+}
+.graph-btn:hover { background: var(--c-accent-light); color: var(--c-accent); }
+.graph-toolbar-sep { width: 0.5px; height: 18px; background: var(--c-border-strong); margin: 0 2px; }
+
+/* ── Graph node detail/edit side panel ── */
+#graph-node-panel {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-surface);
+  border-left: 0.5px solid var(--c-border-strong);
+  overflow: hidden;
+}
+.graph-panel-resize-handle {
+  /* Sits fully inside the panel (not straddling the edge) because the panel
+     has overflow:hidden to clip its body's absolutely-positioned editor
+     layers — a handle placed half outside that box would have its outer
+     half clipped, leaving too thin a hit target to grab reliably. */
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 6;
+}
+.graph-panel-resize-handle:hover { background: var(--c-border-strong); }
+.graph-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--c-border);
+  flex-shrink: 0;
+}
+.graph-panel-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.graph-panel-scenario {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c-muted);
+}
+.graph-panel-title {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graph-panel-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.graph-panel-body { position: relative; flex: 1; overflow: hidden; }
+.gnp-highlight, .gnp-textarea {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 16px 18px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  tab-size: 2;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: auto;
+}
+.gnp-highlight {
+  color: var(--c-text);
+  background: var(--c-bg);
+  pointer-events: none;
+  scrollbar-width: none;
+}
+.gnp-highlight::-webkit-scrollbar { display: none; }
+.gnp-textarea {
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--c-text);
 }
 
 .graph-node {
@@ -863,7 +986,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
     <button class="tb-btn ghost" @click="newNarrative" title="Start a new, empty narrative"><i class="ti ti-file-plus"></i> New</button>
     <button class="tb-btn" @click="triggerUpload"><i class="ti ti-upload"></i> Upload</button>
     <button class="tb-btn ghost" @click="downloadFile"><i class="ti ti-download"></i> Download</button>
-    <input type="file" id="file-input" ref="fileInput" accept=".md,.gno,.txt" @change="onFileUpload">
+    <input type="file" id="file-input" ref="fileInput" accept=".md,.gno,.txt,.zip" @change="onFileUpload">
     <input
       id="filename-display"
       type="text"
@@ -902,7 +1025,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 
     <button
       class="tb-btn ghost icon-only"
-      v-if="view === 'editor'"
+      v-if="view === 'editor' || view === 'graph'"
       :title="leftCollapsed ? 'Show scenes panel' : 'Hide scenes panel'"
       @click="leftCollapsed = !leftCollapsed"
     >
@@ -1050,50 +1173,89 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 
     <!-- Graph view -->
     <div id="graph-view" v-show="view === 'graph'">
-      <div id="graph-canvas" :style="graphCanvasStyle" ref="graphCanvas">
-        <svg id="graph-svg" ref="graphSvg">
-          <defs>
-            <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L8,3 z" :fill="arrowColor" />
-            </marker>
-          </defs>
-          <g v-for="edge in graphEdges" :key="edge.key">
-            <path
-              :d="edge.path"
-              fill="none"
-              :stroke="arrowColor"
-              stroke-width="1.5"
-              stroke-dasharray="5,3"
-              marker-end="url(#arrow)"
-              opacity="0.75"
-            />
-            <text
-              :x="edge.labelX"
-              :y="edge.labelY"
-              font-family="'Outfit', sans-serif"
-              font-size="10"
-              :fill="labelColor"
-              text-anchor="middle"
-              dominant-baseline="middle"
-            >{{ edge.label }}</text>
-          </g>
-        </svg>
-        <div
-          v-for="node in graphNodes"
-          :key="node.id"
-          class="graph-node"
-          :class="{'active-node': activeSceneId === node.id}"
-          :style="{left: node.x + 'px', top: node.y + 'px'}"
-          @click="activeSceneId = node.id; view = 'editor'; $nextTick(() => scrollToScene(node.id))"
-        >
-          <div class="node-header">
-            <div class="node-scenario">{{ node.scenario }}</div>
-            <div class="node-title">{{ node.title }}</div>
+      <div
+        id="graph-viewport"
+        class="graph-canvas-viewport"
+        ref="graphViewportEl"
+        @wheel="onGraphWheel"
+        @mousedown="onCanvasMouseDown"
+      >
+        <div id="graph-canvas" :style="graphCanvasFullStyle" ref="graphCanvas">
+          <svg id="graph-svg" ref="graphSvg">
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" :fill="arrowColor" />
+              </marker>
+            </defs>
+            <g v-for="edge in graphEdges" :key="edge.key">
+              <path
+                :d="edge.path"
+                fill="none"
+                :stroke="arrowColor"
+                stroke-width="1.5"
+                stroke-dasharray="5,3"
+                marker-end="url(#arrow)"
+                opacity="0.75"
+              />
+              <text
+                :x="edge.labelX"
+                :y="edge.labelY"
+                font-family="'Outfit', sans-serif"
+                font-size="10"
+                :fill="labelColor"
+                text-anchor="middle"
+                dominant-baseline="middle"
+              >{{ edge.label }}</text>
+            </g>
+          </svg>
+          <div
+            v-for="(node, nodeIdx) in graphNodes"
+            :key="node.id"
+            class="graph-node"
+            :class="{'active-node': selectedNodeIndex === nodeIdx}"
+            :style="{left: node.x + 'px', top: node.y + 'px'}"
+            @mousedown="onNodeMouseDown(nodeIdx, node, $event)"
+          >
+            <div class="node-header">
+              <div class="node-scenario">{{ node.scenario }}</div>
+              <div class="node-title">{{ node.title }}</div>
+            </div>
+            <div class="node-body">{{ node.excerpt }}</div>
+            <div class="node-diverts" v-if="node.diverts.length">
+              <span v-for="d in node.diverts" :key="d.target" class="node-divert-chip">→ {{ d.target }}</span>
+            </div>
           </div>
-          <div class="node-body">{{ node.excerpt }}</div>
-          <div class="node-diverts" v-if="node.diverts.length">
-            <span v-for="d in node.diverts" :key="d.target" class="node-divert-chip">→ {{ d.target }}</span>
+        </div>
+
+        <div class="graph-toolbar">
+          <button class="graph-btn" title="Zoom in" @click="zoomIn"><i class="ti ti-zoom-in"></i></button>
+          <button class="graph-btn" title="Zoom out" @click="zoomOut"><i class="ti ti-zoom-out"></i></button>
+          <button class="graph-btn" title="Reset view" @click="resetView"><i class="ti ti-focus-2"></i></button>
+          <div class="graph-toolbar-sep"></div>
+          <button class="graph-btn" title="Reset manual layout" @click="resetLayout"><i class="ti ti-layout-grid"></i></button>
+        </div>
+      </div>
+
+      <div id="graph-node-panel" v-if="panelScene" :style="{width: nodePanelWidth + 'px'}">
+        <div class="graph-panel-resize-handle" @mousedown="onPanelResizeDown"></div>
+        <div class="graph-panel-header">
+          <div class="graph-panel-titles">
+            <span class="graph-panel-scenario">{{ panelScene.scenario }}</span>
+            <span class="graph-panel-title">{{ panelScene.title }}</span>
           </div>
+          <div class="graph-panel-actions">
+            <button class="nav-icon-btn" title="Open in Editor" @click="openPanelInEditor"><i class="ti ti-edit"></i></button>
+            <button class="nav-icon-btn" title="Close" @click="selectedNodeIndex = null"><i class="ti ti-x"></i></button>
+          </div>
+        </div>
+        <div class="graph-panel-body">
+          <pre class="gnp-highlight" ref="panelHighlightPre" aria-hidden="true" v-html="panelHighlightedSource"></pre>
+          <textarea
+            class="gnp-textarea"
+            v-model="selectedNodeSource"
+            spellcheck="false"
+            @scroll="onPanelScroll"
+          ></textarea>
         </div>
       </div>
     </div>
@@ -1170,6 +1332,8 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script>
 const { createApp, ref, reactive, computed, watch, nextTick } = Vue;
@@ -1660,8 +1824,11 @@ const NODE_H = 140; // approx — actual height may vary
 const H_GAP  = 80;
 const V_GAP  = 36;
 
-function layoutGraph(scenes) {
-  if (!scenes.length) return { nodes: [], edges: [] };
+// Auto-arranges scenes into left-to-right topological columns. Positions
+// here are the *default* layout; a scene with a manual (dragged) position
+// overrides its x/y downstream without touching this function.
+function layoutGraphNodes(scenes) {
+  if (!scenes.length) return [];
 
   // Build adjacency: title -> scene
   const byTitle = {};
@@ -1720,7 +1887,7 @@ function layoutGraph(scenes) {
   });
 
   // Compute positions
-  const nodes = scenes.map(s => {
+  return scenes.map(s => {
     const c = col[s.id] ?? 0;
     const r = row[s.id] ?? 0;
     const x = c * (NODE_W + H_GAP) + 24;
@@ -1733,11 +1900,15 @@ function layoutGraph(scenes) {
       .slice(0, 140);
     return { id: s.id, title: s.title, scenario: s.scenario, x, y, excerpt, diverts: s.diverts };
   });
+}
 
-  const nodeMap = {};
-  nodes.forEach(n => { nodeMap[n.id] = n; });
+// Builds divert edges from a supplied node map (id -> {x,y,...}) rather than
+// recomputing positions itself, so edges always follow a node's *final*
+// on-screen position — including one overridden by a manual drag.
+function layoutGraphEdges(scenes, nodeMap) {
+  const byTitle = {};
+  scenes.forEach(s => { byTitle[s.title.toLowerCase()] = s; });
 
-  // Edges
   const edges = [];
   scenes.forEach(s => {
     const src = nodeMap[s.id];
@@ -1764,7 +1935,7 @@ function layoutGraph(scenes) {
     });
   });
 
-  return { nodes, edges };
+  return edges;
 }
 
 /* ── VUE APP ── */
@@ -1791,6 +1962,12 @@ createApp({
     const loadedNarrativeName = ref(draft ? draft.loadedNarrativeName || null : null);
     const loadMenuOpen = ref(false);
     const storageVersion = ref(0);
+
+    // Manual graph-view node positions, keyed by scene title (the same
+    // identity diverts already resolve by). Survives in the session autosave
+    // draft and in the downloadable layout YAML; NOT in named browser-storage
+    // saves, which stay plain narrative text for backward compatibility.
+    const manualPositions = reactive(draft && draft.layout ? { ...draft.layout } : {});
 
     const narrativeName = computed(() => filename.value.replace(/\.(gno|md|txt)$/i, '').trim() || 'untitled');
     const savedNarratives = computed(() => {
@@ -1843,9 +2020,19 @@ createApp({
     const renderedHtml = computed(() => renderGno(source.value, scenes.value, entities.value));
     const highlightedSource = computed(() => highlightGno(source.value, entities.value));
 
-    const graphLayout = computed(() => layoutGraph(scenes.value));
-    const graphNodes  = computed(() => graphLayout.value.nodes);
-    const graphEdges  = computed(() => graphLayout.value.edges);
+    const autoGraphNodes = computed(() => layoutGraphNodes(scenes.value));
+    // Manual drag positions (by title) override the auto-layout position.
+    const graphNodes = computed(() => autoGraphNodes.value.map(n => {
+      const manual = manualPositions[n.title];
+      return manual ? { ...n, x: manual.x, y: manual.y } : n;
+    }));
+    // Edges are derived from nodes' *final* positions, so a dragged node's
+    // divert arrows follow it instead of staying anchored to the auto layout.
+    const graphEdges = computed(() => {
+      const nodeMap = {};
+      graphNodes.value.forEach(n => { nodeMap[n.id] = n; });
+      return layoutGraphEdges(scenes.value, nodeMap);
+    });
 
     const graphCanvasStyle = computed(() => {
       if (!graphNodes.value.length) return {};
@@ -1853,6 +2040,160 @@ createApp({
       const maxY = Math.max(...graphNodes.value.map(n => n.y + NODE_H)) + 40;
       return { width: maxX + 'px', height: maxY + 'px' };
     });
+
+    /* ── Graph zoom / pan ── */
+    const graphZoom = ref(1);
+    const graphPan = reactive({ x: 0, y: 0 });
+    const graphViewportEl = ref(null);
+    const ZOOM_MIN = 0.25;
+    const ZOOM_MAX = 2.5;
+
+    const graphCanvasFullStyle = computed(() => ({
+      ...graphCanvasStyle.value,
+      transform: `translate(${graphPan.x}px, ${graphPan.y}px) scale(${graphZoom.value})`,
+      transformOrigin: '0 0',
+    }));
+
+    function zoomAt(mouseX, mouseY, factor) {
+      const cx = (mouseX - graphPan.x) / graphZoom.value;
+      const cy = (mouseY - graphPan.y) / graphZoom.value;
+      const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, graphZoom.value * factor));
+      graphPan.x = mouseX - cx * newZoom;
+      graphPan.y = mouseY - cy * newZoom;
+      graphZoom.value = newZoom;
+    }
+
+    function onGraphWheel(e) {
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      zoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
+    }
+
+    function zoomButtonCenter() {
+      const el = graphViewportEl.value;
+      if (!el) return { x: 300, y: 200 };
+      const rect = el.getBoundingClientRect();
+      return { x: rect.width / 2, y: rect.height / 2 };
+    }
+
+    function zoomIn() { const c = zoomButtonCenter(); zoomAt(c.x, c.y, 1.25); }
+    function zoomOut() { const c = zoomButtonCenter(); zoomAt(c.x, c.y, 1 / 1.25); }
+    function resetView() { graphZoom.value = 1; graphPan.x = 0; graphPan.y = 0; }
+    function resetLayout() {
+      Object.keys(manualPositions).forEach(k => delete manualPositions[k]);
+    }
+    function clearManualPositions() { resetLayout(); }
+
+    /* ── Node dragging, canvas panning, and panel resizing share one pair of
+       window-level mouse handlers (mirrors the single keydown listener
+       pattern used for the Player below) ── */
+    const nodeDragState = ref(null);
+    const canvasPanState = ref(null);
+    const panelResizeState = ref(null);
+
+    function onNodeMouseDown(idx, node, e) {
+      e.stopPropagation();
+      nodeDragState.value = {
+        idx, title: node.title,
+        startX: e.clientX, startY: e.clientY,
+        origX: node.x, origY: node.y,
+        moved: false,
+      };
+    }
+
+    function onCanvasMouseDown(e) {
+      if (e.target.closest('.graph-node') || e.target.closest('.graph-toolbar')) return;
+      canvasPanState.value = {
+        startX: e.clientX, startY: e.clientY,
+        origX: graphPan.x, origY: graphPan.y,
+      };
+    }
+
+    function onPanelResizeDown(e) {
+      panelResizeState.value = { startX: e.clientX, startWidth: nodePanelWidth.value };
+    }
+
+    function onGraphWindowMouseMove(e) {
+      if (nodeDragState.value) {
+        const d = nodeDragState.value;
+        const dx = (e.clientX - d.startX) / graphZoom.value;
+        const dy = (e.clientY - d.startY) / graphZoom.value;
+        if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > 4) d.moved = true;
+        manualPositions[d.title] = { x: Math.max(0, d.origX + dx), y: Math.max(0, d.origY + dy) };
+        return;
+      }
+      if (canvasPanState.value) {
+        const p = canvasPanState.value;
+        graphPan.x = p.origX + (e.clientX - p.startX);
+        graphPan.y = p.origY + (e.clientY - p.startY);
+        return;
+      }
+      if (panelResizeState.value) {
+        const r = panelResizeState.value;
+        nodePanelWidth.value = Math.min(720, Math.max(260, r.startWidth + (r.startX - e.clientX)));
+      }
+    }
+
+    function onGraphWindowMouseUp() {
+      if (nodeDragState.value) {
+        if (!nodeDragState.value.moved) selectedNodeIndex.value = nodeDragState.value.idx;
+        nodeDragState.value = null;
+      }
+      canvasPanState.value = null;
+      panelResizeState.value = null;
+    }
+
+    window.addEventListener('mousemove', onGraphWindowMouseMove);
+    window.addEventListener('mouseup', onGraphWindowMouseUp);
+
+    /* ── Graph node detail/edit side panel ── */
+    const selectedNodeIndex = ref(null);
+    const nodePanelWidth = ref(380);
+    const panelHighlightPre = ref(null);
+
+    // graphNodes / scenesWithBounds share the same array order as scenes.value,
+    // so an index picked in one lines up with the other.
+    const panelScene = computed(() =>
+      selectedNodeIndex.value != null ? (scenesWithBounds.value[selectedNodeIndex.value] || null) : null
+    );
+
+    const selectedNodeSource = computed({
+      get() {
+        const scene = panelScene.value;
+        if (!scene) return '';
+        const lines = source.value.split('\n');
+        return lines.slice(scene.lineStart, scene.bodyEnd + 1).join('\n');
+      },
+      set(newText) {
+        const scene = panelScene.value;
+        if (!scene) return;
+        const lines = source.value.split('\n');
+        const newLines = newText.split('\n');
+        lines.splice(scene.lineStart, scene.bodyEnd - scene.lineStart + 1, ...newLines);
+        source.value = lines.join('\n');
+      },
+    });
+
+    const panelHighlightedSource = computed(() => {
+      const snippet = selectedNodeSource.value;
+      return snippet ? highlightGno(snippet, analyzeEntities(snippet)) : '';
+    });
+
+    function onPanelScroll(e) {
+      const ta = e.target;
+      if (panelHighlightPre.value) {
+        panelHighlightPre.value.scrollTop = ta.scrollTop;
+        panelHighlightPre.value.scrollLeft = ta.scrollLeft;
+      }
+    }
+
+    function openPanelInEditor() {
+      const scene = panelScene.value;
+      if (!scene) return;
+      view.value = 'editor';
+      nextTick(() => scrollToScene(scene.id));
+    }
 
     const arrowColor  = ref('var(--c-divert)');
     const labelColor  = ref('var(--c-muted)');
@@ -2040,24 +2381,82 @@ Write your scene description here.
       fileInput.value.click();
     }
 
-    function onFileUpload(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      filename.value = file.name;
-      loadedNarrativeName.value = null; // came from disk, not from browser storage
-      const reader = new FileReader();
-      reader.onload = ev => { source.value = ev.target.result; };
-      reader.readAsText(file, 'UTF-8');
-      e.target.value = '';
-      resetPlayerProgress();
+    // Layout YAML: { version: 1, nodes: { "<scene title>": { x, y } } }.
+    // Keyed by scene title — the same identity diverts already resolve by —
+    // so the file stays readable and round-trips even if scenes are reordered.
+    function layoutToYaml() {
+      const nodes = {};
+      Object.keys(manualPositions).forEach(title => {
+        const p = manualPositions[title];
+        nodes[title] = { x: Math.round(p.x), y: Math.round(p.y) };
+      });
+      return jsyaml.dump({ version: 1, nodes }, { lineWidth: -1 });
     }
 
-    function downloadFile() {
-      const blob = new Blob([source.value], { type: 'text/markdown;charset=utf-8' });
+    function applyLayoutYaml(text) {
+      clearManualPositions();
+      let data;
+      try {
+        data = jsyaml.load(text);
+      } catch (err) {
+        alert('Could not parse layout YAML: ' + err.message);
+        return;
+      }
+      if (data && data.nodes && typeof data.nodes === 'object') {
+        Object.keys(data.nodes).forEach(title => {
+          const n = data.nodes[title];
+          if (n && typeof n.x === 'number' && typeof n.y === 'number') {
+            manualPositions[title] = { x: n.x, y: n.y };
+          }
+        });
+      }
+    }
+
+    async function onFileUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (/\.zip$/i.test(file.name)) {
+        try {
+          const zip = await JSZip.loadAsync(file);
+          const gnoEntries = zip.file(/\.(gno|md|txt)$/i);
+          if (!gnoEntries.length) throw new Error('No .gno/.md/.txt file found inside the zip.');
+          const yamlEntries = zip.file(/\.ya?ml$/i);
+          source.value = await gnoEntries[0].async('string');
+          filename.value = gnoEntries[0].name.split('/').pop();
+          if (yamlEntries.length) {
+            applyLayoutYaml(await yamlEntries[0].async('string'));
+          } else {
+            clearManualPositions();
+          }
+          loadedNarrativeName.value = null; // came from disk, not from browser storage
+          resetPlayerProgress();
+        } catch (err) {
+          alert('Could not read zip file: ' + err.message);
+        }
+      } else {
+        filename.value = file.name;
+        loadedNarrativeName.value = null;
+        clearManualPositions();
+        const reader = new FileReader();
+        reader.onload = ev => { source.value = ev.target.result; };
+        reader.readAsText(file, 'UTF-8');
+        resetPlayerProgress();
+      }
+      e.target.value = '';
+    }
+
+    // Downloads the narrative and its graph layout together as a zip:
+    // <name>.gno (the script) + <name>.yaml (manual node positions, if any).
+    async function downloadFile() {
+      const base = filename.value.replace(/\.(gno|md|txt|zip)$/i, '').trim() || 'untitled';
+      const zip = new JSZip();
+      zip.file(base + '.gno', source.value);
+      zip.file(base + '.yaml', layoutToYaml());
+      const blob = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename.value.match(/\.(md|gno|txt)$/) ? filename.value : filename.value + '.gno';
+      a.download = base + '.zip';
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -2089,6 +2488,7 @@ Write your scene description here.
       filename.value = name + '.gno';
       loadedNarrativeName.value = name;
       loadMenuOpen.value = false;
+      clearManualPositions();
       resetPlayerProgress();
     }
 
@@ -2097,6 +2497,7 @@ Write your scene description here.
       filename.value = 'council-chamber-demo.gno';
       loadedNarrativeName.value = DEMO_MARKER;
       loadMenuOpen.value = false;
+      clearManualPositions();
       resetPlayerProgress();
     }
 
@@ -2112,6 +2513,7 @@ Write your scene description here.
       filename.value = 'untitled.gno';
       loadedNarrativeName.value = null;
       activeSceneId.value = '';
+      clearManualPositions();
       resetPlayerProgress();
     }
 
@@ -2125,12 +2527,13 @@ Write your scene description here.
           source: source.value,
           filename: filename.value,
           loadedNarrativeName: loadedNarrativeName.value,
+          layout: { ...manualPositions },
           savedAt: Date.now(),
         }));
       } catch (e) { /* storage unavailable/full — draft recovery is best-effort */ }
     }
     let autosaveTimer = null;
-    watch([source, filename, loadedNarrativeName], () => {
+    watch([source, filename, loadedNarrativeName, manualPositions], () => {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       autosaveTimer = setTimeout(saveCurrentDraft, 600);
     });
@@ -2147,7 +2550,11 @@ Write your scene description here.
       fileInput, editorTextarea, previewPane, highlightPre,
       scenes, scenarios, entities, entityList, renderedHtml, highlightedSource,
       entitiesInScene, firstOccInScene,
-      graphNodes, graphEdges, graphCanvasStyle,
+      graphNodes, graphEdges, graphCanvasStyle, graphCanvasFullStyle,
+      graphViewportEl, onGraphWheel, onCanvasMouseDown, onNodeMouseDown,
+      zoomIn, zoomOut, resetView, resetLayout,
+      selectedNodeIndex, panelScene, selectedNodeSource, panelHighlightedSource,
+      panelHighlightPre, nodePanelWidth, onPanelResizeDown, onPanelScroll, openPanelInEditor,
       arrowColor, labelColor, placeholder,
       hasExplicitStart, playerCurrentScene, playerCurrentBeat, playerRevealCount, playerShowMenu,
       playerEntityRoster,
