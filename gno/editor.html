@@ -1056,6 +1056,188 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 .gno-highlight .hl-dialog-prefix { color: var(--c-muted); }
 .gno-highlight .hl-dialog-text { color: var(--c-muted); font-style: italic; }
 
+/* ── Presentation view ── */
+#presentation-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.pres-subtabs {
+  display: flex;
+  gap: 2px;
+  padding: 10px 20px 0;
+  border-bottom: 0.5px solid var(--c-border);
+  flex-shrink: 0;
+}
+.pres-subtab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.pres-subtab.active { color: var(--c-accent); border-bottom-color: var(--c-accent); }
+.pres-subtab:hover:not(.active) { color: var(--c-text); }
+.pres-subtab-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px 40px;
+}
+.pres-subtab-placeholder {
+  max-width: 480px;
+  margin: 40px auto 0;
+  text-align: center;
+  color: var(--c-muted);
+  font-family: var(--font-doc);
+  font-style: italic;
+  font-size: 14px;
+}
+
+.lib-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 780px;
+  margin-bottom: 22px;
+}
+.lib-add-input {
+  flex: 1;
+  padding: 7px 11px;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+.lib-add-input:focus { outline: none; border-color: var(--c-accent); }
+.lib-add-hint {
+  max-width: 780px;
+  margin: -14px 0 22px;
+  font-size: 11.5px;
+  color: var(--c-muted);
+  font-family: var(--font-ui);
+}
+.lib-add-hint code { font-family: var(--font-mono); background: var(--c-accent-light); color: var(--c-accent); padding: 1px 5px; border-radius: 4px; }
+
+.lib-list { display: flex; flex-direction: column; gap: 14px; max-width: 900px; }
+.lib-card {
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 10px;
+  background: var(--c-surface);
+  overflow: hidden;
+}
+.lib-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 0.5px solid var(--c-border);
+  background: var(--c-accent-light);
+}
+.lib-id-input {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-accent);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 3px 6px;
+  width: 180px;
+  flex-shrink: 0;
+}
+.lib-id-input:hover { border-color: var(--c-border-strong); }
+.lib-id-input:focus { outline: none; border-color: var(--c-accent); background: var(--c-surface); }
+.lib-url {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-status {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--c-muted);
+  white-space: nowrap;
+}
+.lib-status.error { color: #a33; }
+.lib-status-broken {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: #a33;
+  background: rgba(170,51,51,0.1);
+  padding: 1px 7px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.lib-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.lib-empty {
+  padding: 18px 14px;
+  font-family: var(--font-doc);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--c-muted);
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  padding: 14px;
+}
+.image-tile {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--c-bg);
+  border: 0.5px solid var(--c-border);
+}
+.image-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.image-tile-label {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 3px 6px 2px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.65));
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.image-tile.broken { background: rgba(170,51,51,0.08); border-color: rgba(170,51,51,0.35); }
+.image-tile-broken {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a33;
+  font-size: 22px;
+}
+.load-more-row { display: flex; justify-content: center; padding: 4px 14px 16px; }
+
 /* ── hidden file input ── */
 #file-input { display: none; }
 
@@ -1117,7 +1299,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 
     <button
       class="tb-btn ghost icon-only"
-      v-if="view === 'editor' || view === 'graph'"
+      v-if="view === 'editor' || view === 'graph' || view === 'presentation'"
       :title="leftCollapsed ? 'Show scenes panel' : 'Hide scenes panel'"
       @click="leftCollapsed = !leftCollapsed"
     >
@@ -1138,6 +1320,9 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
       </button>
       <button class="view-tab" :class="{active: view==='graph'}" @click="view='graph'">
         <i class="ti ti-hierarchy-2"></i> Graph
+      </button>
+      <button class="view-tab" :class="{active: view==='presentation'}" @click="view='presentation'">
+        <i class="ti ti-photo"></i> Presentation
       </button>
       <button class="view-tab" :class="{active: view==='player'}" @click="view='player'">
         <i class="ti ti-player-play"></i> Player
@@ -1390,6 +1575,103 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
             @scroll="onPanelScroll"
           ></textarea>
         </div>
+      </div>
+    </div>
+
+    <!-- Presentation view -->
+    <div id="presentation-view" v-show="view === 'presentation'">
+      <div class="pres-subtabs">
+        <button class="pres-subtab" :class="{active: presentationTab === 'images'}" @click="presentationTab = 'images'">
+          <i class="ti ti-photo"></i> Image Libraries
+        </button>
+        <button class="pres-subtab" :class="{active: presentationTab === 'characters'}" @click="presentationTab = 'characters'">
+          <i class="ti ti-user"></i> Characters
+        </button>
+        <button class="pres-subtab" :class="{active: presentationTab === 'scenarios'}" @click="presentationTab = 'scenarios'">
+          <i class="ti ti-map"></i> Scenarios
+        </button>
+      </div>
+
+      <div class="pres-subtab-body">
+        <template v-if="presentationTab === 'images'">
+          <div class="lib-add-row">
+            <input
+              class="lib-add-input"
+              type="text"
+              v-model="newLibraryUrl"
+              placeholder="Metadata file URL or images directory URL…"
+              @keydown.enter="addImageLibraryFromInput"
+            >
+            <button class="tb-btn" @click="addImageLibraryFromInput"><i class="ti ti-plus"></i> Add library</button>
+          </div>
+          <div class="lib-add-hint">
+            A directory URL is fetched as <code>{{ defaultCatalogFilename }}</code> inside it (gnō's simple catalog format). A direct URL ending in <code>.yaml</code>/<code>.yml</code>/<code>.json</code> is fetched as-is and may also be an IIIF Collection or a schema.org ImageGallery.
+          </div>
+
+          <div class="lib-list" v-if="imageLibraryIds.length">
+            <div class="lib-card" v-for="id in imageLibraryIds" :key="id">
+              <div class="lib-card-header">
+                <input
+                  class="lib-id-input"
+                  type="text"
+                  :value="id"
+                  spellcheck="false"
+                  @change="renameImageLibrary(id, $event.target.value)"
+                  title="Library id"
+                >
+                <span class="lib-url" :title="imageLibraries[id]">{{ imageLibraries[id] }}</span>
+                <span class="lib-status" :class="{error: libraryCatalogs[id] && libraryCatalogs[id].status === 'error'}">
+                  <template v-if="!libraryCatalogs[id] || libraryCatalogs[id].status === 'loading'">Loading…</template>
+                  <template v-else-if="libraryCatalogs[id].status === 'error'">{{ libraryCatalogs[id].error }}</template>
+                  <template v-else>{{ libraryCatalogs[id].images.length }} image(s) · {{ libraryCatalogs[id].format }}</template>
+                </span>
+                <span class="lib-status-broken" v-if="brokenCount(id) > 0" :title="'Path in the catalog does not resolve to a real file'">
+                  <i class="ti ti-alert-triangle"></i> {{ brokenCount(id) }} broken
+                </span>
+                <div class="lib-actions">
+                  <button class="nav-icon-btn" title="Reload" @click="loadLibraryCatalog(id)"><i class="ti ti-refresh"></i></button>
+                  <button class="nav-icon-btn" title="Delete library" @click="removeImageLibrary(id)"><i class="ti ti-trash"></i></button>
+                </div>
+              </div>
+              <div
+                class="lib-empty"
+                v-if="libraryCatalogs[id] && libraryCatalogs[id].status === 'loaded' && libraryCatalogs[id].images.length === 0"
+              >No images found in this catalog.</div>
+              <div class="image-grid" v-if="libraryCatalogs[id] && libraryCatalogs[id].images.length">
+                <div
+                  class="image-tile"
+                  :class="{broken: img.broken}"
+                  v-for="img in libraryCatalogs[id].images.slice(0, libraryCatalogs[id].visibleCount)"
+                  :key="img.id"
+                  :title="img.broken ? (img.label + ' — failed to load: ' + img.thumbnailUrl) : img.label"
+                >
+                  <img v-if="!img.broken" :src="img.thumbnailUrl" :alt="img.label" loading="lazy" @error="img.broken = true">
+                  <div class="image-tile-broken" v-else><i class="ti ti-photo-off"></i></div>
+                  <span class="image-tile-label">{{ img.label }}</span>
+                </div>
+              </div>
+              <div
+                class="load-more-row"
+                v-if="libraryCatalogs[id] && libraryCatalogs[id].images.length > libraryCatalogs[id].visibleCount"
+              >
+                <button class="tb-btn ghost" @click="showMoreImages(id)">
+                  Load more ({{ libraryCatalogs[id].images.length - libraryCatalogs[id].visibleCount }} remaining)
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="pres-subtab-placeholder" v-else>
+            No image libraries yet. Add one above by pasting a metadata file URL or an images directory URL.
+          </div>
+        </template>
+
+        <template v-else-if="presentationTab === 'characters'">
+          <div class="pres-subtab-placeholder">Character editor — coming soon.</div>
+        </template>
+
+        <template v-else>
+          <div class="pres-subtab-placeholder">Scenario editor — coming soon.</div>
+        </template>
       </div>
     </div>
 
@@ -2071,6 +2353,122 @@ function layoutGraphEdges(scenes, nodeMap) {
   return edges;
 }
 
+/* ── IMAGE LIBRARY CATALOG ADAPTER ──
+   Normalizes three catalog formats into one shape: { images: [{id, label, url,
+   thumbnailUrl}], format }. Which format a URL points to is sniffed from its
+   content, not declared up front, so the same "Add library" input accepts any
+   of the three. */
+const DEFAULT_CATALOG_FILENAME = 'gno-catalog.yaml';
+
+function slugFromPath(p) {
+  const base = p.split('/').pop() || p;
+  return slugify(base.replace(/\.[^.]+$/, '')) || base;
+}
+
+// gnō's own simple format: a YAML list where each item is either a bare
+// relative path, or a single-key {id: relative_path} mapping. Paths are
+// resolved against the catalog file's own URL, so plain string concatenation
+// never has to happen — new URL() does the right thing for "dir/catalog.yaml"
+// + "sub/img.png" as long as the catalog URL doesn't have a trailing slash
+// swallowed beforehand.
+function parseGnoSimpleCatalog(text, catalogUrl) {
+  const data = jsyaml.load(text);
+  const list = Array.isArray(data) ? data : [];
+  const images = list.map((entry, i) => {
+    let id, relPath;
+    if (typeof entry === 'string') {
+      relPath = entry;
+      id = slugFromPath(entry);
+    } else if (entry && typeof entry === 'object') {
+      const keys = Object.keys(entry);
+      id = keys[0];
+      relPath = entry[keys[0]];
+    } else {
+      return null;
+    }
+    if (!relPath) return null;
+    const url = new URL(relPath, catalogUrl).href;
+    return { id: id || ('image-' + i), label: id || slugFromPath(relPath), url, thumbnailUrl: url };
+  }).filter(Boolean);
+  return { images, format: 'gno-simple' };
+}
+
+function iiifLabelToString(label) {
+  if (!label) return '';
+  if (typeof label === 'string') return label;
+  const firstLang = Object.values(label)[0];
+  return Array.isArray(firstLang) ? firstLang.join(' ') : String(firstLang || '');
+}
+
+// Walks a Manifest's first Canvas -> AnnotationPage -> (painting) Annotation
+// to find the actual image body, and prefers the Manifest's own `thumbnail`
+// when present so large paintings don't have to be downloaded just to render
+// a preview tile.
+function iiifManifestImage(manifest) {
+  const thumb = manifest.thumbnail && manifest.thumbnail[0] && manifest.thumbnail[0].id;
+  let full = null;
+  const canvas = manifest.items && manifest.items[0];
+  const page = canvas && canvas.items && canvas.items[0];
+  const anno = page && page.items && page.items.find(a => a.motivation === 'painting') || (page && page.items && page.items[0]);
+  if (anno && anno.body) full = anno.body.id || (Array.isArray(anno.body) && anno.body[0] && anno.body[0].id);
+  return { full: full || thumb, thumb: thumb || full };
+}
+
+function parseIiifCollection(json, catalogUrl) {
+  const items = Array.isArray(json.items) ? json.items : [];
+  const images = items.filter(it => it.type === 'Manifest' || it.type === 'Canvas').map((it, i) => {
+    const label = iiifLabelToString(it.label) || slugFromPath(it.id || String(i));
+    if (it.type === 'Manifest') {
+      const { full, thumb } = iiifManifestImage(it);
+      if (!full) return null;
+      return { id: it.id || label, label, url: new URL(full, catalogUrl).href, thumbnailUrl: new URL(thumb || full, catalogUrl).href };
+    }
+    return null;
+  }).filter(Boolean);
+  return { images, format: 'iiif' };
+}
+
+function parseSchemaOrgGallery(json, catalogUrl) {
+  const list = Array.isArray(json.image) ? json.image : (json.image ? [json.image] : []);
+  const images = list.map((it, i) => {
+    if (typeof it === 'string') {
+      const url = new URL(it, catalogUrl).href;
+      return { id: slugFromPath(it), label: slugFromPath(it), url, thumbnailUrl: url };
+    }
+    const url = it.contentUrl || it.url;
+    if (!url) return null;
+    const fullUrl = new URL(url, catalogUrl).href;
+    const thumbUrl = it.thumbnailUrl ? new URL(it.thumbnailUrl, catalogUrl).href : fullUrl;
+    const id = it.identifier || slugFromPath(url);
+    return { id, label: it.name || id, url: fullUrl, thumbnailUrl: thumbUrl };
+  }).filter(Boolean);
+  return { images, format: 'schema.org' };
+}
+
+// Given whatever the user typed, returns the actual catalog file URL to fetch:
+// a URL already ending in a recognized metadata extension is used as-is;
+// anything else is treated as a directory and gnō's default catalog filename
+// is appended (normalizing a missing trailing slash first, since new URL()
+// resolution — not plain concatenation — is what would otherwise silently
+// drop the last path segment).
+function resolveCatalogUrl(inputUrl) {
+  if (/\.(ya?ml|json)$/i.test(inputUrl)) return inputUrl;
+  const dir = inputUrl.endsWith('/') ? inputUrl : inputUrl + '/';
+  return dir + DEFAULT_CATALOG_FILENAME;
+}
+
+function detectAndParseCatalog(text, catalogUrl) {
+  let json = null;
+  try { json = JSON.parse(text); } catch (e) { /* not JSON — fall through to YAML */ }
+  if (json) {
+    const ctx = JSON.stringify(json['@context'] || '');
+    if (json.type === 'Collection' || ctx.includes('iiif.io')) return parseIiifCollection(json, catalogUrl);
+    if (json['@type'] === 'ImageGallery' || ctx.includes('schema.org')) return parseSchemaOrgGallery(json, catalogUrl);
+    throw new Error('Unrecognized JSON catalog format');
+  }
+  return parseGnoSimpleCatalog(text, catalogUrl);
+}
+
 /* ── VUE APP ── */
 createApp({
   setup() {
@@ -2268,6 +2666,122 @@ createApp({
     function clearNodeMeta() {
       Object.keys(nodeMeta).forEach(k => delete nodeMeta[k]);
     }
+
+    /* ── Presentation: image libraries ──
+       imageLibraries is the persisted { id: url } map (the `_presentation.yaml`
+       side-file, mirroring how nodeMeta mirrors `_graph.yaml`). libraryCatalogs
+       holds the *fetched* contents per library id — never persisted, since the
+       whole point is that the images live elsewhere and are re-fetched live. */
+    const presentationTab = ref('images');
+    const newLibraryUrl = ref('');
+    const imageLibraries = reactive(draft && draft.presentation && draft.presentation.image_libraries ? { ...draft.presentation.image_libraries } : {});
+    const libraryCatalogs = reactive({});
+    const IMAGES_PER_PAGE = 48;
+
+    const imageLibraryIds = computed(() => Object.keys(imageLibraries));
+
+    function uniqueLibraryId(base) {
+      let id = base || 'library';
+      let n = 2;
+      while (imageLibraries[id] !== undefined) { id = `${base}-${n}`; n++; }
+      return id;
+    }
+
+    async function loadLibraryCatalog(id) {
+      const url = imageLibraries[id];
+      if (!url) return;
+      libraryCatalogs[id] = { status: 'loading', images: [], error: '', format: '', visibleCount: IMAGES_PER_PAGE };
+      try {
+        const catalogUrl = resolveCatalogUrl(url);
+        const res = await fetch(catalogUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${catalogUrl}`);
+        const text = await res.text();
+        const { images, format } = detectAndParseCatalog(text, catalogUrl);
+        libraryCatalogs[id] = { status: 'loaded', images, error: '', format, visibleCount: IMAGES_PER_PAGE };
+      } catch (err) {
+        libraryCatalogs[id] = { status: 'error', images: [], error: err.message, format: '', visibleCount: IMAGES_PER_PAGE };
+      }
+    }
+
+    function showMoreImages(id) {
+      const cat = libraryCatalogs[id];
+      if (cat) cat.visibleCount += IMAGES_PER_PAGE;
+    }
+
+    // Counts images whose <img> failed to load (img.broken, set by the grid's
+    // @error handler) — a live, per-tile signal that a catalog's relative
+    // path doesn't actually resolve to a file, without any extra requests
+    // beyond the thumbnail fetch the grid was already making.
+    function brokenCount(id) {
+      const cat = libraryCatalogs[id];
+      return cat ? cat.images.reduce((n, img) => n + (img.broken ? 1 : 0), 0) : 0;
+    }
+
+    function addImageLibrary(url, id) {
+      url = (url || '').trim();
+      if (!url) return;
+      const libId = uniqueLibraryId(id || slugFromPath(url.replace(/\/+$/, '')) || 'library');
+      imageLibraries[libId] = url;
+      loadLibraryCatalog(libId);
+    }
+
+    function addImageLibraryFromInput() {
+      addImageLibrary(newLibraryUrl.value);
+      newLibraryUrl.value = '';
+    }
+
+    function removeImageLibrary(id) {
+      delete imageLibraries[id];
+      delete libraryCatalogs[id];
+    }
+
+    function renameImageLibrary(oldId, newId) {
+      newId = (newId || '').trim();
+      if (!newId || newId === oldId) return;
+      if (imageLibraries[newId] !== undefined) {
+        alert(`A library named "${newId}" already exists.`);
+        return;
+      }
+      imageLibraries[newId] = imageLibraries[oldId];
+      delete imageLibraries[oldId];
+      if (libraryCatalogs[oldId]) {
+        libraryCatalogs[newId] = libraryCatalogs[oldId];
+        delete libraryCatalogs[oldId];
+      }
+    }
+
+    function clearImageLibraries() {
+      Object.keys(imageLibraries).forEach(k => delete imageLibraries[k]);
+      Object.keys(libraryCatalogs).forEach(k => delete libraryCatalogs[k]);
+    }
+
+    function presentationToYaml() {
+      return jsyaml.dump({ version: 1, image_libraries: { ...imageLibraries } }, { lineWidth: -1 });
+    }
+
+    function applyPresentationYaml(text) {
+      clearImageLibraries();
+      let data;
+      try {
+        data = jsyaml.load(text);
+      } catch (err) {
+        alert('Could not parse presentation YAML: ' + err.message);
+        return;
+      }
+      if (data && data.image_libraries && typeof data.image_libraries === 'object') {
+        Object.entries(data.image_libraries).forEach(([id, url]) => {
+          if (typeof url === 'string') {
+            imageLibraries[id] = url;
+            loadLibraryCatalog(id);
+          }
+        });
+      }
+    }
+
+    // Restore-from-draft only stores the id->url map (fetched content is
+    // never persisted), so libraries carried over from the autosaved draft
+    // need their catalogs (re-)fetched once on startup.
+    Object.keys(imageLibraries).forEach(id => loadLibraryCatalog(id));
 
     /* ── Node dragging, canvas panning, and panel resizing share one pair of
        window-level mouse handlers (mirrors the single keydown listener
@@ -2673,14 +3187,29 @@ Write your scene description here.
           const zip = await JSZip.loadAsync(file);
           const gnoEntries = zip.file(/\.(gno|md|txt)$/i);
           if (!gnoEntries.length) throw new Error('No .gno/.md/.txt file found inside the zip.');
-          const yamlEntries = zip.file(/\.ya?ml$/i);
           source.value = await gnoEntries[0].async('string');
           filename.value = gnoEntries[0].name.split('/').pop();
-          if (yamlEntries.length) {
-            applyLayoutYaml(await yamlEntries[0].async('string'));
+
+          const presentationEntries = zip.file(/_presentation\.ya?ml$/i);
+          if (presentationEntries.length) {
+            applyPresentationYaml(await presentationEntries[0].async('string'));
+          } else {
+            clearImageLibraries();
+          }
+
+          // "_graph.yaml" is the current name; a bare "<name>.yaml" (not
+          // "_presentation.yaml") is the pre-rename graph-layout file, kept
+          // readable for zips downloaded before this split existed.
+          let graphEntries = zip.file(/_graph\.ya?ml$/i);
+          if (!graphEntries.length) {
+            graphEntries = zip.file(/\.ya?ml$/i).filter(f => !/_presentation\.ya?ml$/i.test(f.name));
+          }
+          if (graphEntries.length) {
+            applyLayoutYaml(await graphEntries[0].async('string'));
           } else {
             clearNodeMeta();
           }
+
           loadedNarrativeName.value = null; // came from disk, not from browser storage
           resetPlayerProgress();
         } catch (err) {
@@ -2690,6 +3219,7 @@ Write your scene description here.
         filename.value = file.name;
         loadedNarrativeName.value = null;
         clearNodeMeta();
+        clearImageLibraries();
         const reader = new FileReader();
         reader.onload = ev => { source.value = ev.target.result; };
         reader.readAsText(file, 'UTF-8');
@@ -2698,13 +3228,14 @@ Write your scene description here.
       e.target.value = '';
     }
 
-    // Downloads the narrative and its graph layout together as a zip:
-    // <name>.gno (the script) + <name>.yaml (manual node positions, if any).
+    // Downloads the narrative together with its graph layout and presentation
+    // setup as a zip: <name>.gno + <name>_graph.yaml + <name>_presentation.yaml.
     async function downloadFile() {
       const base = filename.value.replace(/\.(gno|md|txt|zip)$/i, '').trim() || 'untitled';
       const zip = new JSZip();
       zip.file(base + '.gno', source.value);
-      zip.file(base + '.yaml', layoutToYaml());
+      zip.file(base + '_graph.yaml', layoutToYaml());
+      zip.file(base + '_presentation.yaml', presentationToYaml());
       const blob = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2742,6 +3273,7 @@ Write your scene description here.
       loadedNarrativeName.value = name;
       loadMenuOpen.value = false;
       clearNodeMeta();
+      clearImageLibraries();
       resetPlayerProgress();
     }
 
@@ -2751,6 +3283,7 @@ Write your scene description here.
       loadedNarrativeName.value = DEMO_MARKER;
       loadMenuOpen.value = false;
       clearNodeMeta();
+      clearImageLibraries();
       resetPlayerProgress();
     }
 
@@ -2767,6 +3300,7 @@ Write your scene description here.
       loadedNarrativeName.value = null;
       activeSceneId.value = '';
       clearNodeMeta();
+      clearImageLibraries();
       resetPlayerProgress();
     }
 
@@ -2781,12 +3315,13 @@ Write your scene description here.
           filename: filename.value,
           loadedNarrativeName: loadedNarrativeName.value,
           layout: { ...nodeMeta },
+          presentation: { image_libraries: { ...imageLibraries } },
           savedAt: Date.now(),
         }));
       } catch (e) { /* storage unavailable/full — draft recovery is best-effort */ }
     }
     let autosaveTimer = null;
-    watch([source, filename, loadedNarrativeName, nodeMeta], () => {
+    watch([source, filename, loadedNarrativeName, nodeMeta, imageLibraries], () => {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       autosaveTimer = setTimeout(saveCurrentDraft, 600);
     });
@@ -2819,6 +3354,9 @@ Write your scene description here.
       triggerUpload, onFileUpload, downloadFile,
       saveNarrative, loadNarrative, loadDemoNarrative, newNarrative,
       demoMarker: DEMO_MARKER,
+      presentationTab, newLibraryUrl, imageLibraries, imageLibraryIds, libraryCatalogs,
+      defaultCatalogFilename: DEFAULT_CATALOG_FILENAME,
+      addImageLibraryFromInput, removeImageLibrary, renameImageLibrary, loadLibraryCatalog, showMoreImages, brokenCount,
     };
   }
 }).mount('#vue-mount');
