@@ -1288,6 +1288,86 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 .ent-label-input:focus { outline: none; border-color: var(--c-accent); border-style: solid; }
 .ent-card-picker { padding: 0 14px 14px; }
 
+.scenario-bg-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--c-border);
+}
+.scenario-bg-thumb {
+  width: 40px; height: 40px; object-fit: cover;
+  border-radius: 5px; border: 0.5px solid var(--c-border-strong);
+}
+.scenario-mode-toggle { display: flex; gap: 4px; padding: 10px 14px 0; }
+.scenario-mode-btn {
+  padding: 5px 12px;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  background: var(--c-surface);
+  color: var(--c-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.scenario-mode-btn.active { background: var(--c-accent-light); color: var(--c-accent); border-color: var(--c-accent); }
+.scenario-editor { display: flex; gap: 14px; padding: 14px; align-items: flex-start; }
+.scenario-canvas-wrap {
+  flex: 1;
+  overflow: auto;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 8px;
+  background:
+    repeating-conic-gradient(var(--c-bg) 0% 25%, var(--c-surface) 0% 50%) 0 0 / 20px 20px;
+  max-height: 560px;
+}
+.scenario-svg { display: block; }
+.scenario-palette {
+  width: 220px;
+  flex-shrink: 0;
+  max-height: 560px;
+  overflow-y: auto;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 8px;
+  padding: 10px;
+}
+.scenario-palette-title {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  margin-bottom: 8px;
+}
+.palette-entity { margin-bottom: 12px; }
+.palette-entity-id {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--c-tag-char);
+  margin-bottom: 4px;
+}
+.palette-entity-empty { font-size: 11px; color: var(--c-muted); font-style: italic; }
+.palette-tiles { display: flex; flex-wrap: wrap; gap: 6px; }
+.palette-tile { width: 52px; cursor: grab; text-align: center; }
+.palette-tile img, .palette-tile-broken {
+  width: 52px; height: 52px;
+  object-fit: cover;
+  border-radius: 5px;
+  border: 0.5px solid var(--c-border);
+  display: block;
+}
+.palette-tile-broken { display: flex; align-items: center; justify-content: center; color: #a33; background: var(--c-bg); }
+.palette-tile-label {
+  display: block;
+  font-size: 8.5px;
+  font-family: var(--font-mono);
+  color: var(--c-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── hidden file input ── */
 #file-input { display: none; }
 
@@ -1782,7 +1862,124 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
         </template>
 
         <template v-else>
-          <div class="pres-subtab-placeholder">Scenario editor — coming soon.</div>
+          <div class="lib-list" v-if="scenarioIdsForPresentation.length">
+            <div class="lib-card" v-for="name in scenarioIdsForPresentation" :key="name">
+              <div class="lib-card-header" style="cursor: pointer;" @click="toggleScenario(name)">
+                <i class="ti" :class="openScenario === name ? 'ti-chevron-down' : 'ti-chevron-right'"></i>
+                <span class="lib-id-input" style="border-color: transparent;">{{ name }}</span>
+                <span class="lib-status">{{ (scenarioDesigns[name] && scenarioDesigns[name].items.length) || 0 }} item(s)</span>
+                <div class="lib-actions">
+                  <button class="nav-icon-btn" title="Reset scenario" @click.stop="resetScenario(name)"><i class="ti ti-refresh"></i></button>
+                </div>
+              </div>
+
+              <template v-if="openScenario === name">
+                <div class="scenario-bg-row">
+                  <template v-if="scenarioDesigns[name].background">
+                    <img class="scenario-bg-thumb" :src="scenarioDesigns[name].background.url" alt="background">
+                    <span class="lib-url">{{ scenarioDesigns[name].background.library }} / {{ scenarioDesigns[name].background.image }}</span>
+                    <button class="tb-btn ghost" @click="removeScenarioBackground(name)">Remove background</button>
+                  </template>
+                  <template v-else>
+                    <button class="tb-btn ghost" @click="toggleBgPicker(name)">
+                      <i class="ti ti-photo"></i> {{ bgPickerScenario === name ? 'Close picker' : 'Choose background' }}
+                    </button>
+                  </template>
+                </div>
+                <div class="image-grid" v-if="bgPickerScenario === name">
+                  <div
+                    class="image-tile"
+                    v-for="img in allCatalogImages"
+                    :key="img.library + '::' + img.id"
+                    :title="img.library + ' / ' + img.label"
+                    @click="setScenarioBackground(name, img.library, img.id); bgPickerScenario = null"
+                  >
+                    <img :src="img.thumbnailUrl" :alt="img.label" loading="lazy">
+                    <span class="image-tile-label">{{ img.label }}</span>
+                  </div>
+                  <div class="pres-subtab-placeholder" v-if="!allCatalogImages.length">
+                    No images loaded yet — add an image library first.
+                  </div>
+                </div>
+
+                <div class="scenario-mode-toggle">
+                  <button class="scenario-mode-btn" :class="{active: placeMode === 'entity'}" @click="placeMode = 'entity'">
+                    <i class="ti ti-user"></i> Place: Entity
+                  </button>
+                  <button class="scenario-mode-btn" :class="{active: placeMode === 'anchor'}" @click="placeMode = 'anchor'">
+                    <i class="ti ti-map-pin"></i> Place: Anchor
+                  </button>
+                </div>
+
+                <div class="scenario-editor">
+                  <div class="scenario-canvas-wrap">
+                    <svg
+                      class="scenario-svg"
+                      :width="scenarioDesigns[name].width"
+                      :height="scenarioDesigns[name].height"
+                      :viewBox="'0 0 ' + scenarioDesigns[name].width + ' ' + scenarioDesigns[name].height"
+                      @dragover.prevent
+                      @drop="onCanvasDrop($event, name)"
+                    >
+                      <image
+                        v-if="scenarioDesigns[name].background"
+                        id="background"
+                        x="0" y="0"
+                        :width="scenarioDesigns[name].width" :height="scenarioDesigns[name].height"
+                        :href="scenarioDesigns[name].background.url"
+                        preserveAspectRatio="xMidYMid slice"
+                      />
+                      <template v-for="(item, idx) in scenarioDesigns[name].items" :key="item.svgId">
+                        <g v-if="item.kind === 'entity'">
+                          <image
+                            :id="item.svgId"
+                            :x="item.x" :y="item.y" :width="item.w" :height="item.h"
+                            :href="item.url" style="cursor: move;"
+                            @mousedown="onItemMouseDown(name, idx, item, $event)"
+                          />
+                          <text :x="item.x + item.w/2" :y="item.y + item.h + 11" text-anchor="middle" font-size="9" fill="var(--c-muted)" style="pointer-events:none;">{{ item.svgId }}</text>
+                          <text :x="item.x + item.w - 2" :y="item.y + 10" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @click.stop="removeScenarioItem(name, idx)">✕</text>
+                        </g>
+                        <g v-else :id="item.svgId" :transform="'translate(' + item.x + ',' + item.y + ')'">
+                          <circle r="18" fill="none" stroke="var(--c-accent)" stroke-width="2" stroke-dasharray="4,3" style="cursor: move;" @mousedown="onItemMouseDown(name, idx, item, $event)" />
+                          <text text-anchor="middle" dy="4" font-size="9" fill="var(--c-accent)" style="pointer-events: none;">{{ item.label }}</text>
+                          <text x="16" y="-12" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @click.stop="removeScenarioItem(name, idx)">✕</text>
+                        </g>
+                      </template>
+                    </svg>
+                  </div>
+
+                  <div class="scenario-palette">
+                    <div class="scenario-palette-title">Available entities</div>
+                    <div class="palette-entity" v-for="entId in entityIdsForPresentation" :key="entId">
+                      <div class="palette-entity-id">{{ entId }}</div>
+                      <div class="palette-tiles" v-if="(entityAssociations[entId] || []).length">
+                        <div
+                          class="palette-tile"
+                          v-for="(assoc, ai) in entityAssociations[entId]"
+                          :key="ai"
+                          draggable="true"
+                          @dragstart="onPaletteDragStart($event, entId, assoc)"
+                          :title="entId + (assoc.labels.length ? ' (' + assoc.labels.join(', ') + ')' : '')"
+                        >
+                          <img v-if="resolveAssocImage(assoc)" :src="resolveAssocImage(assoc).thumbnailUrl" :alt="entId">
+                          <div class="palette-tile-broken" v-else><i class="ti ti-photo-off"></i></div>
+                          <span class="palette-tile-label" v-if="assoc.labels.length">{{ assoc.labels.join(', ') }}</span>
+                        </div>
+                      </div>
+                      <div class="palette-entity-empty" v-else>No images</div>
+                    </div>
+                    <div class="pres-subtab-placeholder" v-if="!entityIdsForPresentation.length">
+                      No entities yet.
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div class="pres-subtab-placeholder" v-else>
+            No scenarios yet. Group scenes under a scenario in the narrative (<code># Scene: Scenario Name</code>), then come back here to design its background.
+          </div>
         </template>
       </div>
     </div>
@@ -2581,6 +2778,96 @@ function detectAndParseCatalog(text, catalogUrl) {
   return parseGnoSimpleCatalog(text, catalogUrl);
 }
 
+/* ── SCENARIO SVG BUILD / PARSE ──
+   A scenario's editable model — { background, width, height, items } — is
+   serialized to a standalone SVG file on download (scene/<slug>.svg) and
+   reparsed back out of that same file on upload; `_presentation.yaml` itself
+   only ever stores the id -> filename mapping, per spec, so the SVG is the
+   single source of truth for a scenario's content. data-gno-* attributes
+   carry the bookkeeping (which entity/library/image a placement came from)
+   needed to reconstruct the model; an anchor's <g> gets only its id and
+   data-gno-anchor label — no image — since the entity shown while dragging
+   was only a design-time aid, never meant to be shed here.
+   Both href and xlink:href are written for viewers that only understand the
+   older SVG 1.1 external-reference syntax. */
+function normalizeToSlug(s) {
+  return (s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'item';
+}
+
+function svgEscape(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function buildScenarioSvg(design) {
+  const w = design.width || 960;
+  const h = design.height || 540;
+  const parts = [];
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`);
+  if (design.background && design.background.url) {
+    const b = design.background;
+    parts.push(`  <image id="background" x="0" y="0" width="${w}" height="${h}" href="${svgEscape(b.url)}" xlink:href="${svgEscape(b.url)}" preserveAspectRatio="xMidYMid slice" data-gno-library="${svgEscape(b.library)}" data-gno-image="${svgEscape(b.image)}" />`);
+  }
+  (design.items || []).forEach(item => {
+    if (item.kind === 'entity') {
+      parts.push(`  <image id="${svgEscape(item.svgId)}" x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" href="${svgEscape(item.url)}" xlink:href="${svgEscape(item.url)}" data-gno-entity="${svgEscape(item.entityId)}" data-gno-library="${svgEscape(item.library)}" data-gno-image="${svgEscape(item.image)}" />`);
+    } else if (item.kind === 'anchor') {
+      parts.push(`  <g id="${svgEscape(item.svgId)}" data-gno-anchor="${svgEscape(item.label)}" transform="translate(${item.x},${item.y})"></g>`);
+    }
+  });
+  parts.push('</svg>');
+  return parts.join('\n');
+}
+
+function parseScenarioSvg(svgText) {
+  const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+  const root = doc.documentElement;
+  const width = parseFloat(root.getAttribute('width')) || 960;
+  const height = parseFloat(root.getAttribute('height')) || 540;
+  let background = null;
+  const items = [];
+  Array.from(root.children).forEach(el => {
+    const tag = el.tagName;
+    if (tag === 'image' && el.getAttribute('id') === 'background') {
+      background = {
+        library: el.getAttribute('data-gno-library') || '',
+        image: el.getAttribute('data-gno-image') || '',
+        url: el.getAttribute('href') || '',
+      };
+    } else if (tag === 'image') {
+      items.push({
+        kind: 'entity',
+        svgId: el.getAttribute('id') || '',
+        entityId: el.getAttribute('data-gno-entity') || '',
+        library: el.getAttribute('data-gno-library') || '',
+        image: el.getAttribute('data-gno-image') || '',
+        url: el.getAttribute('href') || '',
+        x: parseFloat(el.getAttribute('x')) || 0,
+        y: parseFloat(el.getAttribute('y')) || 0,
+        w: parseFloat(el.getAttribute('width')) || 80,
+        h: parseFloat(el.getAttribute('height')) || 80,
+      });
+    } else if (tag === 'g') {
+      const label = el.getAttribute('data-gno-anchor');
+      if (label != null) {
+        const t = el.getAttribute('transform') || '';
+        const m = /translate\(\s*([-\d.]+)[ ,]+([-\d.]+)\s*\)/.exec(t);
+        items.push({
+          kind: 'anchor',
+          svgId: el.getAttribute('id') || '',
+          label,
+          x: m ? parseFloat(m[1]) : 0,
+          y: m ? parseFloat(m[2]) : 0,
+        });
+      }
+    }
+  });
+  return { background, width, height, items };
+}
+
 /* ── VUE APP ── */
 createApp({
   setup() {
@@ -2948,10 +3235,14 @@ createApp({
       assoc.labels = newSet;
     }
 
-    function resolveAssocImage(assoc) {
-      const cat = libraryCatalogs[assoc.library];
+    function findCatalogImage(libraryId, imageId) {
+      const cat = libraryCatalogs[libraryId];
       if (!cat || cat.status !== 'loaded') return null;
-      return cat.images.find(img => img.id === assoc.image) || null;
+      return cat.images.find(img => img.id === imageId) || null;
+    }
+
+    function resolveAssocImage(assoc) {
+      return findCatalogImage(assoc.library, assoc.image);
     }
 
     function toggleEntityImages(id) {
@@ -2989,17 +3280,173 @@ createApp({
       return [...ids].sort();
     });
 
+    /* ── Scenario designs ──
+       scenarioDesigns: { scenarioName: { background, width, height, items } }
+       keyed by the narrative's own scenario names (the grouping already used
+       for scene headings, `scenarios` below) — mirrors how entityAssociations
+       is keyed by narrative @ids rather than a separately-invented name.
+       Content is built into/read back from a standalone SVG per scenario on
+       download/upload; only the autosave draft keeps this full model
+       directly (there's no accompanying SVG file to reparse mid-session). */
+    const scenarioDesigns = reactive(draft && draft.presentation && draft.presentation.scenario_designs ? { ...draft.presentation.scenario_designs } : {});
+    const openScenario = ref(null);
+    const bgPickerScenario = ref(null);
+    const placeMode = ref('entity'); // 'entity' | 'anchor'
+    let dragPayload = null; // {entityId, library, image} — set on palette dragstart, consumed on canvas drop
+    const itemDragState = ref(null);
+
+    const scenarioIdsForPresentation = computed(() => {
+      const ids = new Set(scenarios.value.map(s => s.name));
+      Object.keys(scenarioDesigns).forEach(id => ids.add(id));
+      return [...ids].sort();
+    });
+
+    function ensureScenarioDesign(name) {
+      if (!scenarioDesigns[name]) {
+        scenarioDesigns[name] = { background: null, width: 960, height: 540, items: [] };
+      }
+      return scenarioDesigns[name];
+    }
+
+    function toggleScenario(name) {
+      openScenario.value = openScenario.value === name ? null : name;
+      if (openScenario.value) ensureScenarioDesign(name);
+    }
+
+    function resetScenario(name) {
+      if (!window.confirm(`Clear the background and all placed items for "${name}"?`)) return;
+      delete scenarioDesigns[name];
+    }
+
+    function toggleBgPicker(name) {
+      bgPickerScenario.value = bgPickerScenario.value === name ? null : name;
+    }
+
+    function setScenarioBackground(name, libraryId, imageId) {
+      const img = findCatalogImage(libraryId, imageId);
+      if (!img) return;
+      const design = ensureScenarioDesign(name);
+      design.background = { library: libraryId, image: imageId, url: img.url };
+      // Probe the real image for its natural size so the canvas isn't stuck
+      // at the 960x540 default; harmless if it never loads (CORS, 404, …) —
+      // the default just stays in place.
+      const probe = new Image();
+      probe.onload = () => {
+        if (probe.naturalWidth) design.width = probe.naturalWidth;
+        if (probe.naturalHeight) design.height = probe.naturalHeight;
+      };
+      probe.src = img.url;
+    }
+
+    function removeScenarioBackground(name) {
+      const design = scenarioDesigns[name];
+      if (design) design.background = null;
+    }
+
+    function onPaletteDragStart(e, entityId, assoc) {
+      dragPayload = { entityId, library: assoc.library, image: assoc.image };
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', entityId);
+    }
+
+    function onCanvasDrop(e, name) {
+      if (!dragPayload) return;
+      const payload = dragPayload;
+      dragPayload = null;
+      const img = findCatalogImage(payload.library, payload.image);
+      if (!img) return;
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const design = ensureScenarioDesign(name);
+      const usedIds = new Set(design.items.map(it => it.svgId));
+
+      if (placeMode.value === 'anchor') {
+        const rawLabel = window.prompt('Label for this anchor (must be unique in this scenario):', '');
+        const label = (rawLabel || '').trim();
+        if (!label) return;
+        if (design.items.some(it => it.kind === 'anchor' && it.label === label)) {
+          alert('An anchor with that label already exists in this scenario.');
+          return;
+        }
+        const base = normalizeToSlug(label);
+        let svgId = base, n = 1;
+        while (usedIds.has(svgId)) { svgId = `${base}_${n}`; n++; }
+        design.items.push({ kind: 'anchor', svgId, label, x: Math.round(x), y: Math.round(y) });
+        return;
+      }
+
+      const base = normalizeToSlug(payload.entityId.replace(/^@/, ''));
+      let svgId = base, n = 1;
+      while (usedIds.has(svgId)) { svgId = `${base}_${n}`; n++; }
+      const size = 80;
+      design.items.push({
+        kind: 'entity', svgId, entityId: payload.entityId, library: payload.library, image: payload.image, url: img.url,
+        x: Math.round(x - size / 2), y: Math.round(y - size / 2), w: size, h: size,
+      });
+    }
+
+    function removeScenarioItem(name, idx) {
+      const design = scenarioDesigns[name];
+      if (design) design.items.splice(idx, 1);
+    }
+
+    function onItemMouseDown(name, idx, item, e) {
+      e.stopPropagation();
+      itemDragState.value = { name, idx, startX: e.clientX, startY: e.clientY, origX: item.x, origY: item.y };
+    }
+
+    function onScenarioWindowMouseMove(e) {
+      const d = itemDragState.value;
+      if (!d) return;
+      const design = scenarioDesigns[d.name];
+      const item = design && design.items[d.idx];
+      if (!item) return;
+      item.x = Math.round(d.origX + (e.clientX - d.startX));
+      item.y = Math.round(d.origY + (e.clientY - d.startY));
+    }
+    function onScenarioWindowMouseUp() { itemDragState.value = null; }
+    window.addEventListener('mousemove', onScenarioWindowMouseMove);
+    window.addEventListener('mouseup', onScenarioWindowMouseUp);
+
+    function clearScenarioDesigns() {
+      Object.keys(scenarioDesigns).forEach(k => delete scenarioDesigns[k]);
+    }
+
+    // The zip filename each scenario design is written to / read from —
+    // computed once and reused by both the download zip and the YAML's
+    // `scenarios:` map so the two always agree, with a numeric suffix in the
+    // rare case two scenario names normalize to the same slug.
+    function scenarioFileMap() {
+      const used = new Set();
+      const map = {};
+      Object.keys(scenarioDesigns).forEach(name => {
+        const base = normalizeToSlug(name);
+        let slug = base, n = 2;
+        while (used.has(slug)) { slug = `${base}_${n}`; n++; }
+        used.add(slug);
+        map[name] = 'scene/' + slug + '.svg';
+      });
+      return map;
+    }
+
     function presentationToYaml() {
       return jsyaml.dump({
         version: 1,
         image_libraries: { ...imageLibraries },
         entities: { ...entityAssociations },
+        scenarios: scenarioFileMap(),
       }, { lineWidth: -1 });
     }
 
-    function applyPresentationYaml(text) {
+    // zip is optional: passed only when applying a just-uploaded zip's
+    // _presentation.yaml, so any scenarios: {id: path} entries can be
+    // resolved against that same zip's other files and reparsed.
+    async function applyPresentationYaml(text, zip) {
       clearImageLibraries();
       clearEntityAssociations();
+      clearScenarioDesigns();
       let data;
       try {
         data = jsyaml.load(text);
@@ -3027,6 +3474,17 @@ createApp({
             }));
           if (clean.length) entityAssociations[entId] = clean;
         });
+      }
+      if (data && data.scenarios && typeof data.scenarios === 'object' && zip) {
+        for (const [scenarioId, path] of Object.entries(data.scenarios)) {
+          if (typeof path !== 'string') continue;
+          const entry = zip.file(path);
+          if (!entry) continue;
+          try {
+            const svgText = await entry.async('string');
+            scenarioDesigns[scenarioId] = parseScenarioSvg(svgText);
+          } catch (e) { /* unreadable scenario file — skip, rest of the load still succeeds */ }
+        }
       }
     }
 
@@ -3444,10 +3902,11 @@ Write your scene description here.
 
           const presentationEntries = zip.file(/_presentation\.ya?ml$/i);
           if (presentationEntries.length) {
-            applyPresentationYaml(await presentationEntries[0].async('string'));
+            await applyPresentationYaml(await presentationEntries[0].async('string'), zip);
           } else {
             clearImageLibraries();
             clearEntityAssociations();
+            clearScenarioDesigns();
           }
 
           // "_graph.yaml" is the current name; a bare "<name>.yaml" (not
@@ -3474,6 +3933,7 @@ Write your scene description here.
         clearNodeMeta();
         clearImageLibraries();
         clearEntityAssociations();
+        clearScenarioDesigns();
         const reader = new FileReader();
         reader.onload = ev => { source.value = ev.target.result; };
         reader.readAsText(file, 'UTF-8');
@@ -3482,14 +3942,19 @@ Write your scene description here.
       e.target.value = '';
     }
 
-    // Downloads the narrative together with its graph layout and presentation
-    // setup as a zip: <name>.gno + <name>_graph.yaml + <name>_presentation.yaml.
+    // Downloads the narrative together with its graph layout, presentation
+    // setup, and one SVG per scenario design as a zip:
+    // <name>.gno + <name>_graph.yaml + <name>_presentation.yaml + scene/*.svg.
     async function downloadFile() {
       const base = filename.value.replace(/\.(gno|md|txt|zip)$/i, '').trim() || 'untitled';
       const zip = new JSZip();
       zip.file(base + '.gno', source.value);
       zip.file(base + '_graph.yaml', layoutToYaml());
       zip.file(base + '_presentation.yaml', presentationToYaml());
+      const scenarioFiles = scenarioFileMap();
+      Object.keys(scenarioDesigns).forEach(name => {
+        zip.file(scenarioFiles[name], buildScenarioSvg(scenarioDesigns[name]));
+      });
       const blob = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -3529,6 +3994,7 @@ Write your scene description here.
       clearNodeMeta();
       clearImageLibraries();
       clearEntityAssociations();
+      clearScenarioDesigns();
       resetPlayerProgress();
     }
 
@@ -3540,6 +4006,7 @@ Write your scene description here.
       clearNodeMeta();
       clearImageLibraries();
       clearEntityAssociations();
+      clearScenarioDesigns();
       resetPlayerProgress();
     }
 
@@ -3558,6 +4025,7 @@ Write your scene description here.
       clearNodeMeta();
       clearImageLibraries();
       clearEntityAssociations();
+      clearScenarioDesigns();
       resetPlayerProgress();
     }
 
@@ -3572,13 +4040,17 @@ Write your scene description here.
           filename: filename.value,
           loadedNarrativeName: loadedNarrativeName.value,
           layout: { ...nodeMeta },
-          presentation: { image_libraries: { ...imageLibraries }, entities: { ...entityAssociations } },
+          presentation: {
+            image_libraries: { ...imageLibraries },
+            entities: { ...entityAssociations },
+            scenario_designs: { ...scenarioDesigns },
+          },
           savedAt: Date.now(),
         }));
       } catch (e) { /* storage unavailable/full — draft recovery is best-effort */ }
     }
     let autosaveTimer = null;
-    watch([source, filename, loadedNarrativeName, nodeMeta, imageLibraries, entityAssociations], () => {
+    watch([source, filename, loadedNarrativeName, nodeMeta, imageLibraries, entityAssociations, scenarioDesigns], () => {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       autosaveTimer = setTimeout(saveCurrentDraft, 600);
     });
@@ -3617,6 +4089,9 @@ Write your scene description here.
       entityAssociations, entityIdsForPresentation, allCatalogImages, openEntityImages, imagePickerEntity,
       isImageAssociated, associateImage, removeEntityImage, addLabelToAssociation, onAddLabel,
       removeLabelFromAssociation, resolveAssocImage, toggleEntityImages, togglePicker,
+      scenarioDesigns, scenarioIdsForPresentation, openScenario, bgPickerScenario, placeMode,
+      toggleScenario, resetScenario, toggleBgPicker, setScenarioBackground, removeScenarioBackground,
+      onPaletteDragStart, onCanvasDrop, removeScenarioItem, onItemMouseDown,
     };
   }
 }).mount('#vue-mount');
