@@ -186,3 +186,22 @@ The @princess kneels beside the fountain, sketching the koi beneath the surface.
 
 Note that the two consecutive `-- @guard` / `-- @princess` lines form a single dialog set and share one pause, while the later lone `-- @guard` line gets its own. The final screen needs no pause of its own — the divert button is already there waiting to be picked.
 
+## Browser Storage (Save / Load)
+
+The `Save` and `Load` buttons keep named narratives in the browser's `localStorage`, under the key prefix `gno-narrative-v2:<name>`. Each entry is a JSON bundle: the narrative source, the graph layout (`_graph.yaml` equivalent), and the presentation setup (`_presentation.yaml` equivalent — image libraries, entity/image associations, scenario designs). Scenario SVGs aren't stored separately here; the scenario design data is what `Download` renders them from, so keeping one copy avoids the two ever drifting apart.
+
+### Migrating narratives saved before this format (v1)
+
+Versions prior to this one stored only the raw narrative text, under the key prefix `gno-narrative:<name>` (no `-v2`). That format is incompatible with the current app and is **not** read automatically — v1 saves stay exactly where they are in `localStorage` (nothing is deleted), they just no longer appear in the `Load` menu. To bring one forward:
+
+1. Open the browser's DevTools console on this page.
+2. Run `localStorage.getItem('gno-narrative:<name>')` (with the narrative's saved name) to get its raw text, or list every old entry at once:
+   ```js
+   Object.keys(localStorage)
+     .filter(k => k.startsWith('gno-narrative:'))
+     .forEach(k => console.log(k, '=>', localStorage.getItem(k)));
+   ```
+3. Copy the text into a new `.gno` file and use `Upload` to bring it into the editor (or paste it directly into the editor pane).
+4. Use `Save` under the same (or a new) name — this writes it under the new `gno-narrative-v2:` prefix as a full bundle. Graph layout and presentation setup start empty, since v1 saves never had any.
+5. Once confirmed, the old `gno-narrative:<name>` entry can be removed with `localStorage.removeItem('gno-narrative:<name>')` — optional, since the app never reads or writes that prefix anymore.
+

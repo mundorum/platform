@@ -2062,7 +2062,11 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 <script>
 const { createApp, ref, reactive, computed, watch, nextTick } = Vue;
 
-const STORAGE_PREFIX = 'gno-narrative:';
+// v2: a JSON bundle (source + graph layout + presentation setup), replacing
+// v1's bare narrative text. Deliberately a new prefix rather than sniffing
+// the stored value's shape — old saves are left untouched under their old
+// key, not silently reinterpreted; see the migration note in gno/README.md.
+const STORAGE_PREFIX = 'gno-narrative-v2:';
 const CURRENT_KEY = 'gno-current-draft';
 // Sentinel stored in loadedNarrativeName while the bundled demo is loaded —
 // it isn't a real localStorage entry, so it can never collide with a saved name.
@@ -2868,6 +2872,78 @@ function parseScenarioSvg(svgText) {
   return { background, width, height, items };
 }
 
+/* ── PERSISTED-SHAPE SANITIZERS ──
+   Shared by every path that turns untrusted-ish stored data (a YAML side
+   file, a browser-storage save, the autosave draft) back into live state:
+   the zip-upload YAML parsers, the named Save/Load bundle below, and the
+   startup draft-restore all accept the same four shapes, so validating them
+   once here keeps that logic from drifting three separate ways. */
+function sanitizeNodeMeta(raw) {
+  const out = {};
+  if (raw && typeof raw === 'object') {
+    Object.keys(raw).forEach(title => {
+      const n = raw[title];
+      if (!n || typeof n !== 'object') return;
+      const entry = {};
+      if (typeof n.x === 'number' && typeof n.y === 'number') {
+        entry.x = n.x;
+        entry.y = n.y;
+      }
+      if (typeof n.color === 'string') entry.color = n.color;
+      if (typeof n.annotation === 'string') entry.annotation = n.annotation;
+      if (Object.keys(entry).length) out[title] = entry;
+    });
+  }
+  return out;
+}
+
+function sanitizeImageLibraries(raw) {
+  const out = {};
+  if (raw && typeof raw === 'object') {
+    Object.entries(raw).forEach(([id, url]) => {
+      if (typeof url === 'string') out[id] = url;
+    });
+  }
+  return out;
+}
+
+function sanitizeEntityAssociations(raw) {
+  const out = {};
+  if (raw && typeof raw === 'object') {
+    Object.entries(raw).forEach(([entId, list]) => {
+      if (!Array.isArray(list)) return;
+      const clean = list
+        .filter(a => a && typeof a.library === 'string' && typeof a.image === 'string')
+        .map(a => ({
+          library: a.library,
+          image: a.image,
+          labels: Array.isArray(a.labels) ? a.labels.filter(l => typeof l === 'string') : [],
+        }));
+      if (clean.length) out[entId] = clean;
+    });
+  }
+  return out;
+}
+
+function sanitizeScenarioDesigns(raw) {
+  const out = {};
+  if (raw && typeof raw === 'object') {
+    Object.entries(raw).forEach(([name, design]) => {
+      if (!design || typeof design !== 'object') return;
+      const items = Array.isArray(design.items)
+        ? design.items.filter(it => it && (it.kind === 'entity' || it.kind === 'anchor'))
+        : [];
+      out[name] = {
+        background: design.background && typeof design.background === 'object' ? design.background : null,
+        width: typeof design.width === 'number' ? design.width : 960,
+        height: typeof design.height === 'number' ? design.height : 540,
+        items,
+      };
+    });
+  }
+  return out;
+}
+
 /* ── VUE APP ── */
 createApp({
   setup() {
@@ -2900,7 +2976,7 @@ createApp({
     // entry at all. Survives in the session autosave draft and in the downloadable
     // layout YAML; NOT in named browser-storage saves (nor the .gno file
     // itself), which stay plain narrative text for backward compatibility.
-    const nodeMeta = reactive(draft && draft.layout ? { ...draft.layout } : {});
+    const nodeMeta = reactive(sanitizeNodeMeta(draft && draft.layout));
 
     function ensureNodeMeta(title) {
       if (!nodeMeta[title]) nodeMeta[title] = {};
@@ -3073,14 +3149,14 @@ createApp({
        whole point is that the images live elsewhere and are re-fetched live. */
     const presentationTab = ref('images');
     const newLibraryUrl = ref('');
-    const imageLibraries = reactive(draft && draft.presentation && draft.presentation.image_libraries ? { ...draft.presentation.image_libraries } : {});
+    const imageLibraries = reactive(sanitizeImageLibraries(draft && draft.presentation && draft.presentation.image_libraries));
     const libraryCatalogs = reactive({});
     const IMAGES_PER_PAGE = 48;
 
     // entityAssociations: { entityId: [{ library, image, labels: [] }] } — which
     // catalog image(s) an entity (a narrative @id) is shown with. Persisted
     // under `entities:` in the same `_presentation.yaml`.
-    const entityAssociations = reactive(draft && draft.presentation && draft.presentation.entities ? { ...draft.presentation.entities } : {});
+    const entityAssociations = reactive(sanitizeEntityAssociations(draft && draft.presentation && draft.presentation.entities));
     const openEntityImages = reactive(new Set());
     const imagePickerEntity = ref(null);
 
@@ -3288,7 +3364,7 @@ createApp({
        Content is built into/read back from a standalone SVG per scenario on
        download/upload; only the autosave draft keeps this full model
        directly (there's no accompanying SVG file to reparse mid-session). */
-    const scenarioDesigns = reactive(draft && draft.presentation && draft.presentation.scenario_designs ? { ...draft.presentation.scenario_designs } : {});
+    const scenarioDesigns = reactive(sanitizeScenarioDesigns(draft && draft.presentation && draft.presentation.scenario_designs));
     const openScenario = ref(null);
     const bgPickerScenario = ref(null);
     const placeMode = ref('entity'); // 'entity' | 'anchor'
@@ -3454,27 +3530,11 @@ createApp({
         alert('Could not parse presentation YAML: ' + err.message);
         return;
       }
-      if (data && data.image_libraries && typeof data.image_libraries === 'object') {
-        Object.entries(data.image_libraries).forEach(([id, url]) => {
-          if (typeof url === 'string') {
-            imageLibraries[id] = url;
-            loadLibraryCatalog(id);
-          }
-        });
-      }
-      if (data && data.entities && typeof data.entities === 'object') {
-        Object.entries(data.entities).forEach(([entId, list]) => {
-          if (!Array.isArray(list)) return;
-          const clean = list
-            .filter(a => a && typeof a.library === 'string' && typeof a.image === 'string')
-            .map(a => ({
-              library: a.library,
-              image: a.image,
-              labels: Array.isArray(a.labels) ? a.labels.filter(l => typeof l === 'string') : [],
-            }));
-          if (clean.length) entityAssociations[entId] = clean;
-        });
-      }
+      Object.entries(sanitizeImageLibraries(data && data.image_libraries)).forEach(([id, url]) => {
+        imageLibraries[id] = url;
+        loadLibraryCatalog(id);
+      });
+      Object.assign(entityAssociations, sanitizeEntityAssociations(data && data.entities));
       if (data && data.scenarios && typeof data.scenarios === 'object' && zip) {
         for (const [scenarioId, path] of Object.entries(data.scenarios)) {
           if (typeof path !== 'string') continue;
@@ -3873,20 +3933,7 @@ Write your scene description here.
         alert('Could not parse layout YAML: ' + err.message);
         return;
       }
-      if (data && data.nodes && typeof data.nodes === 'object') {
-        Object.keys(data.nodes).forEach(title => {
-          const n = data.nodes[title];
-          if (!n || typeof n !== 'object') return;
-          const entry = {};
-          if (typeof n.x === 'number' && typeof n.y === 'number') {
-            entry.x = n.x;
-            entry.y = n.y;
-          }
-          if (typeof n.color === 'string') entry.color = n.color;
-          if (typeof n.annotation === 'string') entry.annotation = n.annotation;
-          if (Object.keys(entry).length) nodeMeta[title] = entry;
-        });
-      }
+      Object.assign(nodeMeta, sanitizeNodeMeta(data && data.nodes));
     }
 
     async function onFileUpload(e) {
@@ -3964,6 +4011,14 @@ Write your scene description here.
       URL.revokeObjectURL(url);
     }
 
+    // A named save is the same bundle a downloaded zip carries — narrative
+    // text, graph layout, and presentation setup (image libraries, entity
+    // associations, scenario designs) — just kept as one JSON blob instead of
+    // separate files, since there's no zip to unpack from browser storage.
+    // Scenario SVGs specifically aren't serialized here: scenario_designs is
+    // the exact data buildScenarioSvg() renders them from, so keeping the
+    // live model is sufficient and avoids two encodings of the same content
+    // drifting apart.
     function saveNarrative() {
       const name = narrativeName.value;
       const exists = localStorage.getItem(STORAGE_PREFIX + name) !== null;
@@ -3971,7 +4026,17 @@ Write your scene description here.
         const ok = window.confirm(`A narrative named "${name}" already exists. Overwrite it?`);
         if (!ok) return;
       }
-      localStorage.setItem(STORAGE_PREFIX + name, source.value);
+      localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify({
+        version: 2,
+        source: source.value,
+        layout: { ...nodeMeta },
+        presentation: {
+          image_libraries: { ...imageLibraries },
+          entities: { ...entityAssociations },
+          scenario_designs: { ...scenarioDesigns },
+        },
+        savedAt: Date.now(),
+      }));
       loadedNarrativeName.value = name;
       storageVersion.value++;
     }
@@ -3985,9 +4050,15 @@ Write your scene description here.
     }
 
     function loadNarrative(name) {
-      const content = localStorage.getItem(STORAGE_PREFIX + name);
-      if (content === null) return;
-      source.value = content;
+      const raw = localStorage.getItem(STORAGE_PREFIX + name);
+      if (raw === null) return;
+      let bundle = null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && typeof parsed.source === 'string') bundle = parsed;
+      } catch (e) { /* not a v2 bundle — shouldn't happen under the v2 prefix, but fall back to raw text */ }
+
+      source.value = bundle ? bundle.source : raw;
       filename.value = name + '.gno';
       loadedNarrativeName.value = name;
       loadMenuOpen.value = false;
@@ -3995,6 +4066,17 @@ Write your scene description here.
       clearImageLibraries();
       clearEntityAssociations();
       clearScenarioDesigns();
+
+      if (bundle) {
+        Object.assign(nodeMeta, sanitizeNodeMeta(bundle.layout));
+        const p = bundle.presentation || {};
+        Object.entries(sanitizeImageLibraries(p.image_libraries)).forEach(([id, url]) => {
+          imageLibraries[id] = url;
+          loadLibraryCatalog(id);
+        });
+        Object.assign(entityAssociations, sanitizeEntityAssociations(p.entities));
+        Object.assign(scenarioDesigns, sanitizeScenarioDesigns(p.scenario_designs));
+      }
       resetPlayerProgress();
     }
 
