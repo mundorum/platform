@@ -1237,6 +1237,56 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   font-size: 22px;
 }
 .load-more-row { display: flex; justify-content: center; padding: 4px 14px 16px; }
+.image-tile.already-added { outline: 2px solid var(--c-accent); outline-offset: -2px; }
+.image-tile-check {
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+}
+
+.ent-assoc-list { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; }
+.ent-assoc-row { display: flex; align-items: flex-start; gap: 10px; }
+.ent-assoc-thumb {
+  width: 56px; height: 56px; flex-shrink: 0;
+  border-radius: 6px; overflow: hidden;
+  background: var(--c-bg); border: 0.5px solid var(--c-border);
+  display: flex; align-items: center; justify-content: center;
+  color: #a33;
+}
+.ent-assoc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ent-assoc-thumb.broken { background: rgba(170,51,51,0.08); border-color: rgba(170,51,51,0.35); }
+.ent-assoc-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; padding-top: 2px; }
+.ent-assoc-ref { font-family: var(--font-mono); font-size: 11px; color: var(--c-muted); }
+.ent-assoc-labels { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.ent-label-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--c-tag-state); background: var(--c-tag-state-bg);
+  padding: 1px 4px 1px 8px; border-radius: 3px 10px 10px 3px;
+}
+.ent-label-chip button {
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: none; color: inherit; cursor: pointer;
+  padding: 0; font-size: 10px; opacity: 0.7;
+}
+.ent-label-chip button:hover { opacity: 1; }
+.ent-label-input {
+  border: 0.5px dashed var(--c-border-strong);
+  border-radius: 10px;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 2px 8px;
+  color: var(--c-text);
+  width: 90px;
+}
+.ent-label-input:focus { outline: none; border-color: var(--c-accent); border-style: solid; }
+.ent-card-picker { padding: 0 14px 14px; }
 
 /* ── hidden file input ── */
 #file-input { display: none; }
@@ -1584,8 +1634,8 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
         <button class="pres-subtab" :class="{active: presentationTab === 'images'}" @click="presentationTab = 'images'">
           <i class="ti ti-photo"></i> Image Libraries
         </button>
-        <button class="pres-subtab" :class="{active: presentationTab === 'characters'}" @click="presentationTab = 'characters'">
-          <i class="ti ti-user"></i> Characters
+        <button class="pres-subtab" :class="{active: presentationTab === 'entities'}" @click="presentationTab = 'entities'">
+          <i class="ti ti-users"></i> Entity
         </button>
         <button class="pres-subtab" :class="{active: presentationTab === 'scenarios'}" @click="presentationTab = 'scenarios'">
           <i class="ti ti-map"></i> Scenarios
@@ -1665,8 +1715,70 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
           </div>
         </template>
 
-        <template v-else-if="presentationTab === 'characters'">
-          <div class="pres-subtab-placeholder">Character editor — coming soon.</div>
+        <template v-else-if="presentationTab === 'entities'">
+          <div class="lib-list" v-if="entityIdsForPresentation.length">
+            <div class="lib-card" v-for="entId in entityIdsForPresentation" :key="entId">
+              <div class="lib-card-header" style="cursor: pointer;" @click="toggleEntityImages(entId)">
+                <i class="ti" :class="openEntityImages.has(entId) ? 'ti-chevron-down' : 'ti-chevron-right'"></i>
+                <span class="lib-id-input" style="border-color: transparent; cursor: pointer;">{{ entId }}</span>
+                <span class="lib-status">{{ (entityAssociations[entId] || []).length }} image(s)</span>
+              </div>
+              <template v-if="openEntityImages.has(entId)">
+                <div class="ent-assoc-list" v-if="(entityAssociations[entId] || []).length">
+                  <div class="ent-assoc-row" v-for="(assoc, idx) in entityAssociations[entId]" :key="assoc.library + '::' + assoc.image">
+                    <div class="ent-assoc-thumb" :class="{broken: !resolveAssocImage(assoc)}">
+                      <img v-if="resolveAssocImage(assoc)" :src="resolveAssocImage(assoc).thumbnailUrl" :alt="assoc.image">
+                      <i class="ti ti-photo-off" v-else></i>
+                    </div>
+                    <div class="ent-assoc-meta">
+                      <span class="ent-assoc-ref">{{ assoc.library }} / {{ assoc.image }}</span>
+                      <div class="ent-assoc-labels">
+                        <span class="ent-label-chip" v-for="lab in assoc.labels" :key="lab">
+                          {{ lab }}
+                          <button title="Remove label" @click="removeLabelFromAssociation(entId, idx, lab)"><i class="ti ti-x"></i></button>
+                        </span>
+                        <input
+                          class="ent-label-input"
+                          type="text"
+                          placeholder="+ label"
+                          spellcheck="false"
+                          @keydown.enter="onAddLabel(entId, idx, $event)"
+                        >
+                      </div>
+                    </div>
+                    <button class="nav-icon-btn" title="Remove image" @click="removeEntityImage(entId, idx)"><i class="ti ti-trash"></i></button>
+                  </div>
+                </div>
+                <div class="lib-empty" v-else>No images associated yet.</div>
+
+                <div class="ent-card-picker">
+                  <button class="tb-btn ghost" @click="togglePicker(entId)">
+                    <i class="ti ti-plus"></i> {{ imagePickerEntity === entId ? 'Close picker' : 'Add image' }}
+                  </button>
+                  <div class="image-grid" v-if="imagePickerEntity === entId">
+                    <div
+                      class="image-tile"
+                      :class="{'already-added': isImageAssociated(entId, img.library, img.id)}"
+                      v-for="img in allCatalogImages"
+                      :key="img.library + '::' + img.id"
+                      :title="img.library + ' / ' + img.label"
+                      @click="associateImage(entId, img.library, img.id)"
+                    >
+                      <img :src="img.thumbnailUrl" :alt="img.label" loading="lazy">
+                      <span class="image-tile-label">{{ img.label }}</span>
+                      <i class="ti ti-check image-tile-check" v-if="isImageAssociated(entId, img.library, img.id)"></i>
+                    </div>
+                    <div class="pres-subtab-placeholder" v-if="!allCatalogImages.length">
+                      No images loaded yet — add an image library first.
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div class="pres-subtab-placeholder" v-else>
+            No entities yet. Reference one in the narrative with <code>@name</code>, then come back here to attach images.
+          </div>
         </template>
 
         <template v-else>
@@ -2678,6 +2790,13 @@ createApp({
     const libraryCatalogs = reactive({});
     const IMAGES_PER_PAGE = 48;
 
+    // entityAssociations: { entityId: [{ library, image, labels: [] }] } — which
+    // catalog image(s) an entity (a narrative @id) is shown with. Persisted
+    // under `entities:` in the same `_presentation.yaml`.
+    const entityAssociations = reactive(draft && draft.presentation && draft.presentation.entities ? { ...draft.presentation.entities } : {});
+    const openEntityImages = reactive(new Set());
+    const imagePickerEntity = ref(null);
+
     const imageLibraryIds = computed(() => Object.keys(imageLibraries));
 
     function uniqueLibraryId(base) {
@@ -2755,12 +2874,132 @@ createApp({
       Object.keys(libraryCatalogs).forEach(k => delete libraryCatalogs[k]);
     }
 
+    /* ── Entity <-> image associations ──
+       An entity may have several images, but only when each carries at least
+       one label — enforced as a single rule ("no two images of the same
+       entity may share the same label set") rather than as a separate
+       mandatory-labels check: two images with no labels both have the empty
+       set, which already collides under that rule, so the single-image case
+       (empty labels allowed) and the multi-image case (labels required) fall
+       out of the same comparison. */
+    function labelSetEqual(a, b) {
+      if (a.length !== b.length) return false;
+      const as = [...a].sort();
+      const bs = [...b].sort();
+      return as.every((v, i) => v === bs[i]);
+    }
+
+    function isImageAssociated(entityId, libraryId, imageId) {
+      const list = entityAssociations[entityId];
+      return !!list && list.some(a => a.library === libraryId && a.image === imageId);
+    }
+
+    function associateImage(entityId, libraryId, imageId) {
+      if (isImageAssociated(entityId, libraryId, imageId)) return;
+      const list = entityAssociations[entityId] || (entityAssociations[entityId] = []);
+      if (list.some(a => a.labels.length === 0)) {
+        alert('This entity already has an image with no labels. Give it at least one label before adding another image.');
+        return;
+      }
+      list.push({ library: libraryId, image: imageId, labels: [] });
+    }
+
+    function removeEntityImage(entityId, idx) {
+      const list = entityAssociations[entityId];
+      if (!list) return;
+      list.splice(idx, 1);
+      if (list.length === 0) delete entityAssociations[entityId];
+    }
+
+    function addLabelToAssociation(entityId, idx, rawLabel) {
+      const label = (rawLabel || '').trim();
+      if (!label) return;
+      const list = entityAssociations[entityId];
+      if (!list || !list[idx]) return;
+      const assoc = list[idx];
+      if (assoc.labels.includes(label)) {
+        alert('This image already has that label.');
+        return;
+      }
+      const newSet = [...assoc.labels, label];
+      const collides = list.some((a, i) => i !== idx && labelSetEqual(a.labels, newSet));
+      if (collides) {
+        alert('Another image for this entity already uses that exact set of labels.');
+        return;
+      }
+      assoc.labels.push(label);
+    }
+
+    function onAddLabel(entityId, idx, e) {
+      addLabelToAssociation(entityId, idx, e.target.value);
+      e.target.value = '';
+    }
+
+    function removeLabelFromAssociation(entityId, idx, label) {
+      const list = entityAssociations[entityId];
+      if (!list || !list[idx]) return;
+      const assoc = list[idx];
+      const newSet = assoc.labels.filter(l => l !== label);
+      const collides = list.some((a, i) => i !== idx && labelSetEqual(a.labels, newSet));
+      if (collides) {
+        alert("Removing this label would duplicate another image's label set for this entity.");
+        return;
+      }
+      assoc.labels = newSet;
+    }
+
+    function resolveAssocImage(assoc) {
+      const cat = libraryCatalogs[assoc.library];
+      if (!cat || cat.status !== 'loaded') return null;
+      return cat.images.find(img => img.id === assoc.image) || null;
+    }
+
+    function toggleEntityImages(id) {
+      if (openEntityImages.has(id)) openEntityImages.delete(id);
+      else openEntityImages.add(id);
+    }
+
+    function togglePicker(entityId) {
+      imagePickerEntity.value = imagePickerEntity.value === entityId ? null : entityId;
+    }
+
+    function clearEntityAssociations() {
+      Object.keys(entityAssociations).forEach(k => delete entityAssociations[k]);
+    }
+
+    // Every image currently loaded across all libraries, tagged with its
+    // library id — the flat pool the "Add image" picker browses.
+    const allCatalogImages = computed(() => {
+      const out = [];
+      Object.keys(libraryCatalogs).forEach(libId => {
+        const cat = libraryCatalogs[libId];
+        if (cat && cat.status === 'loaded') {
+          cat.images.forEach(img => out.push({ ...img, library: libId }));
+        }
+      });
+      return out;
+    });
+
+    // Union of narrative entity ids and any entity ids already carrying
+    // associations — an association isn't dropped just because its @id was
+    // since removed from the narrative text.
+    const entityIdsForPresentation = computed(() => {
+      const ids = new Set(entityList.value.map(e => e.id));
+      Object.keys(entityAssociations).forEach(id => ids.add(id));
+      return [...ids].sort();
+    });
+
     function presentationToYaml() {
-      return jsyaml.dump({ version: 1, image_libraries: { ...imageLibraries } }, { lineWidth: -1 });
+      return jsyaml.dump({
+        version: 1,
+        image_libraries: { ...imageLibraries },
+        entities: { ...entityAssociations },
+      }, { lineWidth: -1 });
     }
 
     function applyPresentationYaml(text) {
       clearImageLibraries();
+      clearEntityAssociations();
       let data;
       try {
         data = jsyaml.load(text);
@@ -2774,6 +3013,19 @@ createApp({
             imageLibraries[id] = url;
             loadLibraryCatalog(id);
           }
+        });
+      }
+      if (data && data.entities && typeof data.entities === 'object') {
+        Object.entries(data.entities).forEach(([entId, list]) => {
+          if (!Array.isArray(list)) return;
+          const clean = list
+            .filter(a => a && typeof a.library === 'string' && typeof a.image === 'string')
+            .map(a => ({
+              library: a.library,
+              image: a.image,
+              labels: Array.isArray(a.labels) ? a.labels.filter(l => typeof l === 'string') : [],
+            }));
+          if (clean.length) entityAssociations[entId] = clean;
         });
       }
     }
@@ -3195,6 +3447,7 @@ Write your scene description here.
             applyPresentationYaml(await presentationEntries[0].async('string'));
           } else {
             clearImageLibraries();
+            clearEntityAssociations();
           }
 
           // "_graph.yaml" is the current name; a bare "<name>.yaml" (not
@@ -3220,6 +3473,7 @@ Write your scene description here.
         loadedNarrativeName.value = null;
         clearNodeMeta();
         clearImageLibraries();
+        clearEntityAssociations();
         const reader = new FileReader();
         reader.onload = ev => { source.value = ev.target.result; };
         reader.readAsText(file, 'UTF-8');
@@ -3274,6 +3528,7 @@ Write your scene description here.
       loadMenuOpen.value = false;
       clearNodeMeta();
       clearImageLibraries();
+      clearEntityAssociations();
       resetPlayerProgress();
     }
 
@@ -3284,6 +3539,7 @@ Write your scene description here.
       loadMenuOpen.value = false;
       clearNodeMeta();
       clearImageLibraries();
+      clearEntityAssociations();
       resetPlayerProgress();
     }
 
@@ -3301,6 +3557,7 @@ Write your scene description here.
       activeSceneId.value = '';
       clearNodeMeta();
       clearImageLibraries();
+      clearEntityAssociations();
       resetPlayerProgress();
     }
 
@@ -3315,13 +3572,13 @@ Write your scene description here.
           filename: filename.value,
           loadedNarrativeName: loadedNarrativeName.value,
           layout: { ...nodeMeta },
-          presentation: { image_libraries: { ...imageLibraries } },
+          presentation: { image_libraries: { ...imageLibraries }, entities: { ...entityAssociations } },
           savedAt: Date.now(),
         }));
       } catch (e) { /* storage unavailable/full — draft recovery is best-effort */ }
     }
     let autosaveTimer = null;
-    watch([source, filename, loadedNarrativeName, nodeMeta, imageLibraries], () => {
+    watch([source, filename, loadedNarrativeName, nodeMeta, imageLibraries, entityAssociations], () => {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       autosaveTimer = setTimeout(saveCurrentDraft, 600);
     });
@@ -3357,6 +3614,9 @@ Write your scene description here.
       presentationTab, newLibraryUrl, imageLibraries, imageLibraryIds, libraryCatalogs,
       defaultCatalogFilename: DEFAULT_CATALOG_FILENAME,
       addImageLibraryFromInput, removeImageLibrary, renameImageLibrary, loadLibraryCatalog, showMoreImages, brokenCount,
+      entityAssociations, entityIdsForPresentation, allCatalogImages, openEntityImages, imagePickerEntity,
+      isImageAssociated, associateImage, removeEntityImage, addLabelToAssociation, onAddLabel,
+      removeLabelFromAssociation, resolveAssocImage, toggleEntityImages, togglePicker,
     };
   }
 }).mount('#vue-mount');
