@@ -1321,8 +1321,79 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   max-height: 560px;
 }
 .scenario-svg { display: block; }
+.scenario-svg.text-mode { cursor: crosshair; }
+.scenario-side { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; }
+.scenario-mode-hint { align-self: center; margin-left: 6px; font-family: var(--font-ui); font-size: 11.5px; color: var(--c-muted); font-style: italic; }
+
+.scenario-size-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 0.5px solid var(--c-border);
+  font-family: var(--font-ui); font-size: 12px; color: var(--c-muted);
+}
+.scenario-size-label { font-weight: 500; }
+.scenario-size-x { color: var(--c-muted); }
+.scenario-size-hint { font-size: 11.5px; font-style: italic; }
+
+/* canvas corner handle + text-area frames (design-time chrome, drawn inside the SVG) */
+.scenario-canvas-handle { cursor: nwse-resize; }
+.scenario-canvas-handle rect { fill: var(--c-surface); stroke: var(--c-accent); stroke-width: 1; opacity: 0.85; }
+.scenario-canvas-handle path { fill: none; stroke: var(--c-accent); stroke-width: 1.5; stroke-linecap: round; pointer-events: none; }
+.scenario-text-frame { fill: var(--c-accent-light); fill-opacity: 0.25; stroke: var(--c-accent); stroke-width: 1; stroke-dasharray: 4 3; cursor: move; }
+.scenario-text-frame.selected { stroke-width: 2; fill-opacity: 0.4; }
+.scenario-selection { fill: none; stroke: var(--c-accent); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
+.scenario-resize-handle { fill: var(--c-accent); stroke: var(--c-surface); stroke-width: 1.5; cursor: nwse-resize; }
+.scenario-text-fo { pointer-events: none; overflow: hidden; }
+.scenario-text-body {
+  width: 100%; height: 100%; box-sizing: border-box; overflow: hidden;
+  line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
+.scenario-inspector {
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 8px;
+  padding: 10px;
+  font-family: var(--font-ui);
+}
+.inspector-empty { font-size: 12px; color: var(--c-muted); font-style: italic; line-height: 1.45; }
+.inspector-kind { font-size: 11.5px; font-weight: 500; color: var(--c-accent); margin-bottom: 8px; text-transform: capitalize; }
+.inspector-label { display: block; margin: 8px 0 3px; font-size: 10.5px; font-weight: 500; color: var(--c-muted); }
+.inspector-input {
+  width: 100%; box-sizing: border-box;
+  padding: 4px 7px;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 5px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-family: var(--font-ui); font-size: 12.5px;
+}
+.inspector-input.mono { font-family: var(--font-mono); font-size: 12px; }
+.inspector-input.num { width: 64px; }
+.inspector-input:focus { outline: none; border-color: var(--c-accent); }
+.inspector-input.invalid { border-color: #a33; }
+textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-height: 1.4; }
+.inspector-error { margin-top: 4px; font-size: 11.5px; color: #a33; }
+.inspector-suggest { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; align-items: center; }
+.inspector-suggest-label { width: 100%; font-size: 10.5px; color: var(--c-muted); }
+.inspector-chip {
+  padding: 2px 7px;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 10px;
+  background: var(--c-accent-light);
+  color: var(--c-accent);
+  font-family: var(--font-mono); font-size: 11px;
+  cursor: pointer;
+}
+.inspector-chip:hover { border-color: var(--c-accent); }
+.inspector-row { display: flex; gap: 10px; align-items: flex-end; }
+.inspector-row.four { gap: 4px; }
+.inspector-row.four .inspector-input.num { width: 100%; min-width: 0; padding: 4px 4px; -moz-appearance: textfield; }
+.inspector-row.four .inspector-input.num::-webkit-inner-spin-button { display: none; }
+.inspector-color { width: 44px; height: 26px; padding: 0; border: 0.5px solid var(--c-border-strong); border-radius: 5px; background: var(--c-surface); cursor: pointer; }
+.inspector-hint { margin-top: 2px; font-size: 10px; color: var(--c-muted); }
+
 .scenario-palette {
-  width: 220px;
+  width: auto;
   flex-shrink: 0;
   max-height: 560px;
   overflow-y: auto;
@@ -1886,6 +1957,15 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
                     </button>
                   </template>
                 </div>
+                <div class="scenario-size-row">
+                  <span class="scenario-size-label">Canvas size</span>
+                  <input class="inspector-input num" type="number" :min="100" :max="10000" step="1"
+                         :value="scenarioDesigns[name].width" @change="setScenarioSize(name, 'width', $event)" title="Width (px)">
+                  <span class="scenario-size-x">×</span>
+                  <input class="inspector-input num" type="number" :min="100" :max="10000" step="1"
+                         :value="scenarioDesigns[name].height" @change="setScenarioSize(name, 'height', $event)" title="Height (px)">
+                  <span class="scenario-size-hint">px — the background fills the canvas; drag its bottom-right corner to resize.</span>
+                </div>
                 <div class="image-grid" v-if="bgPickerScenario === name">
                   <div
                     class="image-tile"
@@ -1909,17 +1989,24 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
                   <button class="scenario-mode-btn" :class="{active: placeMode === 'anchor'}" @click="placeMode = 'anchor'">
                     <i class="ti ti-map-pin"></i> Place: Anchor
                   </button>
+                  <button class="scenario-mode-btn" :class="{active: placeMode === 'text'}" @click="placeMode = 'text'">
+                    <i class="ti ti-typography"></i> Place: Text
+                  </button>
+                  <span class="scenario-mode-hint" v-if="placeMode === 'text'">Drag over the canvas to draw the text area.</span>
+                  <span class="scenario-mode-hint" v-else-if="placeMode === 'anchor'">Drag any entity tile onto the canvas to drop an anchor.</span>
                 </div>
 
                 <div class="scenario-editor">
                   <div class="scenario-canvas-wrap">
                     <svg
                       class="scenario-svg"
+                      :class="{'text-mode': placeMode === 'text'}"
                       :width="scenarioDesigns[name].width"
                       :height="scenarioDesigns[name].height"
                       :viewBox="'0 0 ' + scenarioDesigns[name].width + ' ' + scenarioDesigns[name].height"
                       @dragover.prevent
                       @drop="onCanvasDrop($event, name)"
+                      @mousedown="onScenarioCanvasMouseDown($event, name)"
                     >
                       <image
                         v-if="scenarioDesigns[name].background"
@@ -1937,16 +2024,103 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
                             :href="item.url" style="cursor: move;"
                             @mousedown="onItemMouseDown(name, idx, item, $event)"
                           />
+                          <rect v-if="selectedItemId === item.svgId" class="scenario-selection" :x="item.x" :y="item.y" :width="item.w" :height="item.h" />
                           <text :x="item.x + item.w/2" :y="item.y + item.h + 11" text-anchor="middle" font-size="9" fill="var(--c-muted)" style="pointer-events:none;">{{ item.svgId }}</text>
-                          <text :x="item.x + item.w - 2" :y="item.y + 10" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @click.stop="removeScenarioItem(name, idx)">✕</text>
+                          <text :x="item.x + item.w - 2" :y="item.y + 10" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
                         </g>
-                        <g v-else :id="item.svgId" :transform="'translate(' + item.x + ',' + item.y + ')'">
-                          <circle r="18" fill="none" stroke="var(--c-accent)" stroke-width="2" stroke-dasharray="4,3" style="cursor: move;" @mousedown="onItemMouseDown(name, idx, item, $event)" />
-                          <text text-anchor="middle" dy="4" font-size="9" fill="var(--c-accent)" style="pointer-events: none;">{{ item.label }}</text>
-                          <text x="16" y="-12" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @click.stop="removeScenarioItem(name, idx)">✕</text>
+                        <g v-else-if="item.kind === 'anchor'" :id="item.svgId" :transform="'translate(' + item.x + ',' + item.y + ')'">
+                          <circle r="18" fill="none" stroke="var(--c-accent)" :stroke-width="selectedItemId === item.svgId ? 3.5 : 2" stroke-dasharray="4,3" style="cursor: move;" @mousedown="onItemMouseDown(name, idx, item, $event)" />
+                          <text y="32" text-anchor="middle" font-size="9" fill="var(--c-accent)" style="pointer-events: none;">{{ item.svgId }}</text>
+                          <text x="16" y="-12" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
+                        </g>
+                        <g v-else>
+                          <rect
+                            class="scenario-text-frame" :class="{selected: selectedItemId === item.svgId}"
+                            :x="item.x" :y="item.y" :width="item.w" :height="item.h"
+                            @mousedown="onItemMouseDown(name, idx, item, $event)"
+                          />
+                          <foreignObject class="scenario-text-fo" :x="item.x" :y="item.y" :width="item.w" :height="item.h">
+                            <div class="scenario-text-body" :style="{fontFamily: item.fontFamily, fontSize: item.fontSize + 'px', color: item.color}">{{ item.text }}</div>
+                          </foreignObject>
+                          <text :x="item.x" :y="item.y - 3" font-size="9" fill="var(--c-muted)" style="pointer-events:none;">{{ item.svgId }}</text>
+                          <text :x="item.x + item.w - 2" :y="item.y - 3" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
+                          <rect
+                            v-if="selectedItemId === item.svgId"
+                            class="scenario-resize-handle"
+                            :x="item.x + item.w - 6" :y="item.y + item.h - 6" width="12" height="12"
+                            @mousedown="onTextResizeMouseDown(name, idx, item, $event)"
+                          />
                         </g>
                       </template>
+                      <rect
+                        v-if="textDraw && textDraw.name === name"
+                        class="scenario-text-frame selected" style="pointer-events: none;"
+                        :x="textDrawRect().x" :y="textDrawRect().y" :width="textDrawRect().w" :height="textDrawRect().h"
+                      />
+                      <!-- canvas (background) resize handle: design-time only, never exported -->
+                      <g :transform="'translate(' + (scenarioDesigns[name].width - 18) + ',' + (scenarioDesigns[name].height - 18) + ')'"
+                         class="scenario-canvas-handle" @mousedown="onBgResizeMouseDown(name, $event)">
+                        <title>Drag to resize the background</title>
+                        <rect width="18" height="18" rx="3" />
+                        <path d="M6 14 L14 6 M10 14 L14 10" />
+                      </g>
                     </svg>
+                  </div>
+
+                  <div class="scenario-side">
+                  <div class="scenario-inspector">
+                    <div class="scenario-palette-title">Selected item</div>
+                    <div class="inspector-empty" v-if="!selectedItem">
+                      Click an entity, anchor or text area on the canvas to edit its ID and properties.
+                    </div>
+                    <template v-else>
+                      <div class="inspector-kind">
+                        <i class="ti" :class="{'ti-user': selectedItem.kind === 'entity', 'ti-map-pin': selectedItem.kind === 'anchor', 'ti-typography': selectedItem.kind === 'text'}"></i>
+                        {{ selectedItem.kind }}<template v-if="selectedItem.kind === 'entity'"> · {{ selectedItem.entityId }}</template>
+                      </div>
+
+                      <label class="inspector-label">ID</label>
+                      <input class="inspector-input mono" :class="{invalid: idError}" type="text" spellcheck="false"
+                             v-model="idDraft" @input="onIdDraftInput" @change="renameSelectedItem(idDraft)">
+                      <div class="inspector-error" v-if="idError">{{ idError }}</div>
+                      <div class="inspector-suggest" v-if="idSuggestions.length">
+                        <span class="inspector-suggest-label">Suggested IDs</span>
+                        <button class="inspector-chip" v-for="sid in idSuggestions" :key="sid"
+                                @mousedown.prevent @click="renameSelectedItem(sid)">{{ sid }}</button>
+                      </div>
+
+                      <template v-if="selectedItem.kind === 'text'">
+                        <label class="inspector-label">Initial text</label>
+                        <textarea class="inspector-input" rows="4" v-model="selectedItem.text"></textarea>
+
+                        <label class="inspector-label">Font</label>
+                        <select class="inspector-input" v-model="selectedItem.fontFamily">
+                          <option v-if="!isKnownFont(selectedItem.fontFamily)" :value="selectedItem.fontFamily">{{ selectedItem.fontFamily }}</option>
+                          <option v-for="f in TEXT_FONTS" :key="f.value" :value="f.value">{{ f.label }}</option>
+                        </select>
+
+                        <div class="inspector-row">
+                          <div>
+                            <label class="inspector-label">Size (px)</label>
+                            <input class="inspector-input num" type="number" min="6" max="300" step="1"
+                                   :value="selectedItem.fontSize" @change="setItemNumber(selectedItem, 'fontSize', $event, 6, 300)">
+                          </div>
+                          <div>
+                            <label class="inspector-label">Color</label>
+                            <input class="inspector-color" type="color" v-model="selectedItem.color">
+                          </div>
+                        </div>
+
+                        <label class="inspector-label">Area (px)</label>
+                        <div class="inspector-row four">
+                          <input class="inspector-input num" type="number" title="X" :value="selectedItem.x" @change="setItemNumber(selectedItem, 'x', $event, -10000, 10000)">
+                          <input class="inspector-input num" type="number" title="Y" :value="selectedItem.y" @change="setItemNumber(selectedItem, 'y', $event, -10000, 10000)">
+                          <input class="inspector-input num" type="number" title="Width" :value="selectedItem.w" @change="setItemNumber(selectedItem, 'w', $event, 20, 10000)">
+                          <input class="inspector-input num" type="number" title="Height" :value="selectedItem.h" @change="setItemNumber(selectedItem, 'h', $event, 20, 10000)">
+                        </div>
+                        <div class="inspector-hint">x · y · width · height</div>
+                      </template>
+                    </template>
                   </div>
 
                   <div class="scenario-palette">
@@ -1972,6 +2146,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
                     <div class="pres-subtab-placeholder" v-if="!entityIdsForPresentation.length">
                       No entities yet.
                     </div>
+                  </div>
                   </div>
                 </div>
               </template>
@@ -2790,8 +2965,12 @@ function detectAndParseCatalog(text, catalogUrl) {
    single source of truth for a scenario's content. data-gno-* attributes
    carry the bookkeeping (which entity/library/image a placement came from)
    needed to reconstruct the model; an anchor's <g> gets only its id and
-   data-gno-anchor label — no image — since the entity shown while dragging
-   was only a design-time aid, never meant to be shed here.
+   data-gno-anchor marker (holding the same id) — no image — since the entity
+   shown while dragging was only a design-time aid, never meant to be shed
+   here. A text area is a <foreignObject> (data-gno-text marker) wrapping an
+   XHTML <div>, since SVG <text> can't wrap long lines by itself; its font,
+   size and color are written both inline (so any viewer honors them) and as
+   data-gno-* attributes (so the model round-trips without parsing CSS).
    Both href and xlink:href are written for viewers that only understand the
    older SVG 1.1 external-reference syntax. */
 function normalizeToSlug(s) {
@@ -2804,6 +2983,35 @@ function normalizeToSlug(s) {
 
 function svgEscape(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Fonts offered for text areas: the app's own three (with fallbacks, since an
+// exported SVG opened elsewhere won't have the Google Fonts) plus common
+// system faces. `value` is the CSS font-family stack stored on the item.
+const TEXT_FONTS = [
+  { label: 'Lora',           value: "Lora, Georgia, serif" },
+  { label: 'Outfit',         value: "Outfit, Arial, sans-serif" },
+  { label: 'JetBrains Mono', value: "'JetBrains Mono', 'Courier New', monospace" },
+  { label: 'Georgia',        value: "Georgia, serif" },
+  { label: 'Times New Roman', value: "'Times New Roman', Times, serif" },
+  { label: 'Arial',          value: "Arial, Helvetica, sans-serif" },
+  { label: 'Verdana',        value: "Verdana, Geneva, sans-serif" },
+  { label: 'Courier New',    value: "'Courier New', monospace" },
+];
+const TEXT_DEFAULTS = { text: 'Text', fontFamily: TEXT_FONTS[0].value, fontSize: 18, color: '#1a1610' };
+
+// Font family and color end up inside an inline style attribute, and can
+// arrive from an uploaded file, so anything outside a conservative
+// character set falls back to the default rather than being trusted.
+function cleanFontFamily(v) {
+  return typeof v === 'string' && /^[\w\s,'"-]{1,120}$/.test(v) ? v : TEXT_DEFAULTS.fontFamily;
+}
+function cleanColor(v) {
+  return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : TEXT_DEFAULTS.color;
+}
+function cleanFontSize(v) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? Math.min(300, Math.max(6, n)) : TEXT_DEFAULTS.fontSize;
 }
 
 function buildScenarioSvg(design) {
@@ -2819,7 +3027,13 @@ function buildScenarioSvg(design) {
     if (item.kind === 'entity') {
       parts.push(`  <image id="${svgEscape(item.svgId)}" x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" href="${svgEscape(item.url)}" xlink:href="${svgEscape(item.url)}" data-gno-entity="${svgEscape(item.entityId)}" data-gno-library="${svgEscape(item.library)}" data-gno-image="${svgEscape(item.image)}" />`);
     } else if (item.kind === 'anchor') {
-      parts.push(`  <g id="${svgEscape(item.svgId)}" data-gno-anchor="${svgEscape(item.label)}" transform="translate(${item.x},${item.y})"></g>`);
+      parts.push(`  <g id="${svgEscape(item.svgId)}" data-gno-anchor="${svgEscape(item.svgId)}" transform="translate(${item.x},${item.y})"></g>`);
+    } else if (item.kind === 'text') {
+      const style = `font-family:${item.fontFamily};font-size:${item.fontSize}px;color:${item.color};`
+        + 'width:100%;height:100%;box-sizing:border-box;overflow:hidden;line-height:1.3;white-space:pre-wrap;overflow-wrap:anywhere;';
+      parts.push(`  <foreignObject id="${svgEscape(item.svgId)}" x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" data-gno-text="" data-gno-font="${svgEscape(item.fontFamily)}" data-gno-font-size="${item.fontSize}" data-gno-color="${svgEscape(item.color)}">`);
+      parts.push(`    <div xmlns="http://www.w3.org/1999/xhtml" style="${svgEscape(style)}">${svgEscape(item.text)}</div>`);
+      parts.push('  </foreignObject>');
     }
   });
   parts.push('</svg>');
@@ -2855,18 +3069,33 @@ function parseScenarioSvg(svgText) {
         h: parseFloat(el.getAttribute('height')) || 80,
       });
     } else if (tag === 'g') {
-      const label = el.getAttribute('data-gno-anchor');
-      if (label != null) {
+      const marker = el.getAttribute('data-gno-anchor');
+      if (marker != null) {
         const t = el.getAttribute('transform') || '';
         const m = /translate\(\s*([-\d.]+)[ ,]+([-\d.]+)\s*\)/.exec(t);
         items.push({
           kind: 'anchor',
-          svgId: el.getAttribute('id') || '',
-          label,
+          // Files written before anchors had a separate id carried the
+          // user's label in the marker and a slug of it in id; id wins.
+          svgId: el.getAttribute('id') || marker,
           x: m ? parseFloat(m[1]) : 0,
           y: m ? parseFloat(m[2]) : 0,
         });
       }
+    } else if (tag === 'foreignObject' && el.getAttribute('data-gno-text') != null) {
+      const body = el.firstElementChild;
+      items.push({
+        kind: 'text',
+        svgId: el.getAttribute('id') || '',
+        text: body ? body.textContent : '',
+        fontFamily: cleanFontFamily(el.getAttribute('data-gno-font')),
+        fontSize: cleanFontSize(el.getAttribute('data-gno-font-size')),
+        color: cleanColor(el.getAttribute('data-gno-color')),
+        x: parseFloat(el.getAttribute('x')) || 0,
+        y: parseFloat(el.getAttribute('y')) || 0,
+        w: parseFloat(el.getAttribute('width')) || 200,
+        h: parseFloat(el.getAttribute('height')) || 80,
+      });
     }
   });
   return { background, width, height, items };
@@ -2925,13 +3154,37 @@ function sanitizeEntityAssociations(raw) {
   return out;
 }
 
+// Rebuilds one placed item from stored data, or returns null to drop it.
+// Anchors from older saves carried a separate `label`; their svgId (a slug of
+// that label) is now the only identifier, so the label is simply not carried on.
+function sanitizeScenarioItem(it) {
+  if (!it || typeof it !== 'object') return null;
+  const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+  if (it.kind === 'entity') return it;
+  if (it.kind === 'anchor') {
+    return { kind: 'anchor', svgId: String(it.svgId || it.label || ''), x: num(it.x, 0), y: num(it.y, 0) };
+  }
+  if (it.kind === 'text') {
+    return {
+      kind: 'text',
+      svgId: String(it.svgId || ''),
+      text: typeof it.text === 'string' ? it.text : '',
+      fontFamily: cleanFontFamily(it.fontFamily),
+      fontSize: cleanFontSize(it.fontSize),
+      color: cleanColor(it.color),
+      x: num(it.x, 0), y: num(it.y, 0), w: num(it.w, 200), h: num(it.h, 80),
+    };
+  }
+  return null;
+}
+
 function sanitizeScenarioDesigns(raw) {
   const out = {};
   if (raw && typeof raw === 'object') {
     Object.entries(raw).forEach(([name, design]) => {
       if (!design || typeof design !== 'object') return;
       const items = Array.isArray(design.items)
-        ? design.items.filter(it => it && (it.kind === 'entity' || it.kind === 'anchor'))
+        ? design.items.map(sanitizeScenarioItem).filter(Boolean)
         : [];
       out[name] = {
         background: design.background && typeof design.background === 'object' ? design.background : null,
@@ -3367,9 +3620,18 @@ createApp({
     const scenarioDesigns = reactive(sanitizeScenarioDesigns(draft && draft.presentation && draft.presentation.scenario_designs));
     const openScenario = ref(null);
     const bgPickerScenario = ref(null);
-    const placeMode = ref('entity'); // 'entity' | 'anchor'
+    const placeMode = ref('entity'); // 'entity' | 'anchor' | 'text'
     let dragPayload = null; // {entityId, library, image} — set on palette dragstart, consumed on canvas drop
     const itemDragState = ref(null);
+    const bgResizeState = ref(null);   // dragging the canvas corner handle
+    const textResizeState = ref(null); // dragging a text area's corner handle
+    const textDraw = ref(null);        // rubber-band rectangle while placing a text area
+    const selectedItemId = ref(null);  // svgId of the item shown in the inspector (openScenario only)
+    const idDraft = ref('');
+    const idError = ref('');
+
+    const MIN_CANVAS = 100, MAX_CANVAS = 10000;
+    const MIN_TEXT_SIDE = 20; // smaller drags are treated as accidental clicks in text mode
 
     const scenarioIdsForPresentation = computed(() => {
       const ids = new Set(scenarios.value.map(s => s.name));
@@ -3386,12 +3648,32 @@ createApp({
 
     function toggleScenario(name) {
       openScenario.value = openScenario.value === name ? null : name;
+      selectedItemId.value = null;
       if (openScenario.value) ensureScenarioDesign(name);
     }
 
     function resetScenario(name) {
       if (!window.confirm(`Clear the background and all placed items for "${name}"?`)) return;
       delete scenarioDesigns[name];
+      selectedItemId.value = null;
+    }
+
+    const clampInt = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(v)));
+
+    // Typed width/height for the canvas (and so its background, which always
+    // fills it). Empty/garbage input is ignored; the bound :value snaps back.
+    function setScenarioSize(name, key, e) {
+      const design = scenarioDesigns[name];
+      const n = parseFloat(e.target.value);
+      if (design && Number.isFinite(n)) design[key] = clampInt(n, MIN_CANVAS, MAX_CANVAS);
+      if (design) e.target.value = design[key];
+    }
+
+    function onBgResizeMouseDown(name, e) {
+      e.stopPropagation();
+      e.preventDefault();
+      const design = scenarioDesigns[name];
+      bgResizeState.value = { name, startX: e.clientX, startY: e.clientY, origW: design.width, origH: design.height };
     }
 
     function toggleBgPicker(name) {
@@ -3425,6 +3707,21 @@ createApp({
       e.dataTransfer.setData('text/plain', entityId);
     }
 
+    // Smallest n >= 1 such that `${prefix}${n}${suffix}` is free. Filling the
+    // lowest gap (rather than max+1) keeps the numbering dense after deletions.
+    function nextSeqId(used, prefix, suffix = '') {
+      let n = 1;
+      while (used.has(`${prefix}${n}${suffix}`)) n++;
+      return `${prefix}${n}${suffix}`;
+    }
+
+    // IDs are shared by every kind of item and by the reserved "background".
+    function usedItemIds(design) {
+      const used = new Set(design.items.map(it => it.svgId));
+      used.add('background');
+      return used;
+    }
+
     function onCanvasDrop(e, name) {
       if (!dragPayload) return;
       const payload = dragPayload;
@@ -3436,20 +3733,12 @@ createApp({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       const design = ensureScenarioDesign(name);
-      const usedIds = new Set(design.items.map(it => it.svgId));
+      const usedIds = usedItemIds(design);
 
       if (placeMode.value === 'anchor') {
-        const rawLabel = window.prompt('Label for this anchor (must be unique in this scenario):', '');
-        const label = (rawLabel || '').trim();
-        if (!label) return;
-        if (design.items.some(it => it.kind === 'anchor' && it.label === label)) {
-          alert('An anchor with that label already exists in this scenario.');
-          return;
-        }
-        const base = normalizeToSlug(label);
-        let svgId = base, n = 1;
-        while (usedIds.has(svgId)) { svgId = `${base}_${n}`; n++; }
-        design.items.push({ kind: 'anchor', svgId, label, x: Math.round(x), y: Math.round(y) });
+        const svgId = nextSeqId(usedIds, 'anchor_');
+        design.items.push({ kind: 'anchor', svgId, x: Math.round(x), y: Math.round(y) });
+        selectedItemId.value = svgId;
         return;
       }
 
@@ -3461,28 +3750,168 @@ createApp({
         kind: 'entity', svgId, entityId: payload.entityId, library: payload.library, image: payload.image, url: img.url,
         x: Math.round(x - size / 2), y: Math.round(y - size / 2), w: size, h: size,
       });
+      selectedItemId.value = svgId;
     }
 
     function removeScenarioItem(name, idx) {
       const design = scenarioDesigns[name];
-      if (design) design.items.splice(idx, 1);
+      if (!design) return;
+      const [gone] = design.items.splice(idx, 1);
+      if (gone && gone.svgId === selectedItemId.value) selectedItemId.value = null;
     }
 
+    /* ── Selection, and the ID-rename procedure shared by every item kind ── */
+    const selectedItem = computed(() => {
+      const design = openScenario.value && scenarioDesigns[openScenario.value];
+      return design ? design.items.find(it => it.svgId === selectedItemId.value) || null : null;
+    });
+
+    // Re-seed the ID field whenever the selection (or the selected item's own
+    // ID) changes, discarding any half-typed draft and its error.
+    watch(() => selectedItem.value && selectedItem.value.svgId, id => {
+      idDraft.value = id || '';
+      idError.value = '';
+    });
+
+    function scenarioItemIdError(design, item, id) {
+      if (!id) return 'The ID cannot be empty.';
+      if (!/^[\p{L}_][\p{L}\p{N}_.\-]*$/u.test(id)) return 'Use letters, digits, "_", "." or "-", and don\'t start with a digit.';
+      if (id !== item.svgId && usedItemIds(design).has(id)) return 'That ID is already used in this scenario.';
+      return '';
+    }
+
+    function onIdDraftInput() {
+      const item = selectedItem.value;
+      const design = scenarioDesigns[openScenario.value];
+      idError.value = item && design ? scenarioItemIdError(design, item, idDraft.value.trim()) : '';
+    }
+
+    function renameSelectedItem(raw) {
+      const item = selectedItem.value;
+      const design = scenarioDesigns[openScenario.value];
+      if (!item || !design) return;
+      const id = String(raw).trim();
+      const err = scenarioItemIdError(design, item, id);
+      idError.value = err;
+      if (err) return;
+      idDraft.value = id;
+      item.svgId = id;
+      selectedItemId.value = id;
+    }
+
+    // Suggested IDs, offered for every kind of item; text areas get a few
+    // more, since they're where dialog lines end up being shown. Only IDs
+    // still free in the scenario are offered.
+    const idSuggestions = computed(() => {
+      const item = selectedItem.value;
+      const design = scenarioDesigns[openScenario.value];
+      if (!item || !design) return [];
+      const used = usedItemIds(design);
+      const list = [
+        nextSeqId(used, 'action_'),
+        nextSeqId(used, 'action_', '_label'),
+        'action_proceed',
+        'action_regress',
+      ];
+      if (item.kind === 'text') list.push('speech', '_.speech', 'entity.speech');
+      return list.filter(id => !used.has(id));
+    });
+
+    // Numeric fields of the selected item (position/size/font size): blank or
+    // non-numeric input is ignored and the field snaps back to the real value.
+    function setItemNumber(item, key, e, lo, hi) {
+      const n = parseFloat(e.target.value);
+      if (Number.isFinite(n)) item[key] = clampInt(n, lo, hi);
+      e.target.value = item[key];
+    }
+
+    function isKnownFont(value) {
+      return TEXT_FONTS.some(f => f.value === value);
+    }
+
+    /* ── Moving items, drawing text areas, and the two corner-handle resizes
+       (canvas, text area) — all driven by the shared window listeners below ── */
     function onItemMouseDown(name, idx, item, e) {
       e.stopPropagation();
+      selectedItemId.value = item.svgId;
       itemDragState.value = { name, idx, startX: e.clientX, startY: e.clientY, origX: item.x, origY: item.y };
+    }
+
+    function onTextResizeMouseDown(name, idx, item, e) {
+      e.stopPropagation();
+      e.preventDefault();
+      textResizeState.value = { name, idx, startX: e.clientX, startY: e.clientY, origW: item.w, origH: item.h };
+    }
+
+    // Mousedown on empty canvas: in text mode it starts drawing a text area;
+    // otherwise it just clears the selection. Items stop propagation, so this
+    // only sees clicks that missed them.
+    function onScenarioCanvasMouseDown(e, name) {
+      if (e.button !== 0) return;
+      if (placeMode.value !== 'text') { selectedItemId.value = null; return; }
+      e.preventDefault(); // no text selection while dragging
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      textDraw.value = { name, left: rect.left, top: rect.top, x0: x, y0: y, x, y };
+    }
+
+    function textDrawRect() {
+      const d = textDraw.value;
+      if (!d) return null;
+      return { x: Math.min(d.x0, d.x), y: Math.min(d.y0, d.y), w: Math.abs(d.x - d.x0), h: Math.abs(d.y - d.y0) };
+    }
+
+    function finishTextDraw() {
+      const d = textDraw.value;
+      const r = textDrawRect();
+      textDraw.value = null;
+      if (!d || r.w < MIN_TEXT_SIDE || r.h < MIN_TEXT_SIDE) return;
+      const design = scenarioDesigns[d.name];
+      if (!design) return;
+      const svgId = nextSeqId(usedItemIds(design), 'text_');
+      design.items.push({
+        kind: 'text', svgId, ...TEXT_DEFAULTS,
+        x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h),
+      });
+      selectedItemId.value = svgId;
     }
 
     function onScenarioWindowMouseMove(e) {
       const d = itemDragState.value;
-      if (!d) return;
-      const design = scenarioDesigns[d.name];
-      const item = design && design.items[d.idx];
-      if (!item) return;
-      item.x = Math.round(d.origX + (e.clientX - d.startX));
-      item.y = Math.round(d.origY + (e.clientY - d.startY));
+      if (d) {
+        const design = scenarioDesigns[d.name];
+        const item = design && design.items[d.idx];
+        if (item) {
+          item.x = Math.round(d.origX + (e.clientX - d.startX));
+          item.y = Math.round(d.origY + (e.clientY - d.startY));
+        }
+      }
+      const b = bgResizeState.value;
+      if (b && scenarioDesigns[b.name]) {
+        scenarioDesigns[b.name].width = clampInt(b.origW + (e.clientX - b.startX), MIN_CANVAS, MAX_CANVAS);
+        scenarioDesigns[b.name].height = clampInt(b.origH + (e.clientY - b.startY), MIN_CANVAS, MAX_CANVAS);
+      }
+      const t = textResizeState.value;
+      if (t) {
+        const item = scenarioDesigns[t.name] && scenarioDesigns[t.name].items[t.idx];
+        if (item) {
+          item.w = clampInt(t.origW + (e.clientX - t.startX), MIN_TEXT_SIDE, MAX_CANVAS);
+          item.h = clampInt(t.origH + (e.clientY - t.startY), MIN_TEXT_SIDE, MAX_CANVAS);
+        }
+      }
+      const w = textDraw.value;
+      if (w && scenarioDesigns[w.name]) {
+        const design = scenarioDesigns[w.name];
+        w.x = Math.min(design.width, Math.max(0, e.clientX - w.left));
+        w.y = Math.min(design.height, Math.max(0, e.clientY - w.top));
+      }
     }
-    function onScenarioWindowMouseUp() { itemDragState.value = null; }
+    function onScenarioWindowMouseUp() {
+      itemDragState.value = null;
+      bgResizeState.value = null;
+      textResizeState.value = null;
+      if (textDraw.value) finishTextDraw();
+    }
     window.addEventListener('mousemove', onScenarioWindowMouseMove);
     window.addEventListener('mouseup', onScenarioWindowMouseUp);
 
@@ -4174,6 +4603,9 @@ Write your scene description here.
       scenarioDesigns, scenarioIdsForPresentation, openScenario, bgPickerScenario, placeMode,
       toggleScenario, resetScenario, toggleBgPicker, setScenarioBackground, removeScenarioBackground,
       onPaletteDragStart, onCanvasDrop, removeScenarioItem, onItemMouseDown,
+      setScenarioSize, onBgResizeMouseDown, onTextResizeMouseDown, onScenarioCanvasMouseDown, textDraw, textDrawRect,
+      selectedItemId, selectedItem, idDraft, idError, idSuggestions, onIdDraftInput, renameSelectedItem,
+      setItemNumber, isKnownFont, TEXT_FONTS,
     };
   }
 }).mount('#vue-mount');

@@ -87,7 +87,18 @@ all persisted together as `_presentation.yaml`:
   (`entityAssociations`).
 - **Scenarios** — a small SVG design canvas per scenario
   (`buildScenarioSvg`/`parseScenarioSvg`), downloaded as one `.svg` file per
-  scenario inside the export zip.
+  scenario inside the export zip. The canvas (whose size the background
+  always fills) is resized by dragging its bottom-right corner or by typing
+  width/height. Three kinds of item can be placed on it — entities, anchors,
+  and text areas — and every item has an ID, unique within the scenario, that
+  is edited in the sidebar inspector after placement. New anchors and text
+  areas start as `anchor_n` / `text_n` (lowest free `n` from 1); entities
+  start as their entity id. The same inspector offers suggested IDs for all
+  kinds (`action_n`, `action_n_label`, `action_proceed`, `action_regress`),
+  plus `speech`, `_.speech` and `entity.speech` for text areas. A text area is
+  drawn by dragging in "Place: Text" mode and exported as a `<foreignObject>`
+  wrapping an HTML `<div>`, since SVG `<text>` cannot wrap lines; its text,
+  font, size and color are set in the inspector.
 
 ### Player
 Steps through the narrative as a reader would. `buildScenePlayback` splits
