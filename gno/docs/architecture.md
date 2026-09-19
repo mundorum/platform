@@ -129,6 +129,25 @@ stage" — present since first mention, carrying their last-given state,
 until an explicit `@entity ->` exit or the scene ends — rendered in a
 separate panel independent of the narrative text itself.
 
+*Graphic mode* plays the same beats on the scenario's designed SVG (rules in
+`README.md`, "Graphic play"). It is on by default when `scenarioDesigns` has an
+entry for the scene's scenario; `playerGraphic` is only the reader's
+preference and `playerUseGraphic` the effective mode. The stage is not the
+exported SVG file loaded into the DOM: it is drawn by the Player's own
+`<svg>` from the live `scenarioDesigns` data (like the Scenarios canvas), so it
+tracks edits to the design, the associations and the narrative without a
+round-trip. The pipeline is a chain of pure functions:
+`buildScenePlayback` additionally returns per-beat `events` (entity mentions)
+and `speeches` (prose and dialogs, in order) → `foldStageFrames` replays the
+events into who is on stage and where, using `pickEntityImage` (best label
+match, first on ties) → `routeSpeech` assigns speech to text areas →
+`buildPlayerStage` walks the design in its own z-order and emits drawable
+layers, with `action_*` items turned into click targets. Entity images come
+from the live library catalogs (`findCatalogImage`), not from anything stored
+in the design, so an entity is drawn only once its catalog has loaded. The
+Vue template binds the SVG's `viewBox` through `v-bind="{viewBox: …}"`
+because the template is parsed as HTML, which lowercases a `:viewBox` name.
+
 ## Persistence model
 
 Three independent mechanisms share the same underlying bundle shape
@@ -165,7 +184,9 @@ independent and re-run reactively as the user types:
 4. `highlightGno(source, entities)` — tokenizes each line for the editor's
    syntax-highlight overlay.
 5. `buildScenePlayback(scene, ...)` — (Player-only) turns one scene's body
-   into the beat/pause sequence described above.
+   into the beat/pause sequence described above, plus the entity events and
+   speech the graphic mode consumes (`foldStageFrames`, `routeSpeech`,
+   `buildPlayerStage`).
 
 None of these functions depend on Vue; they operate on plain strings/arrays
 and are called from computed properties inside the app.

@@ -190,6 +190,37 @@ The @princess kneels beside the fountain, sketching the koi beneath the surface.
 
 Note that the two consecutive `-- @guard` / `-- @princess` lines form a single dialog set and share one pause, while the later lone `-- @guard` line gets its own. The final screen needs no pause of its own — the divert button is already there waiting to be picked.
 
+### Graphic play
+
+When the current scene's scenario has a design in **Presentation → Scenarios**, the Player plays it graphically by default: the scenario's SVG is loaded and the scene is acted out on it, instead of printed as text. The `Graphic` / `Text` switch at the top of the Player picks between the two; a scenario with no design always plays as text. The pauses, `(Start)`/`(End)` scenes and diverts work exactly as described above — only the presentation changes.
+
+**Entities.** When an entity enters, its image is placed on the SVG. Its labels (the words after `@id`) are read in two steps:
+
+1. *State → image.* The label sets defined for the entity in **Presentation → Entity** are compared with the labels written after it, and the image sharing the most labels is used. On a tie, the first one defined wins. Given `@king happy left` and images labeled `happy` and `sad`, the `happy` image is used, since `left` isn't one of its labels. A label made of several words (`very happy`) must appear as such. If the entity has no matching label at all it gets its first image.
+2. *Label → anchor.* Of the labels that weren't used as a state, the first one that names an anchor ID in the SVG says where the entity stands; its image is fitted into that anchor's box. An entity with no anchor label (and none from before) isn't drawn.
+
+Later mentions update what they say something about: `@king sad` changes the image and keeps the position, `@king right` moves the king and keeps the image. `@king ->` removes the entity. Labels, anchor IDs and text-area IDs are compared ignoring case and accents.
+
+**Speech.** Text is shown in the SVG's text areas, replaced at every pause like the text view:
+
+| What | Goes to text area | Otherwise |
+|---|---|---|
+| Free text (outside any dialog) | `_.speech` | `speech` |
+| A dialog of `@king` | `king.speech` | `speech` |
+
+When dialogs share a `speech` area they are prefixed with the speaker's name. Text with no area to go to isn't shown.
+
+**Actions.** Items with these IDs are the controls:
+
+| ID | Kind | Behavior |
+|---|---|---|
+| `action_proceed` | entity | Visible and clickable while the scene is paused; continues. |
+| `action_regress` | entity | Visible and clickable once past the first beat; steps back to the previous beat. |
+| `action_N` | entity | Choice N (the Nth `* Label -> Target` of the scene); clickable while the choices are on offer, goes to its target. |
+| `action_N_label` | text area | Filled with choice N's label; clickable like `action_N`. (`action_N_text` is accepted as well.) |
+
+Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without `action_N` / `action_N_label`), so a scene can never get stuck; `Space` always continues.
+
 ## Browser Storage (Save / Load)
 
 The `Save` and `Load` buttons keep named narratives in the browser's `localStorage`, under the key prefix `gno-narrative-v2:<name>`. Each entry is a JSON bundle: the narrative source, the graph layout (`_graph.yaml` equivalent), and the presentation setup (`_presentation.yaml` equivalent — image libraries, entity/image associations, scenario designs). Scenario SVGs aren't stored separately here; the scenario design data is what `Download` renders them from, so keeping one copy avoids the two ever drifting apart.

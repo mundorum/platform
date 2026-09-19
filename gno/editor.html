@@ -608,6 +608,47 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   font-style: italic;
 }
 .player-empty { padding: 40px 0; }
+#player-content.graphic { max-width: 1200px; }
+.player-mode-toggle {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-bottom: 14px;
+  font-family: var(--font-ui);
+}
+.player-mode-toggle button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border: 0.5px solid var(--c-border-strong);
+  background: var(--c-surface);
+  color: var(--c-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.player-mode-toggle button:first-child { border-radius: 6px 0 0 6px; }
+.player-mode-toggle button:last-child { border-radius: 0 6px 6px 0; }
+.player-mode-toggle button.active { background: var(--c-accent-light); color: var(--c-accent); border-color: var(--c-accent); }
+.player-mode-toggle button:disabled { opacity: 0.45; cursor: not-allowed; }
+.player-stage-wrap { margin: 0 auto 1em; }
+.player-stage { display: block; width: 100%; height: auto; max-height: 72vh; margin: 0 auto; }
+.player-stage .stage-click { cursor: pointer; }
+.player-stage .stage-click:hover { opacity: 0.85; }
+.player-stage .stage-static { pointer-events: none; }
+.player-stage-text {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.player-stage-text.pre { white-space: pre-wrap; }
+#player-content .player-stage-text p { margin: 0 0 0.5em; }
+#player-content .player-stage-text p:last-child { margin-bottom: 0; }
+.player-stage-text .speaker { font-weight: 600; }
 .player-warning {
   background: var(--c-tag-state-bg);
   color: var(--c-tag-state);
@@ -2239,11 +2280,22 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
     <!-- Player view -->
     <div id="player-view" v-show="view === 'player'">
       <div id="player-scroll">
-        <div id="player-content">
+        <div id="player-content" :class="{graphic: playerUseGraphic}">
           <div v-if="!playerCurrentScene" class="player-empty">
             No scenes to play yet.
           </div>
           <template v-else>
+            <div class="player-mode-toggle">
+              <button
+                :class="{active: playerUseGraphic}"
+                :disabled="!playerDesign"
+                :title="playerDesign ? 'Play on the scenario\'s graphic presentation' : 'This scenario has no presentation set up (Presentation → Scenarios)'"
+                @click="playerGraphic = true"
+              ><i class="ti ti-photo"></i> Graphic</button>
+              <button :class="{active: !playerUseGraphic}" title="Play as text" @click="playerGraphic = false">
+                <i class="ti ti-align-left"></i> Text
+              </button>
+            </div>
             <div class="player-warning" v-if="!hasExplicitStart">
               No scene marked <code>(Start)</code> was found — beginning at the first scene instead.
             </div>
@@ -2256,26 +2308,56 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
               <span class="scene-scenario">Scenario: {{ playerCurrentScene.scenario }}</span>
             </div>
 
-            <div :key="playerCurrentScene.id + ':' + playerRevealCount" v-html="playerCurrentBeat"></div>
+            <div v-if="playerStage" class="player-stage-wrap" :style="{maxWidth: playerStage.width + 'px'}">
+              <svg
+                class="player-stage"
+                xmlns="http://www.w3.org/2000/svg"
+                v-bind="{viewBox: '0 0 ' + playerStage.width + ' ' + playerStage.height}"
+              ><!-- v-bind object: this template is parsed as HTML, which would lowercase a :viewBox attribute name -->
+                <image
+                  v-if="playerStage.background"
+                  x="0" y="0" :width="playerStage.width" :height="playerStage.height"
+                  :href="playerStage.background" preserveAspectRatio="xMidYMid slice"
+                />
+                <template v-for="layer in playerStage.layers" :key="layer.key">
+                  <image
+                    v-if="layer.type === 'image'"
+                    :x="layer.x" :y="layer.y" :width="layer.w" :height="layer.h"
+                    :href="layer.url" preserveAspectRatio="xMidYMid meet"
+                    :class="{'stage-click': layer.click}"
+                    @click="onStageClick(layer.click)"
+                  />
+                  <foreignObject
+                    v-else
+                    :x="layer.x" :y="layer.y" :width="layer.w" :height="layer.h"
+                    :class="{'stage-click': layer.click, 'stage-static': !layer.click && !layer.live}"
+                    @click="onStageClick(layer.click)"
+                  >
+                    <div class="player-stage-text" :class="{pre: layer.pre}" :style="layer.style" v-html="layer.html"></div>
+                  </foreignObject>
+                </template>
+              </svg>
+            </div>
+            <div v-else :key="playerCurrentScene.id + ':' + playerRevealCount" v-html="playerCurrentBeat"></div>
 
             <div class="player-controls">
               <button
-                v-if="!playerShowMenu"
+                v-if="playerShowContinueButton"
                 class="player-continue-btn"
                 title="Continue (Space)"
                 @click="playerAdvance"
               >
                 <i class="ti ti-player-play"></i>
               </button>
-              <template v-else-if="playerCurrentScene.marker === 'end'">
+              <template v-else-if="playerShowMenu && playerCurrentScene.marker === 'end'">
                 <div class="player-end-panel">
                   <div class="player-end-title">— The End —</div>
                   <button class="tb-btn ghost" @click="playerRestart"><i class="ti ti-refresh"></i> Restart</button>
                 </div>
               </template>
-              <div class="player-choices" v-else-if="playerCurrentScene.diverts.length">
+              <div class="player-choices" v-else-if="playerShowMenu && playerCurrentScene.diverts.length">
                 <button
-                  v-for="d in playerCurrentScene.diverts"
+                  v-for="d in playerMenuDiverts"
                   :key="d.target"
                   class="player-choice-btn"
                   @click="playerChoose(d.target)"
@@ -2283,7 +2365,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                   {{ d.label }} <i class="ti ti-arrow-right"></i>
                 </button>
               </div>
-              <div class="player-end-panel" v-else>
+              <div class="player-end-panel" v-else-if="playerShowMenu">
                 <div class="player-end-title">No diverts lead out of this scene.</div>
                 <button class="tb-btn ghost" @click="playerRestart"><i class="ti ti-refresh"></i> Restart</button>
               </div>
@@ -2293,7 +2375,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
       </div>
 
       <!-- Entities on stage: separate from the narrative text, scoped to the current scene -->
-      <aside id="player-entities-panel" v-if="playerCurrentScene">
+      <aside id="player-entities-panel" v-if="playerCurrentScene && !playerUseGraphic">
         <div class="nav-section-label">In this scene</div>
         <div v-if="playerEntityRoster.length === 0" class="player-entities-empty">No entities on stage yet.</div>
         <div v-for="e in playerEntityRoster" :key="e.id" class="player-entity-row">
@@ -2662,6 +2744,14 @@ function restIsOnlyDiverts(lines, fromIdx, toIdx) {
 // present — carrying its most recently given state — until either the scene
 // ends or a standalone "@entity ->" line (state text of exactly "->") marks
 // it as having exited.
+//
+// For the graphic Player, each beat additionally carries:
+//   - events: the entity mentions made in that beat, in order, as
+//     { entityId, labels, exit } — the raw material `foldStageFrames` replays;
+//   - speech: what is spoken/narrated in that beat, in source order, as
+//     { kind: 'free', html } (prose outside any dialog) or
+//     { kind: 'dialog', entityId, html } — routed to text areas by
+//     `routeSpeech`.
 function buildScenePlayback(scene, bodyEnd, source, entities) {
   const lines = source.split('\n');
   const bodyStart = scene.lineStart + 1;
@@ -2680,12 +2770,18 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
 
   const beats = [];
   const rosters = [];
+  const events = [];
+  const speeches = [];
   let current = [];
+  let currentEvents = [];
+  let currentSpeech = [];
+  let freeLines = []; // raw prose lines since the last dialog / beat boundary
   const roster = new Map(); // entityId -> latest known state ('' = present, no known state)
 
   function applyEntityOccurrence(occ) {
     if (occ.type === 'state' && occ.state.trim() === '->') {
       roster.delete(occ.entityId);
+      currentEvents.push({ entityId: occ.entityId, labels: [], exit: true });
       return;
     }
     if (occ.state) {
@@ -2693,12 +2789,26 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
     } else if (!roster.has(occ.entityId)) {
       roster.set(occ.entityId, '');
     }
+    currentEvents.push({ entityId: occ.entityId, labels: occ.state.split(/\s+/).filter(Boolean), exit: false });
+  }
+
+  // Prose becomes one speech item per uninterrupted run, so its position
+  // relative to the dialogs around it survives (they may share a text area).
+  function flushFree() {
+    const md = freeLines.join('\n').trim();
+    if (md) currentSpeech.push({ kind: 'free', html: marked.parse(md, { gfm: true, breaks: false }).trim() });
+    freeLines = [];
   }
 
   function flushBeat() {
+    flushFree();
     beats.push(current);
     rosters.push([...roster.entries()].map(([id, state]) => ({ id, state })));
+    events.push(currentEvents);
+    speeches.push(currentSpeech);
     current = [];
+    currentEvents = [];
+    currentSpeech = [];
   }
 
   for (let idx = bodyStart; idx <= bodyEnd; idx++) {
@@ -2712,6 +2822,12 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
       const occ = blockByLine.get(idx);
       current.push('', entityBlockHtml(occ), '');
       applyEntityOccurrence(occ);
+      if (occ.type === 'dialog') {
+        flushFree();
+        currentSpeech.push({ kind: 'dialog', entityId: occ.entityId, html: marked.parseInline(occ.dialogLines.join(' ')).trim() });
+      } else {
+        freeLines.push(''); // a standalone entity line still separates the prose around it
+      }
       idx = occ.lineEnd;
       if (occ.type === 'dialog') {
         const nextIsDialog = blockByLine.has(idx + 1) && blockByLine.get(idx + 1).type === 'dialog';
@@ -2723,16 +2839,200 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
       const occs = mentionsByLine.get(idx);
       occs.forEach(applyEntityOccurrence);
       current.push(substituteMentions(line, occs));
+      freeLines.push(line.replace(MENTION_RE, (_, id) => entityDisplayName(id)));
       continue;
     }
     current.push(line);
+    freeLines.push(line);
   }
   flushBeat();
 
   return {
     beatsHtml: beats.map(ls => marked.parse(ls.join('\n'), { gfm: true, breaks: false }).trim()),
     rosters,
+    events,
+    speeches,
   };
+}
+
+/* ── PLAYER (graphic): what goes where on the scenario SVG ── */
+// The graphic Player replays a scene on the scenario's designed SVG instead of
+// printing it: entities appear at anchors, speech fills text areas, and a few
+// specially-named items act as buttons. Everything below is pure — it turns a
+// scene's playback, the entity/image associations and a scenario design into
+// a flat list of layers to draw — so it can be reasoned about (and tested)
+// without the Vue app.
+const MENTION_RE = /@([\p{L}\p{N}_'-]+)/gu;
+
+// "Dra_Sandra" -> "Dra Sandra": how an entity id reads in prose or as a speaker.
+function entityDisplayName(id) {
+  return String(id).replace(/^@/, '').replace(/_/g, ' ');
+}
+
+// Labels, anchor IDs and text-area IDs are all typed by hand in different
+// places, so they are compared case- and accent-insensitively.
+function idKey(s) {
+  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+// Index in `tokens` where `phrase` occurs as a contiguous run, or -1.
+function findPhrase(tokens, phrase) {
+  for (let i = 0; i + phrase.length <= tokens.length; i++) {
+    if (phrase.every((w, k) => tokens[i + k] === w)) return i;
+  }
+  return -1;
+}
+
+// Chooses which of an entity's images fits the labels written after it: the
+// association sharing the most labels wins (a label may be several words, and
+// must then appear as such), and on a tie the first one defined. `used` holds
+// the indices of the entity's labels the winner accounted for as state, so
+// whatever is left can be read as an anchor name. Returns null without images.
+function pickEntityImage(assocs, labels) {
+  const tokens = labels.map(idKey);
+  let best = null;
+  assocs.forEach(assoc => {
+    let score = 0;
+    const used = new Set();
+    assoc.labels.forEach(l => {
+      const phrase = l.trim().split(/\s+/).filter(Boolean).map(idKey);
+      const at = phrase.length ? findPhrase(tokens, phrase) : -1;
+      if (at < 0) return;
+      score++;
+      phrase.forEach((_, k) => used.add(at + k));
+    });
+    if (!best || score > best.score) best = { assoc, score, used };
+  });
+  return best;
+}
+
+// Replays a scene's entity events beat by beat and returns, for each beat, who
+// is on stage: [{ entityId, assoc, anchorId }] in order of entry. An entity's
+// labels are read as a state first (its image) and, of what remains, the first
+// one naming an anchor of the SVG says where it stands. A later mention that
+// says nothing about one of the two keeps what it had — `@king left` after
+// `@king sad` moves the king without cheering him up.
+function foldStageFrames(eventsByBeat, associations, anchorKeys) {
+  const onStage = new Map();
+  return eventsByBeat.map(events => {
+    events.forEach(ev => {
+      if (ev.exit) { onStage.delete(ev.entityId); return; }
+      const prev = onStage.get(ev.entityId) || { entityId: ev.entityId, assoc: null, anchorId: null };
+      const pick = pickEntityImage(associations[ev.entityId] || [], ev.labels);
+      const restate = !!pick && (pick.score > 0 || !prev.assoc);
+      const rest = ev.labels.filter((_, i) => !(restate && pick.used.has(i)));
+      const anchorKey = rest.map(idKey).find(k => anchorKeys.has(k));
+      onStage.set(ev.entityId, {
+        entityId: ev.entityId,
+        assoc: restate ? pick.assoc : prev.assoc,
+        anchorId: anchorKey ? anchorKeys.get(anchorKey) : prev.anchorId,
+      });
+    });
+    return [...onStage.values()];
+  });
+}
+
+// Which special role, if any, a scenario item plays. Entities named
+// `action_proceed` / `action_regress` / `action_N` are buttons; text areas named
+// `action_N_label` (or `_text`) carry the label of choice N.
+function actionRole(item) {
+  const key = idKey(item.svgId);
+  if (item.kind === 'entity') {
+    if (key === 'action_proceed') return { kind: 'proceed' };
+    if (key === 'action_regress') return { kind: 'regress' };
+    const m = /^action_(\d+)$/.exec(key);
+    if (m) return { kind: 'choice', n: parseInt(m[1], 10) };
+  } else if (item.kind === 'text') {
+    const m = /^action_(\d+)_(?:label|text)$/.exec(key);
+    if (m) return { kind: 'choice', n: parseInt(m[1], 10) };
+  }
+  return null;
+}
+
+// Which of the graphic controls a design actually provides, so the Player can
+// fall back to its plain buttons for the ones it lacks (a design without
+// `action_proceed` would otherwise leave nothing to click).
+function scenarioActionSlots(design) {
+  const slots = { proceed: false, regress: false, choices: new Set() };
+  design.items.forEach(item => {
+    const role = actionRole(item);
+    if (!role) return;
+    if (role.kind === 'choice') slots.choices.add(role.n);
+    else slots[role.kind] = true;
+  });
+  return slots;
+}
+
+const isSpeechArea = item => item.kind === 'text' && /(^|\.)speech$/.test(idKey(item.svgId));
+
+// Sends each piece of a beat's speech to a text area: prose to `_.speech`,
+// a character's dialog to `<entity>.speech`, either falling back to `speech`.
+// Where several pieces share an area they stay in source order, and a shared
+// `speech` area names the speaker since the area itself no longer does.
+// Speech with no area to go to isn't shown. Returns Map(svgId -> html).
+function routeSpeech(items, design) {
+  const areas = new Map(design.items.filter(isSpeechArea).map(it => [idKey(it.svgId), it.svgId]));
+  const out = new Map();
+  items.forEach(it => {
+    let key, html;
+    if (it.kind === 'free') {
+      key = ['_.speech', 'speech'].find(k => areas.has(k));
+      html = it.html;
+    } else {
+      const own = idKey(it.entityId.replace(/^@/, '')) + '.speech';
+      key = areas.has(own) ? own : (areas.has('speech') ? 'speech' : undefined);
+      html = `<p>${key === 'speech' ? `<strong class="speaker">${escH(entityDisplayName(it.entityId))}:</strong> ` : ''}${it.html}</p>`;
+    }
+    if (key === undefined) return;
+    const id = areas.get(key);
+    out.set(id, (out.get(id) || '') + html);
+  });
+  return out;
+}
+
+// Draws one moment of a scene onto a scenario design, as layers in the
+// design's own z-order. An entity image is drawn where its anchor sits, so it
+// stacks like the anchor does. `ctx`:
+//   frame    [{ entityId, anchorId, url }] — who is on stage now
+//   speech   Map(svgId -> html) from routeSpeech
+//   diverts  [{ label, target }] — offered choices, once `atMenu`
+//   canProceed / canRegress / atMenu — which controls are live right now
+// A layer is { key, type: 'image'|'text', x, y, w, h, ... } with `click`
+// ({ type: 'proceed'|'regress'|'choose', target? }) when it is a button.
+function buildPlayerStage(design, ctx) {
+  const layers = [];
+  design.items.forEach(item => {
+    if (item.kind === 'anchor') {
+      ctx.frame.filter(f => f.anchorId === item.svgId && f.url).forEach(f => {
+        layers.push({ key: 'stage:' + f.entityId, type: 'image', url: f.url,
+          x: item.x - item.w / 2, y: item.y - item.h / 2, w: item.w, h: item.h });
+      });
+      return;
+    }
+    const box = { x: item.x, y: item.y, w: item.w, h: item.h };
+    const role = actionRole(item);
+    let click = null, choice = null;
+    if (role) {
+      if (role.kind === 'proceed') { if (!ctx.canProceed) return; click = { type: 'proceed' }; }
+      else if (role.kind === 'regress') { if (!ctx.canRegress) return; click = { type: 'regress' }; }
+      else {
+        choice = ctx.atMenu ? ctx.diverts[role.n - 1] : null;
+        if (!choice) return;
+        click = { type: 'choose', target: choice.target };
+      }
+    }
+    if (item.kind === 'entity') {
+      layers.push({ key: item.svgId, type: 'image', url: item.url, click, ...box });
+    } else {
+      const style = `font-family:${item.fontFamily};font-size:${item.fontSize}px;color:${item.color};`;
+      let html, pre = false, live = false;
+      if (choice) html = escH(choice.label);
+      else if (isSpeechArea(item)) { html = ctx.speech.get(item.svgId) || ''; live = true; }
+      else { html = escH(item.text); pre = true; }
+      layers.push({ key: item.svgId, type: 'text', style, html, pre, live, click, ...box });
+    }
+  });
+  return layers;
 }
 
 /* ── SOURCE EDITOR SYNTAX HIGHLIGHTING ── */
@@ -4348,6 +4648,63 @@ createApp({
     // so no separate advance is needed to reveal them.
     const playerShowMenu = computed(() => playerRevealCount.value >= playerBeats.value.length);
 
+    /* ── Player: graphic mode ──
+       Playing on the scenario's designed SVG is the default whenever the
+       current scene's scenario has a design; `playerGraphic` is only the
+       reader's preference for it (the Text button turns it off). A scenario
+       with no design always plays as text, whatever the preference. */
+    const playerGraphic = ref(true);
+
+    const playerDesign = computed(() => {
+      const scene = playerCurrentScene.value;
+      const design = scene && scenarioDesigns[scene.scenario];
+      return design && (design.background || design.items.length) ? design : null;
+    });
+    const playerUseGraphic = computed(() => playerGraphic.value && !!playerDesign.value);
+    const playerActionSlots = computed(() => playerDesign.value ? scenarioActionSlots(playerDesign.value) : null);
+
+    // Who is on stage at each beat and where — depends on the design (anchors)
+    // and the Entity associations, so it recomputes when either is edited.
+    const playerStageFrames = computed(() => {
+      const design = playerDesign.value;
+      if (!design) return [];
+      const anchorKeys = new Map(design.items.filter(it => it.kind === 'anchor').map(it => [idKey(it.svgId), it.svgId]));
+      return foldStageFrames(playerPlayback.value.events, entityAssociations, anchorKeys);
+    });
+
+    const playerStage = computed(() => {
+      const design = playerDesign.value;
+      if (!design || !playerUseGraphic.value) return null;
+      const beat = playerRevealCount.value - 1;
+      const frame = (playerStageFrames.value[beat] || []).map(f => {
+        const img = f.assoc && findCatalogImage(f.assoc.library, f.assoc.image);
+        return { ...f, url: img ? img.url : '' };
+      });
+      return {
+        width: design.width,
+        height: design.height,
+        background: design.background && design.background.url ? design.background.url : '',
+        layers: buildPlayerStage(design, {
+          frame,
+          speech: routeSpeech(playerPlayback.value.speeches[beat] || [], design),
+          diverts: playerCurrentScene.value.diverts,
+          atMenu: playerShowMenu.value,
+          canProceed: !playerShowMenu.value,
+          canRegress: playerRevealCount.value > 1,
+        }),
+      };
+    });
+
+    // Plain-button fallbacks for whatever the design has no graphic control for.
+    const playerShowContinueButton = computed(() =>
+      !playerShowMenu.value && !(playerUseGraphic.value && playerActionSlots.value.proceed)
+    );
+    const playerMenuDiverts = computed(() => {
+      const diverts = playerCurrentScene.value ? playerCurrentScene.value.diverts : [];
+      if (!playerUseGraphic.value) return diverts;
+      return diverts.filter((_, i) => !playerActionSlots.value.choices.has(i + 1));
+    });
+
     function initPlayer() {
       const s = startScene.value;
       playerSceneId.value = s ? s.id : null;
@@ -4358,6 +4715,18 @@ createApp({
       if (playerRevealCount.value < playerBeats.value.length) {
         playerRevealCount.value++;
       }
+    }
+
+    // Back to the beat before the last pause (the reverse of advancing).
+    function playerRegress() {
+      if (playerRevealCount.value > 1) playerRevealCount.value--;
+    }
+
+    function onStageClick(click) {
+      if (!click) return;
+      if (click.type === 'proceed') playerAdvance();
+      else if (click.type === 'regress') playerRegress();
+      else if (click.type === 'choose') playerChoose(click.target);
     }
 
     function playerChoose(targetTitle) {
@@ -4742,6 +5111,8 @@ Write your scene description here.
       arrowColor, labelColor, placeholder,
       hasExplicitStart, playerCurrentScene, playerCurrentBeat, playerRevealCount, playerShowMenu,
       playerEntityRoster,
+      playerGraphic, playerDesign, playerUseGraphic, playerStage, playerShowContinueButton, playerMenuDiverts,
+      onStageClick,
       playerAdvance, playerChoose, playerRestart,
       scrollToScene, newScene, renameScene,
       onEditorScroll, onEditorInput,
