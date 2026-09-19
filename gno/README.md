@@ -1,5 +1,9 @@
 # gnō-
 
+This document describes the `.gno` narrative format and the editor's Player
+behavior. For how the editor application itself is built (stack, views,
+persistence, parsing pipeline), see [`docs/architecture.md`](docs/architecture.md).
+
 ## Narrative
 
 A narrative is the complete description of an interactive story: everything contained in a single `.gno` file. A narrative is composed of one or more scenarios, each grouping one or more scenes.

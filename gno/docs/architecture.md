@@ -1,0 +1,140 @@
+# gnō- Architecture
+
+`gno/` is a **single-file, single-page application**: everything — markup, CSS,
+and application code — lives in [`editor.html`](../editor.html). There is no
+build step, no bundler, and no package.json; the file is opened directly in a
+browser. This is a deliberate scope choice, not a placeholder: `gno/` is
+isolated from the rest of the platform (see the root `CLAUDE.md`) and doesn't
+share tooling or code with `backend/`/`frontend/` or `noid/`.
+
+For the *narrative format itself* (scenes, entities, dialogs, diverts,
+Player pause rules), see [`../README.md`](../README.md). This document covers
+how the editor application that reads/writes that format is built.
+
+## Stack
+
+| Concern | Choice | How it's loaded |
+|---|---|---|
+| UI framework | Vue 3 (Composition-ish `createApp` with `ref`/`reactive`/`computed`/`watch`) | `unpkg.com/vue@3/dist/vue.global.prod.js` |
+| Markdown rendering | `marked` | cdnjs |
+| Zip read/write (Download / Upload) | `JSZip` | cdnjs |
+| YAML read/write (`_graph.yaml`, `_presentation.yaml`) | `js-yaml` | cdnjs |
+| Icons | Tabler Icons webfont | jsdelivr |
+| Fonts | Lora / Outfit / JetBrains Mono | Google Fonts |
+
+All libraries are pulled from CDNs via `<script>`/`<link>` tags at the top of
+`editor.html` — no local `node_modules`. This mirrors the "no build step"
+constraint but is otherwise independent from the CSS design-token system
+shared with the rest of the platform (`--c-*` custom properties), which `gno/`
+also follows even though it doesn't import `assets/tokens.css` from
+`frontend/`.
+
+## File layout inside `editor.html`
+
+1. `<head>` — font/icon links, then a single `<style>` block defining the
+   `--c-*`/`--font-*` custom properties (light palette in `:root`, dark
+   palette under `@media (prefers-color-scheme: dark)`) and all component CSS.
+2. `<body>` — the Vue template: topbar, left nav (`#nav-panel`), and
+   `#main-area` containing four mutually-exclusive view panels toggled by
+   `view === '...'` (`editor`, `graph`, `presentation`, `player`).
+3. A single trailing `<script>` block containing:
+   - Free (non-Vue) functions: the `.gno` parser, entity analyzer, Markdown
+     preview renderer, syntax highlighter, graph layout, catalog parsers, and
+     scenario-SVG (de)serialization.
+   - One `createApp({ ... })` call holding all reactive state and the methods
+     the template binds to, mounted to `#app`.
+
+There is no component decomposition — the whole UI is one Vue root instance
+with template `v-if`/`v-show` blocks per view. Given the file's size (~4200
+lines), when making changes prefer `grep -n` for the section comments (each
+major function is preceded by a comment explaining its *why*) over reading
+the file top to bottom.
+
+## The four views
+
+The editor is one Vue app with a `view` ref switching between four panels;
+all four share the same in-memory narrative (`source`, the raw `.gno` text)
+and its derived state.
+
+### Editor
+Split pane: a plain `<textarea>` for the raw `.gno` source, with a read-only
+`<pre>` overlay behind it (`highlightGno`) providing the colored-token
+syntax highlighting, plus a live preview pane rendered by `renderGno`
+(`.gno` → HTML via `marked`, with scene headings, diverts, and `@entity`
+mentions substituted into styled spans first).
+
+### Graph
+A node-per-scene diagram. `layoutGraphNodes` auto-arranges scenes into
+left-to-right topological columns (BFS from root scenes, orphans handled
+separately); `layoutGraphEdges` draws cubic-bezier divert arrows between
+nodes based on their *final* rendered position. Nodes can be dragged; a
+dragged position, a chosen color, and a free-text annotation are stored per
+scene **title** in `nodeMeta` (title, not id, so the graph survives scene
+reordering/renumbering). `nodeMeta` round-trips through the session
+autosave and the downloadable `_graph.yaml`, but is **not** part of named
+browser-storage saves or the `.gno` file itself — it's presentation
+metadata, not narrative content.
+
+### Presentation
+Three sub-tabs building the visual/staging layer on top of the narrative,
+all persisted together as `_presentation.yaml`:
+- **Image Libraries** — external image catalogs registered by URL. A
+  catalog can be gnō's own simple YAML list, an IIIF Collection, or a
+  schema.org `ImageGallery`; `detectAndParseCatalog` sniffs the format and
+  `resolveCatalogUrl` treats a bare directory URL as "fetch gnō's default
+  catalog filename inside it."
+- **Entity** — associates narrative `@id`s with one or more library images
+  (`entityAssociations`).
+- **Scenarios** — a small SVG design canvas per scenario
+  (`buildScenarioSvg`/`parseScenarioSvg`), downloaded as one `.svg` file per
+  scenario inside the export zip.
+
+### Player
+Steps through the narrative as a reader would. `buildScenePlayback` splits
+a scene's body into *beats* (pause points), per the rules documented in
+`README.md` (a lone `---` line, or the end of a dialog/dialog-set unless
+only diverts follow). Alongside beats it tracks which entities are "on
+stage" — present since first mention, carrying their last-given state,
+until an explicit `@entity ->` exit or the scene ends — rendered in a
+separate panel independent of the narrative text itself.
+
+## Persistence model
+
+Three independent mechanisms share the same underlying bundle shape
+(narrative source + graph layout + presentation setup):
+
+| Mechanism | Trigger | Shape |
+|---|---|---|
+| Session autosave | Debounced (~600ms) on every edit, flushed immediately on tab hide/close | One `localStorage` draft key; restores work after a reload even without an explicit Save |
+| Named save (Save/Load buttons) | Explicit user action | One JSON blob per name in `localStorage`, prefix `gno-narrative-v2:<name>` (see migration notes in `README.md` for the pre-v2 format) |
+| Download / Upload | Explicit user action | A `.zip` containing `<name>.gno` + `<name>_graph.yaml` + `<name>_presentation.yaml` + one `scene/*.svg` per scenario design |
+
+Named saves and the session draft keep `scenario_designs` as live data (the
+same structure `buildScenarioSvg` renders from) rather than pre-rendered
+SVG, so the two representations can never drift apart; only the downloadable
+zip materializes the SVGs, as files meant to be viewed outside the app.
+Uploading a single `.gno`/`.md`/`.txt` file (not a zip) loads narrative text
+only and clears graph/presentation state, since there's nothing else to
+restore it from.
+
+## Parsing pipeline
+
+`source` (raw text) flows through a small set of pure functions, each
+independent and re-run reactively as the user types:
+
+1. `parseGno(source)` — splits the text into scenes by `# Title: Scenario
+   (Start|End)?` headings, extracting each scene's body and its trailing
+   divert list (`* Label -> Target`).
+2. `analyzeEntities(source)` — regex-based detection of the three `@entity`
+   forms (standalone, dialog-leading, inline), using Unicode letter/number
+   classes so accented ids are matched in full.
+3. `renderGno(source, scenes, entities)` — produces the live preview HTML,
+   substituting scene headings/diverts/entity mentions with styled spans
+   before handing the rest of each line to `marked`.
+4. `highlightGno(source, entities)` — tokenizes each line for the editor's
+   syntax-highlight overlay.
+5. `buildScenePlayback(scene, ...)` — (Player-only) turns one scene's body
+   into the beat/pause sequence described above.
+
+None of these functions depend on Vue; they operate on plain strings/arrays
+and are called from computed properties inside the app.
