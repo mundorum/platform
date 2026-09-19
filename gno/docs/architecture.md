@@ -89,7 +89,8 @@ all persisted together as `_presentation.yaml`:
   (`buildScenarioSvg`/`parseScenarioSvg`), downloaded as one `.svg` file per
   scenario inside the export zip. The canvas (whose size the background
   always fills) is resized by dragging its bottom-right corner or by typing
-  width/height. Three kinds of item can be placed on it — entities, anchors,
+  width/height; holding Shift while dragging, or turning on the lock toggle
+  beside the inputs, keeps the current proportion. Three kinds of item can be placed on it — entities, anchors,
   and text areas — and every item has an ID, unique within the scenario, that
   is edited in the sidebar inspector after placement. New anchors and text
   areas start as `anchor_n` / `text_n` (lowest free `n` from 1); entities

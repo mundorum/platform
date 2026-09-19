@@ -1334,6 +1334,16 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 .scenario-size-label { font-weight: 500; }
 .scenario-size-x { color: var(--c-muted); }
 .scenario-size-hint { font-size: 11.5px; font-style: italic; }
+.scenario-lock-btn {
+  padding: 3px 6px;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 5px;
+  background: var(--c-surface);
+  color: var(--c-muted);
+  font-size: 14px; line-height: 1;
+  cursor: pointer;
+}
+.scenario-lock-btn.active { background: var(--c-accent-light); color: var(--c-accent); border-color: var(--c-accent); }
 
 /* canvas corner handle + text-area frames (design-time chrome, drawn inside the SVG) */
 .scenario-canvas-handle { cursor: nwse-resize; }
@@ -1964,7 +1974,11 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                   <span class="scenario-size-x">×</span>
                   <input class="inspector-input num" type="number" :min="100" :max="10000" step="1"
                          :value="scenarioDesigns[name].height" @change="setScenarioSize(name, 'height', $event)" title="Height (px)">
-                  <span class="scenario-size-hint">px — the background fills the canvas; drag its bottom-right corner to resize.</span>
+                  <button class="scenario-lock-btn" :class="{active: lockCanvasRatio}" @click="lockCanvasRatio = !lockCanvasRatio"
+                          :title="lockCanvasRatio ? 'Proportion locked — click to unlock' : 'Lock the proportion (or hold Shift while dragging)'">
+                    <i class="ti" :class="lockCanvasRatio ? 'ti-lock' : 'ti-lock-open'"></i>
+                  </button>
+                  <span class="scenario-size-hint">px — the background fills the canvas; drag its bottom-right corner to resize (hold Shift to keep the proportion).</span>
                 </div>
                 <div class="image-grid" v-if="bgPickerScenario === name">
                   <div
@@ -3630,6 +3644,7 @@ createApp({
     const idDraft = ref('');
     const idError = ref('');
 
+    const lockCanvasRatio = ref(false); // keep the canvas proportion when resizing it (Shift does the same, per drag)
     const MIN_CANVAS = 100, MAX_CANVAS = 10000;
     const MIN_TEXT_SIDE = 20; // smaller drags are treated as accidental clicks in text mode
 
@@ -3662,11 +3677,26 @@ createApp({
 
     // Typed width/height for the canvas (and so its background, which always
     // fills it). Empty/garbage input is ignored; the bound :value snaps back.
+    // With the proportion locked, typing one side rescales both from the
+    // canvas's current size instead.
     function setScenarioSize(name, key, e) {
       const design = scenarioDesigns[name];
+      if (!design) return;
       const n = parseFloat(e.target.value);
-      if (design && Number.isFinite(n)) design[key] = clampInt(n, MIN_CANVAS, MAX_CANVAS);
-      if (design) e.target.value = design[key];
+      if (Number.isFinite(n)) {
+        if (lockCanvasRatio.value) Object.assign(design, scaledCanvas(design.width, design.height, n / design[key]));
+        else design[key] = clampInt(n, MIN_CANVAS, MAX_CANVAS);
+      }
+      e.target.value = design[key];
+    }
+
+    // Scales w0 x h0 by s, clamping s (not each side) so both stay within
+    // the canvas limits and the proportion survives the clamp.
+    function scaledCanvas(w0, h0, s) {
+      const lo = Math.max(MIN_CANVAS / w0, MIN_CANVAS / h0);
+      const hi = Math.min(MAX_CANVAS / w0, MAX_CANVAS / h0);
+      const c = Math.min(hi, Math.max(lo, s));
+      return { width: Math.round(w0 * c), height: Math.round(h0 * c) };
     }
 
     function onBgResizeMouseDown(name, e) {
@@ -3888,8 +3918,16 @@ createApp({
       }
       const b = bgResizeState.value;
       if (b && scenarioDesigns[b.name]) {
-        scenarioDesigns[b.name].width = clampInt(b.origW + (e.clientX - b.startX), MIN_CANVAS, MAX_CANVAS);
-        scenarioDesigns[b.name].height = clampInt(b.origH + (e.clientY - b.startY), MIN_CANVAS, MAX_CANVAS);
+        const design = scenarioDesigns[b.name];
+        const dw = b.origW + (e.clientX - b.startX), dh = b.origH + (e.clientY - b.startY);
+        if (e.shiftKey || lockCanvasRatio.value) {
+          // Follow whichever axis the pointer has moved further (relatively).
+          const sx = dw / b.origW, sy = dh / b.origH;
+          Object.assign(design, scaledCanvas(b.origW, b.origH, Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy));
+        } else {
+          design.width = clampInt(dw, MIN_CANVAS, MAX_CANVAS);
+          design.height = clampInt(dh, MIN_CANVAS, MAX_CANVAS);
+        }
       }
       const t = textResizeState.value;
       if (t) {
@@ -4603,7 +4641,7 @@ Write your scene description here.
       scenarioDesigns, scenarioIdsForPresentation, openScenario, bgPickerScenario, placeMode,
       toggleScenario, resetScenario, toggleBgPicker, setScenarioBackground, removeScenarioBackground,
       onPaletteDragStart, onCanvasDrop, removeScenarioItem, onItemMouseDown,
-      setScenarioSize, onBgResizeMouseDown, onTextResizeMouseDown, onScenarioCanvasMouseDown, textDraw, textDrawRect,
+      setScenarioSize, lockCanvasRatio, onBgResizeMouseDown, onTextResizeMouseDown, onScenarioCanvasMouseDown, textDraw, textDrawRect,
       selectedItemId, selectedItem, idDraft, idError, idSuggestions, onIdDraftInput, renameSelectedItem,
       setItemNumber, isKnownFont, TEXT_FONTS,
     };
