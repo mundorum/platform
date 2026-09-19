@@ -31,7 +31,9 @@ also follows even though it doesn't import `assets/tokens.css` from
 
 ## File layout inside `editor.html`
 
-1. `<head>` — font/icon links, then a single `<style>` block defining the
+1. `<head>` — the favicon (an inline SVG `data:` URI of the app-tile icon from
+   `design/icons/gno-icon-tile.svg`, so the file stays self-contained),
+   font/icon links, then a single `<style>` block defining the
    `--c-*`/`--font-*` custom properties (light palette in `:root`, dark
    palette under `@media (prefers-color-scheme: dark)`) and all component CSS.
 2. `<body>` — the Vue template: topbar, left nav (`#nav-panel`), and

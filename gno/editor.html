@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>gnō- Narrative Editor</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%3E%3Crect%20width=%2264%22%20height=%2264%22%20rx=%2214%22%20fill=%22%237a3e1a%22/%3E%3Cg%20fill=%22none%22%20stroke=%22%23f8f3e8%22%20stroke-width=%223.6%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20transform=%22translate%286.4%206.4%29%20scale%280.8%29%22%3E%3Cpath%20d=%22M6%2052V32A26%2026%200%200%201%2058%2032V52M3%2052H61%22/%3E%3Crect%20x=%2213%22%20y=%2228%22%20width=%2212%22%20height=%2212%22%20rx=%223.5%22/%3E%3Cpath%20d=%22M25%2034H30M30%2034C36%2034%2036%2024%2041%2024M30%2034C35%2034%2036%2043%2041%2043%22/%3E%3Cpath%20d=%22M41%2020L49%2024L41%2028ZM41%2039L49%2043L41%2047Z%22%20fill=%22%23f8f3e8%22/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -102,7 +103,18 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   white-space: nowrap;
   margin-right: 6px;
 }
-#topbar-logo i { font-size: 19px; }
+.gno-logo {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--c-text);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.gno-logo-a { fill: var(--c-accent); stroke: var(--c-accent); }
+.gno-logo-b { fill: var(--c-text);   stroke: var(--c-text); }
 
 .tb-btn {
   display: flex;
@@ -1556,7 +1568,16 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
   <!-- Topbar -->
   <header id="topbar">
     <div id="topbar-logo">
-      <i class="ti ti-feather"></i>
+      <svg class="gno-logo" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M6 52 V32 A26 26 0 0 1 58 32 V52"/>
+        <path d="M3 52 H61"/>
+        <rect x="13" y="28" width="12" height="12" rx="3.5"/>
+        <path d="M25 34 H30"/>
+        <path d="M30 34 C36 34 36 24 41 24"/>
+        <path d="M30 34 C35 34 36 43 41 43"/>
+        <path class="gno-logo-a" d="M41 20 L49 24 L41 28 Z"/>
+        <path class="gno-logo-b" d="M41 39 L49 43 L41 47 Z"/>
+      </svg>
       gnō-
     </div>
 
