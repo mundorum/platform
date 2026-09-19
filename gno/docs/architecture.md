@@ -79,10 +79,12 @@ metadata, not narrative content.
 Three sub-tabs building the visual/staging layer on top of the narrative,
 all persisted together as `_presentation.yaml`:
 - **Image Libraries** — external image catalogs registered by URL. A
-  catalog can be gnō's own simple YAML list, an IIIF Collection, or a
-  schema.org `ImageGallery`; `detectAndParseCatalog` sniffs the format and
-  `resolveCatalogUrl` treats a bare directory URL as "fetch gnō's default
-  catalog filename inside it."
+  catalog can be gnō's own simple list (`gno-catalog.yaml`, or its restricted
+  Markdown twin `gno-catalog.md` — a bullet list of `* ![id](path)` items),
+  an IIIF Collection, or a schema.org `ImageGallery`; `detectAndParseCatalog`
+  sniffs the format (`.md` by extension) and `resolveCatalogUrls` treats a
+  bare directory URL as "fetch `gno-catalog.yaml` inside it, else
+  `gno-catalog.md`" (`fetchCatalog`).
 - **Entity** — associates narrative `@id`s with one or more library images
   (`entityAssociations`). Entities the narrative never mentions (scenery,
   props) can be declared with the "Add entity" field; those ids live in
