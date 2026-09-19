@@ -223,7 +223,7 @@ Controls that don't apply right now are hidden. If the design lacks a control, t
 
 ## Browser Storage (Save / Load)
 
-The `Save` and `Load` buttons keep named narratives in the browser's `localStorage`, under the key prefix `gno-narrative-v2:<name>`. Each entry is a JSON bundle: the narrative source, the graph layout (`_graph.yaml` equivalent), and the presentation setup (`_presentation.yaml` equivalent — image libraries, entity/image associations, scenario designs). Scenario SVGs aren't stored separately here; the scenario design data is what `Download` renders them from, so keeping one copy avoids the two ever drifting apart.
+The `Save` and `Load` buttons keep named narratives in the browser's `localStorage`, under the key prefix `gno-narrative-v2:<name>`. Each entry is a JSON bundle: the narrative source, the graph layout (`_graph.yaml` equivalent), and the presentation setup (`_presentation.yaml` equivalent — image libraries, entity/image associations, declared entities, scenario designs). Scenario SVGs aren't stored separately here; the scenario design data is what `Download` renders them from, so keeping one copy avoids the two ever drifting apart.
 
 ### Migrating narratives saved before this format (v1)
 

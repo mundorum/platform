@@ -84,7 +84,12 @@ all persisted together as `_presentation.yaml`:
   `resolveCatalogUrl` treats a bare directory URL as "fetch gnō's default
   catalog filename inside it."
 - **Entity** — associates narrative `@id`s with one or more library images
-  (`entityAssociations`).
+  (`entityAssociations`). Entities the narrative never mentions (scenery,
+  props) can be declared with the "Add entity" field; those ids live in
+  `extraEntities` (`extra_entities:` in `_presentation.yaml`) because, unlike
+  narrative entities, nothing in the text would bring them back on reload.
+  They appear in the Scenarios palette like any other entity and can be
+  removed again; narrative entities can't (the text defines them).
 - **Scenarios** — a small SVG design canvas per scenario
   (`buildScenarioSvg`/`parseScenarioSvg`), downloaded as one `.svg` file per
   scenario inside the export zip.

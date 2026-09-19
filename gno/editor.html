@@ -1947,12 +1947,31 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
         </template>
 
         <template v-else-if="presentationTab === 'entities'">
+          <div class="lib-add-row">
+            <input
+              class="lib-add-input"
+              type="text"
+              v-model="newEntityId"
+              placeholder="@name of an entity the narrative doesn't mention…"
+              spellcheck="false"
+              @keydown.enter="addExtraEntity"
+            >
+            <button class="tb-btn" @click="addExtraEntity"><i class="ti ti-plus"></i> Add entity</button>
+          </div>
+          <div class="lib-add-hint">
+            Entities written as <code>@name</code> in the narrative are listed automatically. Add one here for scenery or props (a throne, a tree) that only appear in the scenario designs.
+          </div>
+
           <div class="lib-list" v-if="entityIdsForPresentation.length">
             <div class="lib-card" v-for="entId in entityIdsForPresentation" :key="entId">
               <div class="lib-card-header" style="cursor: pointer;" @click="toggleEntityImages(entId)">
                 <i class="ti" :class="openEntityImages.has(entId) ? 'ti-chevron-down' : 'ti-chevron-right'"></i>
                 <span class="lib-id-input" style="border-color: transparent; cursor: pointer;">{{ entId }}</span>
+                <span class="lib-url" v-if="isDeclaredEntity(entId)">not in the narrative</span>
                 <span class="lib-status">{{ (entityAssociations[entId] || []).length }} image(s)</span>
+                <div class="lib-actions" v-if="isDeclaredEntity(entId)">
+                  <button class="nav-icon-btn" title="Remove entity" @click.stop="removeExtraEntity(entId)"><i class="ti ti-trash"></i></button>
+                </div>
               </div>
               <template v-if="openEntityImages.has(entId)">
                 <div class="ent-assoc-list" v-if="(entityAssociations[entId] || []).length">
@@ -2008,7 +2027,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
             </div>
           </div>
           <div class="pres-subtab-placeholder" v-else>
-            No entities yet. Reference one in the narrative with <code>@name</code>, then come back here to attach images.
+            No entities yet. Reference one in the narrative with <code>@name</code>, or add one above, then attach images to it.
           </div>
         </template>
 
@@ -3536,6 +3555,26 @@ function sanitizeEntityAssociations(raw) {
   return out;
 }
 
+// "throne" / "@throne" -> "@throne" (the form narrative entity ids take), or
+// null when it isn't a valid identifier — same character set as ID_RE in
+// analyzeEntities, so a declared entity can later be written as @id in the text.
+function normalizeEntityId(raw) {
+  const id = String(raw == null ? '' : raw).trim().replace(/^@/, '');
+  return /^[\p{L}\p{N}_'-]+$/u.test(id) ? '@' + id : null;
+}
+
+// Entities declared in Presentation without being mentioned in the narrative.
+function sanitizeExtraEntities(raw) {
+  const out = [];
+  if (Array.isArray(raw)) {
+    raw.forEach(v => {
+      const id = normalizeEntityId(v);
+      if (id && !out.includes(id)) out.push(id);
+    });
+  }
+  return out;
+}
+
 // Rebuilds one placed item from stored data, or returns null to drop it.
 // Anchors from older saves carried a separate `label`; their svgId (a slug of
 // that label) is now the only identifier, so the label is simply not carried on.
@@ -3795,6 +3834,13 @@ createApp({
     const openEntityImages = reactive(new Set());
     const imagePickerEntity = ref(null);
 
+    // extraEntities: ids ("@throne") declared here for scenery or props the
+    // narrative never mentions. They have no occurrences, so unlike narrative
+    // entities they must be stored themselves — an entity with no images yet
+    // would otherwise vanish on reload. Persisted as `extra_entities:`.
+    const extraEntities = reactive(sanitizeExtraEntities(draft && draft.presentation && draft.presentation.extra_entities));
+    const newEntityId = ref('');
+
     const imageLibraryIds = computed(() => Object.keys(imageLibraries));
 
     function uniqueLibraryId(base) {
@@ -3965,8 +4011,40 @@ createApp({
       imagePickerEntity.value = imagePickerEntity.value === entityId ? null : entityId;
     }
 
-    function clearEntityAssociations() {
+    function clearEntitySetup() {
       Object.keys(entityAssociations).forEach(k => delete entityAssociations[k]);
+      extraEntities.length = 0;
+    }
+
+    // Declared entities the narrative doesn't mention — the only ones that can
+    // be removed from here, since the others are defined by the text itself.
+    function isDeclaredEntity(id) {
+      return extraEntities.includes(id) && !entities.value.entityIndex.has(id);
+    }
+
+    function addExtraEntity() {
+      const raw = newEntityId.value.trim();
+      if (!raw) return;
+      const id = normalizeEntityId(raw);
+      if (!id) {
+        alert('An entity name may only contain letters, numbers, "_", "\'" and "-".');
+        return;
+      }
+      // Already known (in the narrative, declared, or carrying images): just
+      // show it rather than creating a duplicate.
+      if (!entityIdsForPresentation.value.includes(id)) extraEntities.push(id);
+      openEntityImages.add(id);
+      newEntityId.value = '';
+    }
+
+    function removeExtraEntity(id) {
+      const count = (entityAssociations[id] || []).length;
+      if (count && !window.confirm(`Remove ${id} and its ${count} image association(s)?`)) return;
+      delete entityAssociations[id];
+      const i = extraEntities.indexOf(id);
+      if (i >= 0) extraEntities.splice(i, 1);
+      openEntityImages.delete(id);
+      if (imagePickerEntity.value === id) imagePickerEntity.value = null;
     }
 
     // Every image currently loaded across all libraries, tagged with its
@@ -3982,11 +4060,12 @@ createApp({
       return out;
     });
 
-    // Union of narrative entity ids and any entity ids already carrying
-    // associations — an association isn't dropped just because its @id was
-    // since removed from the narrative text.
+    // Union of narrative entity ids, declared ones, and any entity ids already
+    // carrying associations — an association isn't dropped just because its @id
+    // was since removed from the narrative text.
     const entityIdsForPresentation = computed(() => {
       const ids = new Set(entityList.value.map(e => e.id));
+      extraEntities.forEach(id => ids.add(id));
       Object.keys(entityAssociations).forEach(id => ids.add(id));
       return [...ids].sort();
     });
@@ -4396,6 +4475,7 @@ createApp({
         version: 1,
         image_libraries: { ...imageLibraries },
         entities: { ...entityAssociations },
+        extra_entities: [...extraEntities],
         scenarios: scenarioFileMap(),
       }, { lineWidth: -1 });
     }
@@ -4405,7 +4485,7 @@ createApp({
     // resolved against that same zip's other files and reparsed.
     async function applyPresentationYaml(text, zip) {
       clearImageLibraries();
-      clearEntityAssociations();
+      clearEntitySetup();
       clearScenarioDesigns();
       let data;
       try {
@@ -4419,6 +4499,7 @@ createApp({
         loadLibraryCatalog(id);
       });
       Object.assign(entityAssociations, sanitizeEntityAssociations(data && data.entities));
+      extraEntities.push(...sanitizeExtraEntities(data && data.extra_entities));
       if (data && data.scenarios && typeof data.scenarios === 'object' && zip) {
         for (const [scenarioId, path] of Object.entries(data.scenarios)) {
           if (typeof path !== 'string') continue;
@@ -4905,7 +4986,7 @@ Write your scene description here.
             await applyPresentationYaml(await presentationEntries[0].async('string'), zip);
           } else {
             clearImageLibraries();
-            clearEntityAssociations();
+            clearEntitySetup();
             clearScenarioDesigns();
           }
 
@@ -4932,7 +5013,7 @@ Write your scene description here.
         loadedNarrativeName.value = null;
         clearNodeMeta();
         clearImageLibraries();
-        clearEntityAssociations();
+        clearEntitySetup();
         clearScenarioDesigns();
         const reader = new FileReader();
         reader.onload = ev => { source.value = ev.target.result; };
@@ -4986,6 +5067,7 @@ Write your scene description here.
         presentation: {
           image_libraries: { ...imageLibraries },
           entities: { ...entityAssociations },
+          extra_entities: [...extraEntities],
           scenario_designs: { ...scenarioDesigns },
         },
         savedAt: Date.now(),
@@ -5017,7 +5099,7 @@ Write your scene description here.
       loadMenuOpen.value = false;
       clearNodeMeta();
       clearImageLibraries();
-      clearEntityAssociations();
+      clearEntitySetup();
       clearScenarioDesigns();
 
       if (bundle) {
@@ -5028,6 +5110,7 @@ Write your scene description here.
           loadLibraryCatalog(id);
         });
         Object.assign(entityAssociations, sanitizeEntityAssociations(p.entities));
+        extraEntities.push(...sanitizeExtraEntities(p.extra_entities));
         Object.assign(scenarioDesigns, sanitizeScenarioDesigns(p.scenario_designs));
       }
       resetPlayerProgress();
@@ -5040,7 +5123,7 @@ Write your scene description here.
       loadMenuOpen.value = false;
       clearNodeMeta();
       clearImageLibraries();
-      clearEntityAssociations();
+      clearEntitySetup();
       clearScenarioDesigns();
       resetPlayerProgress();
     }
@@ -5059,7 +5142,7 @@ Write your scene description here.
       activeSceneId.value = '';
       clearNodeMeta();
       clearImageLibraries();
-      clearEntityAssociations();
+      clearEntitySetup();
       clearScenarioDesigns();
       resetPlayerProgress();
     }
@@ -5078,6 +5161,7 @@ Write your scene description here.
           presentation: {
             image_libraries: { ...imageLibraries },
             entities: { ...entityAssociations },
+            extra_entities: [...extraEntities],
             scenario_designs: { ...scenarioDesigns },
           },
           savedAt: Date.now(),
@@ -5085,7 +5169,7 @@ Write your scene description here.
       } catch (e) { /* storage unavailable/full — draft recovery is best-effort */ }
     }
     let autosaveTimer = null;
-    watch([source, filename, loadedNarrativeName, nodeMeta, imageLibraries, entityAssociations, scenarioDesigns], () => {
+    watch([source, filename, loadedNarrativeName, nodeMeta, imageLibraries, entityAssociations, extraEntities, scenarioDesigns], () => {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       autosaveTimer = setTimeout(saveCurrentDraft, 600);
     });
@@ -5124,6 +5208,7 @@ Write your scene description here.
       defaultCatalogFilename: DEFAULT_CATALOG_FILENAME,
       addImageLibraryFromInput, removeImageLibrary, renameImageLibrary, loadLibraryCatalog, showMoreImages, brokenCount,
       entityAssociations, entityIdsForPresentation, allCatalogImages, openEntityImages, imagePickerEntity,
+      newEntityId, addExtraEntity, removeExtraEntity, isDeclaredEntity,
       isImageAssociated, associateImage, removeEntityImage, addLabelToAssociation, onAddLabel,
       removeLabelFromAssociation, resolveAssocImage, toggleEntityImages, togglePicker,
       scenarioDesigns, scenarioIdsForPresentation, openScenario, bgPickerScenario, placeMode,
