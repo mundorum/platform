@@ -112,7 +112,7 @@ If no scene is marked `(Start)`, the player falls back to the first scene in the
 While playing a scene, the player reveals its content a little at a time, clearing the screen at each pause so only the newly-revealed text and dialogs are shown (not a growing transcript). It stops at each pause to show a "continue" icon (or button); pressing `space` also advances. A pause happens in two situations:
 
 1. **After a dialog.** Once a single dialog line, or an unbroken run of consecutive dialog lines (a *dialog set*), has been shown, the player pauses before continuing — **unless** nothing but the scene's diverts follow that dialog. In that case there's no pause: the dialog stays on screen together with the divert options, since offering the diverts is already a wait for the reader to pick one.
-2. **At a lone `---` line.** A line containing only `---` forces a pause at that point. The `---` itself is never shown to the reader — it is a pure pause marker.
+2. **At a lone `--` line.** A line containing only `--` forces a pause at that point. The `--` itself is never shown to the reader — it is a pure pause marker.
 
 Plain prose, standalone entity lines (`@princess right curious`), and inline mentions do **not** cause a pause by themselves; they simply accumulate into whatever is shown at the next pause.
 
@@ -135,7 +135,7 @@ For example, given this scene:
 
 The castle garden is bright and cold.
 
----
+--
 
 The fountain has things moving under its waters.
 

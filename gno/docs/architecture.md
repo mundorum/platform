@@ -92,7 +92,7 @@ all persisted together as `_presentation.yaml`:
 ### Player
 Steps through the narrative as a reader would. `buildScenePlayback` splits
 a scene's body into *beats* (pause points), per the rules documented in
-`README.md` (a lone `---` line, or the end of a dialog/dialog-set unless
+`README.md` (a lone `--` line, or the end of a dialog/dialog-set unless
 only diverts follow). Alongside beats it tracks which entities are "on
 stage" — present since first mention, carrying their last-given state,
 until an explicit `@entity ->` exit or the scene ends — rendered in a

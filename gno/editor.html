@@ -2076,7 +2076,7 @@ const DEMO_MARKER = '__demo__';
 // never shown automatically, so a blank editor always starts truly empty.
 // Demonstrates every construct documented in README.md: scenarios/scenes,
 // diverts, all three entity forms (standalone+state, dialog, inline), the
-// (Start)/(End) markers, the Player's pause triggers ("---" and a dialog or
+// (Start)/(End) markers, the Player's pause triggers ("--" and a dialog or
 // dialog set), and an entity leaving the scene (`@guard ->`) partway through,
 // so it drops out of the entities-on-stage panel.
 const DEMO_SOURCE = `# The Council Chamber: Castle (Start)
@@ -2397,7 +2397,7 @@ function restIsOnlyDiverts(lines, fromIdx, toIdx) {
 
 /* ── PLAYER: splits a scene's body into pause-delimited "beats" ── */
 // A new beat starts after:
-//   - a lone "---" line (the line itself is dropped, not shown), or
+//   - a lone "--" line (the line itself is dropped, not shown), or
 //   - the last line of a dialog (or an unbroken run of dialog lines) —
 //     *unless* nothing but the scene's diverts follow it, since presenting
 //     the diverts is already a wait and doesn't need a pause of its own.
@@ -2453,7 +2453,7 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
     const line = lines[idx];
     const trimmed = line.trim();
 
-    if (trimmed === '---') { flushBeat(); continue; }
+    if (trimmed === '--') { flushBeat(); continue; }
     if (DIVERT_RE.test(trimmed)) continue; // diverts are presented separately, not as beat content
 
     if (blockByLine.has(idx)) {
