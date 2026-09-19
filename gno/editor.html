@@ -1320,6 +1320,35 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
     repeating-conic-gradient(var(--c-bg) 0% 25%, var(--c-surface) 0% 50%) 0 0 / 20px 20px;
   max-height: 560px;
 }
+.scenario-wide-btn { margin-left: auto; }
+.scenario-mode-toggle { align-items: center; }
+.scenario-wide-title { font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--c-accent); }
+.inspector-convert { width: 100%; justify-content: center; margin-top: 12px; }
+
+/* Wide editor: the workspace (toolbar + canvas + sidebar) is lifted out of
+   the page and fills the window, so nothing but what editing a scenario
+   needs stays on screen. */
+.scenario-workspace.wide {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; flex-direction: column;
+  background: var(--c-bg);
+}
+.scenario-workspace.wide .scenario-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px;
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background: var(--c-surface);
+  border-bottom: 0.5px solid var(--c-border-strong);
+}
+.scenario-workspace.wide .scenario-toolbar > * { padding: 0; border-bottom: none; }
+.scenario-workspace.wide .scenario-mode-toggle { flex: 1; }
+.scenario-workspace.wide .scenario-size-hint { display: none; }
+.scenario-workspace.wide .scenario-toolbar .image-grid { order: 10; flex-basis: 100%; max-height: 220px; overflow-y: auto; padding: 8px 0 0; }
+.scenario-workspace.wide .scenario-editor { flex: 1; min-height: 0; align-items: stretch; padding: 10px 14px 14px; }
+.scenario-workspace.wide .scenario-canvas-wrap { max-height: none; min-width: 0; }
+.scenario-workspace.wide .scenario-side { overflow-y: auto; }
+.scenario-workspace.wide .scenario-palette { max-height: none; overflow-y: visible; }
+
 .scenario-svg { display: block; }
 .scenario-svg.text-mode { cursor: crosshair; }
 .scenario-side { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; }
@@ -1955,6 +1984,9 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
               </div>
 
               <template v-if="openScenario === name">
+               <div class="scenario-workspace" :class="{wide: wideScenario}">
+                <div class="scenario-toolbar">
+                <span class="scenario-wide-title" v-if="wideScenario"><i class="ti ti-map"></i> {{ name }}</span>
                 <div class="scenario-bg-row">
                   <template v-if="scenarioDesigns[name].background">
                     <img class="scenario-bg-thumb" :src="scenarioDesigns[name].background.url" alt="background">
@@ -2000,14 +2032,15 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                   <button class="scenario-mode-btn" :class="{active: placeMode === 'entity'}" @click="placeMode = 'entity'">
                     <i class="ti ti-user"></i> Place: Entity
                   </button>
-                  <button class="scenario-mode-btn" :class="{active: placeMode === 'anchor'}" @click="placeMode = 'anchor'">
-                    <i class="ti ti-map-pin"></i> Place: Anchor
-                  </button>
                   <button class="scenario-mode-btn" :class="{active: placeMode === 'text'}" @click="placeMode = 'text'">
                     <i class="ti ti-typography"></i> Place: Text
                   </button>
                   <span class="scenario-mode-hint" v-if="placeMode === 'text'">Drag over the canvas to draw the text area.</span>
-                  <span class="scenario-mode-hint" v-else-if="placeMode === 'anchor'">Drag any entity tile onto the canvas to drop an anchor.</span>
+                  <button class="scenario-mode-btn scenario-wide-btn" @click="wideScenario = !wideScenario"
+                          :title="wideScenario ? 'Back to the normal layout (Esc)' : 'Widen the editor: hide everything around it'">
+                    <i class="ti" :class="wideScenario ? 'ti-arrows-minimize' : 'ti-arrows-maximize'"></i> {{ wideScenario ? 'Exit wide (Esc)' : 'Wide editor' }}
+                  </button>
+                </div>
                 </div>
 
                 <div class="scenario-editor">
@@ -2127,6 +2160,13 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                         </button>
                       </div>
 
+                      <template v-if="selectedItem.kind === 'entity'">
+                        <button class="tb-btn ghost inspector-convert" @click="convertSelectedToAnchor">
+                          <i class="ti ti-map-pin"></i> Convert to anchor
+                        </button>
+                        <div class="inspector-hint">Removes the image and keeps the position and size, as a placeholder for the entity.</div>
+                      </template>
+
                       <template v-if="selectedItem.kind === 'text'">
                         <label class="inspector-label">Initial text</label>
                         <textarea class="inspector-input" rows="4" v-model="selectedItem.text"></textarea>
@@ -2185,6 +2225,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                   </div>
                   </div>
                 </div>
+               </div>
               </template>
             </div>
           </div>
@@ -3661,13 +3702,14 @@ createApp({
     const scenarioDesigns = reactive(sanitizeScenarioDesigns(draft && draft.presentation && draft.presentation.scenario_designs));
     const openScenario = ref(null);
     const bgPickerScenario = ref(null);
-    const placeMode = ref('entity'); // 'entity' | 'anchor' | 'text'
+    const placeMode = ref('entity'); // 'entity' | 'text'
     let dragPayload = null; // {entityId, library, image} — set on palette dragstart, consumed on canvas drop
     const itemDragState = ref(null);
     const bgResizeState = ref(null);   // dragging the canvas corner handle
     const itemResizeState = ref(null); // dragging an item's corner handle (entity, anchor or text area)
     const textDraw = ref(null);        // rubber-band rectangle while placing a text area
     const selectedItemId = ref(null);  // svgId of the item shown in the inspector (openScenario only)
+    const wideScenario = ref(false);   // wide editor: the workspace covers the whole window
     const idDraft = ref('');
     const idError = ref('');
 
@@ -3693,6 +3735,7 @@ createApp({
     function toggleScenario(name) {
       openScenario.value = openScenario.value === name ? null : name;
       selectedItemId.value = null;
+      wideScenario.value = false;
       if (openScenario.value) ensureScenarioDesign(name);
     }
 
@@ -3809,13 +3852,6 @@ createApp({
       const design = ensureScenarioDesign(name);
       const usedIds = usedItemIds(design);
 
-      if (placeMode.value === 'anchor') {
-        const svgId = nextSeqId(usedIds, 'anchor_');
-        design.items.push({ kind: 'anchor', svgId, x: Math.round(x), y: Math.round(y), w: ANCHOR_SIZE, h: ANCHOR_SIZE });
-        selectedItemId.value = svgId;
-        return;
-      }
-
       const base = normalizeToSlug(payload.entityId.replace(/^@/, ''));
       let svgId = base, n = 1;
       while (usedIds.has(svgId)) { svgId = `${base}_${n}`; n++; }
@@ -3823,6 +3859,26 @@ createApp({
       design.items.push({
         kind: 'entity', svgId, entityId: payload.entityId, library: payload.library, image: payload.image, url: img.url,
         x: Math.round(x - size / 2), y: Math.round(y - size / 2), w: size, h: size,
+      });
+      selectedItemId.value = svgId;
+    }
+
+    // Anchors are made from entities: place the entity, size it while its image
+    // is still visible, then turn it into an anchor — the image goes away, the
+    // footprint stays. x/y switches from the entity's top-left to the anchor's
+    // center. The ID becomes the next anchor_n unless the user already chose
+    // one (i.e. it's no longer the auto-generated one derived from the entity).
+    function convertSelectedToAnchor() {
+      const item = selectedItem.value;
+      const design = scenarioDesigns[openScenario.value];
+      if (!item || !design || item.kind !== 'entity') return;
+      const idx = design.items.findIndex(it => it.svgId === item.svgId);
+      const auto = normalizeToSlug(String(item.entityId).replace(/^@/, ''));
+      const isAutoId = item.svgId === auto || new RegExp('^' + auto + '_\\d+$').test(item.svgId);
+      const svgId = isAutoId ? nextSeqId(usedItemIds(design), 'anchor_') : item.svgId;
+      design.items.splice(idx, 1, {
+        kind: 'anchor', svgId,
+        x: Math.round(item.x + item.w / 2), y: Math.round(item.y + item.h / 2), w: item.w, h: item.h,
       });
       selectedItemId.value = svgId;
     }
@@ -4003,6 +4059,14 @@ createApp({
       itemResizeState.value = null;
       if (textDraw.value) finishTextDraw();
     }
+    // Esc leaves the wide editor; inside a form field it only blurs the field
+    // first, so cancelling an edit doesn't also throw away the layout.
+    window.addEventListener('keydown', e => {
+      if (e.key !== 'Escape' || !wideScenario.value) return;
+      const el = document.activeElement;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) el.blur();
+      else wideScenario.value = false;
+    });
     window.addEventListener('mousemove', onScenarioWindowMouseMove);
     window.addEventListener('mouseup', onScenarioWindowMouseUp);
 
@@ -4694,7 +4758,7 @@ Write your scene description here.
       scenarioDesigns, scenarioIdsForPresentation, openScenario, bgPickerScenario, placeMode,
       toggleScenario, resetScenario, toggleBgPicker, setScenarioBackground, removeScenarioBackground,
       onPaletteDragStart, onCanvasDrop, removeScenarioItem, onItemMouseDown,
-      setScenarioSize, lockCanvasRatio, lockItemRatio, setItemSize, onBgResizeMouseDown, onItemResizeMouseDown, onScenarioCanvasMouseDown, textDraw, textDrawRect,
+      setScenarioSize, lockCanvasRatio, lockItemRatio, setItemSize, convertSelectedToAnchor, wideScenario, onBgResizeMouseDown, onItemResizeMouseDown, onScenarioCanvasMouseDown, textDraw, textDrawRect,
       selectedItemId, selectedItem, idDraft, idError, idSuggestions, onIdDraftInput, renameSelectedItem,
       setItemNumber, isKnownFont, TEXT_FONTS,
     };

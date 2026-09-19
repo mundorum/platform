@@ -90,7 +90,9 @@ all persisted together as `_presentation.yaml`:
   scenario inside the export zip.
   - *Canvas:* its size, which the background always fills, is set by dragging
     the bottom-right corner or by typing width/height.
-  - *Items:* entities, anchors and text areas can be placed on it. Every item
+  - *Items:* entities and text areas are placed on it ("Place: Entity" drags
+    a tile from the palette, "Place: Text" drags out an area); anchors are
+    made from entities (see below). Every item
     has an ID, unique within the scenario, edited in the sidebar inspector
     after placement. New anchors and text areas start as `anchor_n` /
     `text_n` (lowest free `n` from 1); entities start as their entity id. The
@@ -101,12 +103,22 @@ all persisted together as `_presentation.yaml`:
     handle or typing width/height. Holding Shift while dragging, or the lock
     toggle beside the inputs (one for the canvas, one for items), keeps the
     current proportion.
-  - *Anchors* have a width/height too (default 36×36, drawn as an ellipse,
-    exported as `data-gno-width`/`data-gno-height`). Their x/y is their
-    center, so they grow around it.
+  - *Anchors* are made by placing an entity, sizing it while its image is
+    still visible, then using the inspector's "Convert to anchor" button: the
+    image is dropped and the footprint (size, and position as its center) is
+    kept. The ID becomes the next `anchor_n` unless the user had already
+    renamed it. Anchors are drawn as an ellipse and exported as a `<g>` with
+    `data-gno-width`/`data-gno-height` (36×36 if absent, e.g. in older
+    files). Their x/y is their center, so they grow around it when resized.
+    The conversion is one-way.
   - *Text areas* are drawn by dragging in "Place: Text" mode and exported as a
     `<foreignObject>` wrapping an HTML `<div>`, since SVG `<text>` cannot wrap
     lines; text, font, size and color are set in the inspector.
+  - *Wide editor:* a toolbar button lifts the whole workspace (toolbar,
+    canvas, sidebar) into a fixed full-window layer (`.scenario-workspace.wide`),
+    hiding the app's top bar, navigation and the 900px page column. Esc (or
+    the same button) leaves it. It is a layout switch only — the canvas is
+    still shown at 1:1, so a large background scrolls inside it.
 
 ### Player
 Steps through the narrative as a reader would. `buildScenePlayback` splits
