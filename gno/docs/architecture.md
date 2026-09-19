@@ -87,19 +87,26 @@ all persisted together as `_presentation.yaml`:
   (`entityAssociations`).
 - **Scenarios** — a small SVG design canvas per scenario
   (`buildScenarioSvg`/`parseScenarioSvg`), downloaded as one `.svg` file per
-  scenario inside the export zip. The canvas (whose size the background
-  always fills) is resized by dragging its bottom-right corner or by typing
-  width/height; holding Shift while dragging, or turning on the lock toggle
-  beside the inputs, keeps the current proportion. Three kinds of item can be placed on it — entities, anchors,
-  and text areas — and every item has an ID, unique within the scenario, that
-  is edited in the sidebar inspector after placement. New anchors and text
-  areas start as `anchor_n` / `text_n` (lowest free `n` from 1); entities
-  start as their entity id. The same inspector offers suggested IDs for all
-  kinds (`action_n`, `action_n_label`, `action_proceed`, `action_regress`),
-  plus `speech`, `_.speech` and `entity.speech` for text areas. A text area is
-  drawn by dragging in "Place: Text" mode and exported as a `<foreignObject>`
-  wrapping an HTML `<div>`, since SVG `<text>` cannot wrap lines; its text,
-  font, size and color are set in the inspector.
+  scenario inside the export zip.
+  - *Canvas:* its size, which the background always fills, is set by dragging
+    the bottom-right corner or by typing width/height.
+  - *Items:* entities, anchors and text areas can be placed on it. Every item
+    has an ID, unique within the scenario, edited in the sidebar inspector
+    after placement. New anchors and text areas start as `anchor_n` /
+    `text_n` (lowest free `n` from 1); entities start as their entity id. The
+    inspector offers suggested IDs for all kinds (`action_n`,
+    `action_n_label`, `action_proceed`, `action_regress`), plus `speech`,
+    `_.speech` and `entity.speech` for text areas.
+  - *Resizing:* the canvas and every item can be resized by dragging a corner
+    handle or typing width/height. Holding Shift while dragging, or the lock
+    toggle beside the inputs (one for the canvas, one for items), keeps the
+    current proportion.
+  - *Anchors* have a width/height too (default 36×36, drawn as an ellipse,
+    exported as `data-gno-width`/`data-gno-height`). Their x/y is their
+    center, so they grow around it.
+  - *Text areas* are drawn by dragging in "Place: Text" mode and exported as a
+    `<foreignObject>` wrapping an HTML `<div>`, since SVG `<text>` cannot wrap
+    lines; text, font, size and color are set in the inspector.
 
 ### Player
 Steps through the narrative as a reader would. `buildScenePlayback` splits

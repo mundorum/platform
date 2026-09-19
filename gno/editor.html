@@ -1396,9 +1396,9 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
 }
 .inspector-chip:hover { border-color: var(--c-accent); }
 .inspector-row { display: flex; gap: 10px; align-items: flex-end; }
-.inspector-row.four { gap: 4px; }
-.inspector-row.four .inspector-input.num { width: 100%; min-width: 0; padding: 4px 4px; -moz-appearance: textfield; }
-.inspector-row.four .inspector-input.num::-webkit-inner-spin-button { display: none; }
+.inspector-row.compact { gap: 4px; align-items: center; }
+.inspector-row.compact .inspector-input.num { width: 100%; min-width: 0; padding: 4px 4px; -moz-appearance: textfield; }
+.inspector-row.compact .inspector-input.num::-webkit-inner-spin-button { display: none; }
 .inspector-color { width: 44px; height: 26px; padding: 0; border: 0.5px solid var(--c-border-strong); border-radius: 5px; background: var(--c-surface); cursor: pointer; }
 .inspector-hint { margin-top: 2px; font-size: 10px; color: var(--c-muted); }
 
@@ -2039,13 +2039,26 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                             @mousedown="onItemMouseDown(name, idx, item, $event)"
                           />
                           <rect v-if="selectedItemId === item.svgId" class="scenario-selection" :x="item.x" :y="item.y" :width="item.w" :height="item.h" />
+                          <rect
+                            v-if="selectedItemId === item.svgId"
+                            class="scenario-resize-handle"
+                            :x="item.x + item.w - 6" :y="item.y + item.h - 6" width="12" height="12"
+                            @mousedown="onItemResizeMouseDown(name, idx, item, $event)"
+                          />
                           <text :x="item.x + item.w/2" :y="item.y + item.h + 11" text-anchor="middle" font-size="9" fill="var(--c-muted)" style="pointer-events:none;">{{ item.svgId }}</text>
                           <text :x="item.x + item.w - 2" :y="item.y + 10" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
                         </g>
                         <g v-else-if="item.kind === 'anchor'" :id="item.svgId" :transform="'translate(' + item.x + ',' + item.y + ')'">
-                          <circle r="18" fill="none" stroke="var(--c-accent)" :stroke-width="selectedItemId === item.svgId ? 3.5 : 2" stroke-dasharray="4,3" style="cursor: move;" @mousedown="onItemMouseDown(name, idx, item, $event)" />
-                          <text y="32" text-anchor="middle" font-size="9" fill="var(--c-accent)" style="pointer-events: none;">{{ item.svgId }}</text>
-                          <text x="16" y="-12" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
+                          <ellipse :rx="item.w / 2" :ry="item.h / 2" fill="none" stroke="var(--c-accent)" :stroke-width="selectedItemId === item.svgId ? 3.5 : 2" stroke-dasharray="4,3" style="cursor: move;" @mousedown="onItemMouseDown(name, idx, item, $event)" />
+                          <rect v-if="selectedItemId === item.svgId" class="scenario-selection" :x="-item.w / 2" :y="-item.h / 2" :width="item.w" :height="item.h" />
+                          <text :y="item.h / 2 + 12" text-anchor="middle" font-size="9" fill="var(--c-accent)" style="pointer-events: none;">{{ item.svgId }}</text>
+                          <text :x="item.w / 2" :y="-item.h / 2 + 6" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
+                          <rect
+                            v-if="selectedItemId === item.svgId"
+                            class="scenario-resize-handle"
+                            :x="item.w / 2 - 6" :y="item.h / 2 - 6" width="12" height="12"
+                            @mousedown="onItemResizeMouseDown(name, idx, item, $event)"
+                          />
                         </g>
                         <g v-else>
                           <rect
@@ -2062,7 +2075,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                             v-if="selectedItemId === item.svgId"
                             class="scenario-resize-handle"
                             :x="item.x + item.w - 6" :y="item.y + item.h - 6" width="12" height="12"
-                            @mousedown="onTextResizeMouseDown(name, idx, item, $event)"
+                            @mousedown="onItemResizeMouseDown(name, idx, item, $event)"
                           />
                         </g>
                       </template>
@@ -2103,6 +2116,17 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                                 @mousedown.prevent @click="renameSelectedItem(sid)">{{ sid }}</button>
                       </div>
 
+                      <label class="inspector-label">Width × height (px)</label>
+                      <div class="inspector-row compact">
+                        <input class="inspector-input num" type="number" title="Width" :value="selectedItem.w" @change="setItemSize(selectedItem, 'w', $event)">
+                        <span class="scenario-size-x">×</span>
+                        <input class="inspector-input num" type="number" title="Height" :value="selectedItem.h" @change="setItemSize(selectedItem, 'h', $event)">
+                        <button class="scenario-lock-btn" :class="{active: lockItemRatio}" @click="lockItemRatio = !lockItemRatio"
+                                :title="lockItemRatio ? 'Proportion locked — click to unlock' : 'Lock the proportion (or hold Shift while dragging the corner handle)'">
+                          <i class="ti" :class="lockItemRatio ? 'ti-lock' : 'ti-lock-open'"></i>
+                        </button>
+                      </div>
+
                       <template v-if="selectedItem.kind === 'text'">
                         <label class="inspector-label">Initial text</label>
                         <textarea class="inspector-input" rows="4" v-model="selectedItem.text"></textarea>
@@ -2115,7 +2139,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
 
                         <div class="inspector-row">
                           <div>
-                            <label class="inspector-label">Size (px)</label>
+                            <label class="inspector-label">Font size (px)</label>
                             <input class="inspector-input num" type="number" min="6" max="300" step="1"
                                    :value="selectedItem.fontSize" @change="setItemNumber(selectedItem, 'fontSize', $event, 6, 300)">
                           </div>
@@ -2125,14 +2149,12 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                           </div>
                         </div>
 
-                        <label class="inspector-label">Area (px)</label>
-                        <div class="inspector-row four">
+                        <label class="inspector-label">Position (px)</label>
+                        <div class="inspector-row compact">
                           <input class="inspector-input num" type="number" title="X" :value="selectedItem.x" @change="setItemNumber(selectedItem, 'x', $event, -10000, 10000)">
+                          <span class="scenario-size-x">,</span>
                           <input class="inspector-input num" type="number" title="Y" :value="selectedItem.y" @change="setItemNumber(selectedItem, 'y', $event, -10000, 10000)">
-                          <input class="inspector-input num" type="number" title="Width" :value="selectedItem.w" @change="setItemNumber(selectedItem, 'w', $event, 20, 10000)">
-                          <input class="inspector-input num" type="number" title="Height" :value="selectedItem.h" @change="setItemNumber(selectedItem, 'h', $event, 20, 10000)">
                         </div>
-                        <div class="inspector-hint">x · y · width · height</div>
                       </template>
                     </template>
                   </div>
@@ -2981,7 +3003,7 @@ function detectAndParseCatalog(text, catalogUrl) {
    needed to reconstruct the model; an anchor's <g> gets only its id and
    data-gno-anchor marker (holding the same id) — no image — since the entity
    shown while dragging was only a design-time aid, never meant to be shed
-   here. A text area is a <foreignObject> (data-gno-text marker) wrapping an
+   here. Its size travels as data-gno-width/height (its x/y is its center). A text area is a <foreignObject> (data-gno-text marker) wrapping an
    XHTML <div>, since SVG <text> can't wrap long lines by itself; its font,
    size and color are written both inline (so any viewer honors them) and as
    data-gno-* attributes (so the model round-trips without parsing CSS).
@@ -3012,6 +3034,9 @@ const TEXT_FONTS = [
   { label: 'Verdana',        value: "Verdana, Geneva, sans-serif" },
   { label: 'Courier New',    value: "'Courier New', monospace" },
 ];
+// An anchor's default footprint (the diameter of the circle it was before
+// anchors could be resized). Its x/y is the center of this box.
+const ANCHOR_SIZE = 36;
 const TEXT_DEFAULTS = { text: 'Text', fontFamily: TEXT_FONTS[0].value, fontSize: 18, color: '#1a1610' };
 
 // Font family and color end up inside an inline style attribute, and can
@@ -3041,7 +3066,7 @@ function buildScenarioSvg(design) {
     if (item.kind === 'entity') {
       parts.push(`  <image id="${svgEscape(item.svgId)}" x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" href="${svgEscape(item.url)}" xlink:href="${svgEscape(item.url)}" data-gno-entity="${svgEscape(item.entityId)}" data-gno-library="${svgEscape(item.library)}" data-gno-image="${svgEscape(item.image)}" />`);
     } else if (item.kind === 'anchor') {
-      parts.push(`  <g id="${svgEscape(item.svgId)}" data-gno-anchor="${svgEscape(item.svgId)}" transform="translate(${item.x},${item.y})"></g>`);
+      parts.push(`  <g id="${svgEscape(item.svgId)}" data-gno-anchor="${svgEscape(item.svgId)}" data-gno-width="${item.w}" data-gno-height="${item.h}" transform="translate(${item.x},${item.y})"></g>`);
     } else if (item.kind === 'text') {
       const style = `font-family:${item.fontFamily};font-size:${item.fontSize}px;color:${item.color};`
         + 'width:100%;height:100%;box-sizing:border-box;overflow:hidden;line-height:1.3;white-space:pre-wrap;overflow-wrap:anywhere;';
@@ -3094,6 +3119,8 @@ function parseScenarioSvg(svgText) {
           svgId: el.getAttribute('id') || marker,
           x: m ? parseFloat(m[1]) : 0,
           y: m ? parseFloat(m[2]) : 0,
+          w: parseFloat(el.getAttribute('data-gno-width')) || ANCHOR_SIZE,
+          h: parseFloat(el.getAttribute('data-gno-height')) || ANCHOR_SIZE,
         });
       }
     } else if (tag === 'foreignObject' && el.getAttribute('data-gno-text') != null) {
@@ -3176,7 +3203,7 @@ function sanitizeScenarioItem(it) {
   const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
   if (it.kind === 'entity') return it;
   if (it.kind === 'anchor') {
-    return { kind: 'anchor', svgId: String(it.svgId || it.label || ''), x: num(it.x, 0), y: num(it.y, 0) };
+    return { kind: 'anchor', svgId: String(it.svgId || it.label || ''), x: num(it.x, 0), y: num(it.y, 0), w: num(it.w, ANCHOR_SIZE), h: num(it.h, ANCHOR_SIZE) };
   }
   if (it.kind === 'text') {
     return {
@@ -3638,14 +3665,16 @@ createApp({
     let dragPayload = null; // {entityId, library, image} — set on palette dragstart, consumed on canvas drop
     const itemDragState = ref(null);
     const bgResizeState = ref(null);   // dragging the canvas corner handle
-    const textResizeState = ref(null); // dragging a text area's corner handle
+    const itemResizeState = ref(null); // dragging an item's corner handle (entity, anchor or text area)
     const textDraw = ref(null);        // rubber-band rectangle while placing a text area
     const selectedItemId = ref(null);  // svgId of the item shown in the inspector (openScenario only)
     const idDraft = ref('');
     const idError = ref('');
 
     const lockCanvasRatio = ref(false); // keep the canvas proportion when resizing it (Shift does the same, per drag)
+    const lockItemRatio = ref(false);   // same, for resizing placed items
     const MIN_CANVAS = 100, MAX_CANVAS = 10000;
+    const MIN_ITEM_SIDE = 10;
     const MIN_TEXT_SIDE = 20; // smaller drags are treated as accidental clicks in text mode
 
     const scenarioIdsForPresentation = computed(() => {
@@ -3691,12 +3720,27 @@ createApp({
     }
 
     // Scales w0 x h0 by s, clamping s (not each side) so both stay within
-    // the canvas limits and the proportion survives the clamp.
-    function scaledCanvas(w0, h0, s) {
-      const lo = Math.max(MIN_CANVAS / w0, MIN_CANVAS / h0);
-      const hi = Math.min(MAX_CANVAS / w0, MAX_CANVAS / h0);
+    // [min, max] and the proportion survives the clamp.
+    function scaledSize(w0, h0, s, min, max) {
+      const lo = Math.max(min / w0, min / h0);
+      const hi = Math.min(max / w0, max / h0);
       const c = Math.min(hi, Math.max(lo, s));
-      return { width: Math.round(w0 * c), height: Math.round(h0 * c) };
+      return { w: Math.round(w0 * c), h: Math.round(h0 * c) };
+    }
+
+    function scaledCanvas(w0, h0, s) {
+      const r = scaledSize(w0, h0, s, MIN_CANVAS, MAX_CANVAS);
+      return { width: r.w, height: r.h };
+    }
+
+    // Typed width/height of the selected item — same lock behavior as the canvas.
+    function setItemSize(item, key, e) {
+      const n = parseFloat(e.target.value);
+      if (Number.isFinite(n)) {
+        if (lockItemRatio.value) Object.assign(item, scaledSize(item.w, item.h, n / item[key], MIN_ITEM_SIDE, MAX_CANVAS));
+        else item[key] = clampInt(n, MIN_ITEM_SIDE, MAX_CANVAS);
+      }
+      e.target.value = item[key];
     }
 
     function onBgResizeMouseDown(name, e) {
@@ -3767,7 +3811,7 @@ createApp({
 
       if (placeMode.value === 'anchor') {
         const svgId = nextSeqId(usedIds, 'anchor_');
-        design.items.push({ kind: 'anchor', svgId, x: Math.round(x), y: Math.round(y) });
+        design.items.push({ kind: 'anchor', svgId, x: Math.round(x), y: Math.round(y), w: ANCHOR_SIZE, h: ANCHOR_SIZE });
         selectedItemId.value = svgId;
         return;
       }
@@ -3867,10 +3911,10 @@ createApp({
       itemDragState.value = { name, idx, startX: e.clientX, startY: e.clientY, origX: item.x, origY: item.y };
     }
 
-    function onTextResizeMouseDown(name, idx, item, e) {
+    function onItemResizeMouseDown(name, idx, item, e) {
       e.stopPropagation();
       e.preventDefault();
-      textResizeState.value = { name, idx, startX: e.clientX, startY: e.clientY, origW: item.w, origH: item.h };
+      itemResizeState.value = { name, idx, startX: e.clientX, startY: e.clientY, origW: item.w, origH: item.h };
     }
 
     // Mousedown on empty canvas: in text mode it starts drawing a text area;
@@ -3929,12 +3973,21 @@ createApp({
           design.height = clampInt(dh, MIN_CANVAS, MAX_CANVAS);
         }
       }
-      const t = textResizeState.value;
+      const t = itemResizeState.value;
       if (t) {
         const item = scenarioDesigns[t.name] && scenarioDesigns[t.name].items[t.idx];
         if (item) {
-          item.w = clampInt(t.origW + (e.clientX - t.startX), MIN_TEXT_SIDE, MAX_CANVAS);
-          item.h = clampInt(t.origH + (e.clientY - t.startY), MIN_TEXT_SIDE, MAX_CANVAS);
+          // An anchor's x/y is its center and stays put, so it grows on both
+          // sides and the handle (at its corner) follows the pointer at 2x.
+          const k = item.kind === 'anchor' ? 2 : 1;
+          const dw = t.origW + k * (e.clientX - t.startX), dh = t.origH + k * (e.clientY - t.startY);
+          if (e.shiftKey || lockItemRatio.value) {
+            const sx = dw / t.origW, sy = dh / t.origH;
+            Object.assign(item, scaledSize(t.origW, t.origH, Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy, MIN_ITEM_SIDE, MAX_CANVAS));
+          } else {
+            item.w = clampInt(dw, MIN_ITEM_SIDE, MAX_CANVAS);
+            item.h = clampInt(dh, MIN_ITEM_SIDE, MAX_CANVAS);
+          }
         }
       }
       const w = textDraw.value;
@@ -3947,7 +4000,7 @@ createApp({
     function onScenarioWindowMouseUp() {
       itemDragState.value = null;
       bgResizeState.value = null;
-      textResizeState.value = null;
+      itemResizeState.value = null;
       if (textDraw.value) finishTextDraw();
     }
     window.addEventListener('mousemove', onScenarioWindowMouseMove);
@@ -4641,7 +4694,7 @@ Write your scene description here.
       scenarioDesigns, scenarioIdsForPresentation, openScenario, bgPickerScenario, placeMode,
       toggleScenario, resetScenario, toggleBgPicker, setScenarioBackground, removeScenarioBackground,
       onPaletteDragStart, onCanvasDrop, removeScenarioItem, onItemMouseDown,
-      setScenarioSize, lockCanvasRatio, onBgResizeMouseDown, onTextResizeMouseDown, onScenarioCanvasMouseDown, textDraw, textDrawRect,
+      setScenarioSize, lockCanvasRatio, lockItemRatio, setItemSize, onBgResizeMouseDown, onItemResizeMouseDown, onScenarioCanvasMouseDown, textDraw, textDrawRect,
       selectedItemId, selectedItem, idDraft, idError, idSuggestions, onIdDraftInput, renameSelectedItem,
       setItemNumber, isKnownFont, TEXT_FONTS,
     };
