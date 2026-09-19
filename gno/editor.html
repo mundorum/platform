@@ -443,15 +443,21 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  overflow: auto;
+  /* The overlay and the textarea must wrap text at exactly the same width, so
+     both always reserve an identical scrollbar gutter. The overlay's is just
+     invisible: hiding it (scrollbar-width: none / display: none) would make its
+     content box wider than the textarea's and shift every wrapped line. */
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-width: thin;
 }
 #editor-highlight {
   color: var(--c-text);
   background: var(--c-bg);
   pointer-events: none;
-  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
 }
-#editor-highlight::-webkit-scrollbar { display: none; }
+#editor-highlight::-webkit-scrollbar-thumb { background: transparent; }
 #editor-pane textarea {
   width: 100%;
   resize: none;
@@ -609,14 +615,19 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 }
 .player-empty { padding: 40px 0; }
 #player-content.graphic { max-width: 1200px; }
-.player-mode-toggle {
+.player-toolbar {
   display: flex;
-  justify-content: flex-end;
-  gap: 2px;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 14px;
   font-family: var(--font-ui);
 }
-.player-mode-toggle button {
+.player-mode-toggle {
+  display: flex;
+  gap: 2px;
+}
+.player-mode-toggle button,
+.player-restart-top {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -628,6 +639,8 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   font-size: 12px;
   cursor: pointer;
 }
+.player-restart-top { border-radius: 6px; }
+.player-restart-top:hover { border-color: var(--c-accent); color: var(--c-accent); }
 .player-mode-toggle button:first-child { border-radius: 6px 0 0 6px; }
 .player-mode-toggle button:last-child { border-radius: 0 6px 6px 0; }
 .player-mode-toggle button.active { background: var(--c-accent-light); color: var(--c-accent); border-color: var(--c-accent); }
@@ -661,9 +674,12 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 .player-controls {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 14px;
   margin: 1.6em 0 2.4em;
 }
-.player-continue-btn {
+.player-continue-btn,
+.player-back-btn {
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -677,7 +693,10 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   font-size: 18px;
   transition: background 0.12s, box-shadow 0.12s;
 }
-.player-continue-btn:hover { background: var(--c-accent-light); box-shadow: 0 2px 10px rgba(0,0,0,0.10); }
+.player-continue-btn:hover,
+.player-back-btn:hover { background: var(--c-accent-light); box-shadow: 0 2px 10px rgba(0,0,0,0.10); }
+.player-back-btn { width: 36px; height: 36px; font-size: 16px; color: var(--c-muted); }
+.player-back-btn:hover { color: var(--c-accent); }
 .player-choices {
   display: flex;
   flex-direction: column;
@@ -926,15 +945,18 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  overflow: auto;
+  /* Same identical-gutter rule as #editor-highlight above. */
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-width: thin;
 }
 .gnp-highlight {
   color: var(--c-text);
   background: var(--c-bg);
   pointer-events: none;
-  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
 }
-.gnp-highlight::-webkit-scrollbar { display: none; }
+.gnp-highlight::-webkit-scrollbar-thumb { background: transparent; }
 .gnp-textarea {
   width: 100%;
   resize: none;
@@ -2304,6 +2326,10 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
             No scenes to play yet.
           </div>
           <template v-else>
+            <div class="player-toolbar">
+            <button class="player-restart-top" title="Restart the narrative from its start scene" @click="playerRestart">
+              <i class="ti ti-refresh"></i> Restart
+            </button>
             <div class="player-mode-toggle">
               <button
                 :class="{active: playerUseGraphic}"
@@ -2314,6 +2340,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
               <button :class="{active: !playerUseGraphic}" title="Play as text" @click="playerGraphic = false">
                 <i class="ti ti-align-left"></i> Text
               </button>
+            </div>
             </div>
             <div class="player-warning" v-if="!hasExplicitStart">
               No scene marked <code>(Start)</code> was found — beginning at the first scene instead.
@@ -2360,6 +2387,14 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
             <div v-else :key="playerCurrentScene.id + ':' + playerRevealCount" v-html="playerCurrentBeat"></div>
 
             <div class="player-controls">
+              <button
+                v-if="playerShowBackButton"
+                class="player-back-btn"
+                title="Back to the previous pause"
+                @click="playerRegress"
+              >
+                <i class="ti ti-player-play" style="transform: scaleX(-1)"></i>
+              </button>
               <button
                 v-if="playerShowContinueButton"
                 class="player-continue-btn"
@@ -3114,7 +3149,10 @@ function highlightGno(source, entities) {
       return result;
     }
     return escH(line);
-  }).join('\n');
+  // The trailing '\n' matters: a textarea shows an empty last line after a
+  // final newline, but a <pre> drops it — so without this the overlay would be
+  // one line shorter and stop scrolling short of the textarea at the bottom.
+  }).join('\n') + '\n';
 }
 
 /* ── GRAPH LAYOUT (left-to-right daggers) ── */
@@ -4817,6 +4855,9 @@ createApp({
     const playerShowContinueButton = computed(() =>
       !playerShowMenu.value && !(playerUseGraphic.value && playerActionSlots.value.proceed)
     );
+    const playerShowBackButton = computed(() =>
+      playerRevealCount.value > 1 && !(playerUseGraphic.value && playerActionSlots.value.regress)
+    );
     const playerMenuDiverts = computed(() => {
       const diverts = playerCurrentScene.value ? playerCurrentScene.value.diverts : [];
       if (!playerUseGraphic.value) return diverts;
@@ -5232,9 +5273,9 @@ Write your scene description here.
       arrowColor, labelColor, placeholder,
       hasExplicitStart, playerCurrentScene, playerCurrentBeat, playerRevealCount, playerShowMenu,
       playerEntityRoster,
-      playerGraphic, playerDesign, playerUseGraphic, playerStage, playerShowContinueButton, playerMenuDiverts,
+      playerGraphic, playerDesign, playerUseGraphic, playerStage, playerShowContinueButton, playerShowBackButton, playerMenuDiverts,
       onStageClick,
-      playerAdvance, playerChoose, playerRestart,
+      playerAdvance, playerRegress, playerChoose, playerRestart,
       scrollToScene, newScene, renameScene,
       onEditorScroll, onEditorInput,
       toggleEntity, scrollToEntityOccurrence,

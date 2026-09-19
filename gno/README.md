@@ -114,6 +114,8 @@ While playing a scene, the player reveals its content a little at a time, cleari
 1. **After a dialog.** Once a single dialog line, or an unbroken run of consecutive dialog lines (a *dialog set*), has been shown, the player pauses before continuing — **unless** nothing but the scene's diverts follow that dialog. In that case there's no pause: the dialog stays on screen together with the divert options, since offering the diverts is already a wait for the reader to pick one.
 2. **At a lone `--` line.** A line containing only `--` forces a pause at that point. The `--` itself is never shown to the reader — it is a pure pause marker.
 
+A back button, shown beside the continue button once the reader is past a scene's first pause, steps back to the previous screen (a graphic design can supply its own with `action_regress`, see below). The `Restart` button at the top of the Player starts the narrative over from its `(Start)` scene at any time.
+
 Plain prose, standalone entity lines (`@princess right curious`), and inline mentions do **not** cause a pause by themselves; they simply accumulate into whatever is shown at the next pause.
 
 At the end of a scene, once its last bit of content is on screen, the scene's diverts appear right alongside it. For an `(End)` scene, that same moment shows that the narrative is finished instead of a divert list.
