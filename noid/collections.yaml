@@ -35,4 +35,5 @@ collections:
   - label: "LM Agents"
     modules:
       - noid_collections.lm_agents.lm.lm
+      - noid_collections.lm_agents.image.image
       - noid_collections.lm_agents.ner.ner

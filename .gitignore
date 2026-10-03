@@ -227,3 +227,5 @@ noid/authoring/staticfiles/
 noid/docs/internal/
 
 temp/
+
+.claude
