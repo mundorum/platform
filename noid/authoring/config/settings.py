@@ -8,6 +8,15 @@ try:
 except ImportError:
     pass
 
+# A relative COLLECTIONS_FILE is relative to noid/ (where .env lives), not to
+# the CWD — so the shared noid/collections.yaml is found regardless of whether
+# manage.py is run from noid/ or noid/authoring/.
+_collections = os.environ.get('COLLECTIONS_FILE', '')
+if _collections and not Path(_collections).is_absolute():
+    os.environ['COLLECTIONS_FILE'] = str(
+        (Path(__file__).resolve().parent.parent.parent / _collections).resolve()
+    )
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'noid-authoring-dev-key-not-for-production')

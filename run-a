@@ -1,2 +1,3 @@
+newgrp docker
 cd noid/dbms
 docker compose up

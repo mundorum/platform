@@ -33,13 +33,14 @@ cp .env.example .env
 #   DATABASE_URL=postgres://noid:noid@localhost:5432/noid
 #   PROCESSING_URL=http://localhost:8001
 #   PROCESSING_API_KEY=dev-key
-#   COLLECTIONS_FILE=../collections.yaml
+#   COLLECTIONS_FILE=./collections.yaml   (relative to noid/)
 #   SCENE_PACKAGES_DIR=../scene_packages
 
 # Create the authoring database schema
 python authoring/manage.py migrate
 
 # Add the first manager in the database
+cd authoring
 python manage.py seed_initial_manager
 ```
 

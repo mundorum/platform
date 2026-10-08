@@ -3,7 +3,7 @@ services:
     image: postgres
     container_name: mundorum-dbms
     volumes:
-      - mundorum-db:/var/lib/postgresql/data
+      - mundorum-db:/var/lib/postgresql
     restart: on-failure:5
     shm_size: 128mb
     environment:
