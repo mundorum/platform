@@ -3761,7 +3761,12 @@ createApp({
     const playWarnings    = ref([]);
 
     /* ── Auth ── */
-    const auth       = reactive({ token: localStorage.getItem('noid_token'), user: null });
+    const auth       = reactive({
+      // Shared with every Mundorum app on this origin; noid_token is the
+      // pre-shared-server key, read once so existing sessions survive.
+      token: localStorage.getItem('mundorum_token') || localStorage.getItem('noid_token'),
+      user: null,
+    });
     const loginError = ref('');
 
     async function apiFetch(url, options = {}) {
@@ -3778,7 +3783,7 @@ createApp({
     function signOut() {
       auth.token = null;
       auth.user  = null;
-      localStorage.removeItem('noid_token');
+      localStorage.removeItem('mundorum_token'); localStorage.removeItem('noid_token');
       if (window.google?.accounts?.id) google.accounts.id.disableAutoSelect();
     }
 
@@ -3797,7 +3802,7 @@ createApp({
         }
         auth.token = data.token;
         auth.user  = data.user;
-        localStorage.setItem('noid_token', data.token);
+        localStorage.setItem('mundorum_token', data.token);
         fetchCatalog();
         loadLastScene();
       } catch (e) {
@@ -3815,7 +3820,7 @@ createApp({
       const viewParam  = params.get('view');
       if (urlToken) {
         auth.token = urlToken;
-        localStorage.setItem('noid_token', urlToken);
+        localStorage.setItem('mundorum_token', urlToken);
       }
       if (urlError) {
         const messages = {
@@ -3826,7 +3831,7 @@ createApp({
         loginError.value = messages[urlError] || 'Sign-in failed.';
       }
       if (urlToken || urlError) {
-        history.replaceState(null, '', '/');
+        history.replaceState(null, '', '/noid/');
       }
 
       // Fetch public config to get the Google Client ID
@@ -3850,17 +3855,17 @@ createApp({
             fetchCatalog();
             if (sceneParam) {
               await openSharedScene(sceneParam, viewParam);
-              history.replaceState(null, '', '/');
+              history.replaceState(null, '', '/noid/');
             } else {
               loadLastScene();
             }
           } else {
             auth.token = null;
-            localStorage.removeItem('noid_token');
+            localStorage.removeItem('mundorum_token'); localStorage.removeItem('noid_token');
           }
         } catch (e) {
           auth.token = null;
-          localStorage.removeItem('noid_token');
+          localStorage.removeItem('mundorum_token'); localStorage.removeItem('noid_token');
         }
       }
 
@@ -3875,8 +3880,8 @@ createApp({
       await gsiReady();
 
       // Carry the shared-scene deep link through the redirect round-trip:
-      // the callback view echoes next_scene/next_view back onto /?auth_token=...
-      const nextParams = new URLSearchParams();
+      // the callback view echoes next_scene/next_view back onto /noid/?auth_token=...
+      const nextParams = new URLSearchParams({ next: 'noid' });
       if (sceneParam) nextParams.set('next_scene', sceneParam);
       if (viewParam)  nextParams.set('next_view', viewParam);
       const callbackQs = nextParams.toString();
@@ -3917,7 +3922,7 @@ createApp({
     /* ── Catalog fetch ── */
     async function fetchCatalog() {
       try {
-        const r = await apiFetch('/api/catalog/');
+        const r = await apiFetch('/noid/api/catalog/');
         const data = await r.json();
         catalog.value = data.components || [];
         catalogErrors.value = data.errors || [];
@@ -4004,7 +4009,7 @@ createApp({
         }
         if (resFilterType.value)  params.set('type',  resFilterType.value);
         if (resSearch.value)      params.set('search', resSearch.value);
-        const r = await apiFetch(`/api/resources/?${params}`);
+        const r = await apiFetch(`/noid/api/resources/?${params}`);
         resources.value = await r.json();
       } catch(e) {
         _resStatus(`Failed to load resources: ${e}`, false);
@@ -4015,7 +4020,7 @@ createApp({
 
     async function fetchSceneList() {
       try {
-        const r = await apiFetch('/api/scenes/');
+        const r = await apiFetch('/noid/api/scenes/');
         sceneList.value = await r.json();
       } catch(_) { sceneList.value = []; }
     }
@@ -4028,7 +4033,7 @@ createApp({
 
     async function downloadResource(r) {
       try {
-        const resp = await apiFetch(`/api/resources/${r.id}/download/`);
+        const resp = await apiFetch(`/noid/api/resources/${r.id}/download/`);
         if (!resp.ok) throw new Error(await resp.text());
         const blob = await resp.blob();
         const url  = URL.createObjectURL(blob);
@@ -4047,7 +4052,7 @@ createApp({
     async function deleteResource(r) {
       if (!confirm(`Delete "${r.display_name}"?\nThis will remove the file from disk.`)) return;
       try {
-        const resp = await apiFetch(`/api/resources/${r.id}/`, { method: 'DELETE' });
+        const resp = await apiFetch(`/noid/api/resources/${r.id}/`, { method: 'DELETE' });
         if (!resp.ok) throw new Error(await resp.text());
         resources.value = resources.value.filter(x => x.id !== r.id);
         _resStatus(`${r.display_name} deleted`);
@@ -4071,7 +4076,7 @@ createApp({
 
         const headers = {};
         if (auth.token) headers['Authorization'] = `Token ${auth.token}`;
-        const resp = await fetch('/api/resources/', { method: 'POST', headers, body: fd });
+        const resp = await fetch('/noid/api/resources/', { method: 'POST', headers, body: fd });
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({}));
           throw new Error(err.error || resp.statusText);
@@ -4119,7 +4124,7 @@ createApp({
 
     async function fetchLibraries() {
       try {
-        const r = await apiFetch('/api/libraries/');
+        const r = await apiFetch('/noid/api/libraries/');
         libraries.value = await r.json();
       } catch(e) {
         _libStatus(`Failed to load libraries: ${e}`, false);
@@ -4130,7 +4135,7 @@ createApp({
       if (availableLoading.value) return;
       availableLoading.value = true;
       try {
-        const r = await apiFetch('/api/libraries/available/');
+        const r = await apiFetch('/noid/api/libraries/available/');
         availableCollections.value = await r.json();
       } catch(e) {
         availableCollections.value = [];
@@ -4145,7 +4150,7 @@ createApp({
 
     async function toggleLibrary(lib, enabled) {
       try {
-        const r = await apiFetch(`/api/libraries/${lib.id}/`, {
+        const r = await apiFetch(`/noid/api/libraries/${lib.id}/`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ enabled }),
@@ -4162,7 +4167,7 @@ createApp({
     async function deleteLibrary(lib) {
       if (!confirm(`Delete "${lib.name}"?`)) return;
       try {
-        const r = await apiFetch(`/api/libraries/${lib.id}/`, { method: 'DELETE' });
+        const r = await apiFetch(`/noid/api/libraries/${lib.id}/`, { method: 'DELETE' });
         if (!r.ok) throw new Error(await r.text());
         libraries.value = libraries.value.filter(l => l.id !== lib.id);
         _libStatus(`${lib.name} deleted`);
@@ -4184,7 +4189,7 @@ createApp({
           description: avail.description || '',
           enabled: true,
         };
-        const r = await apiFetch('/api/libraries/', {
+        const r = await apiFetch('/noid/api/libraries/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -4214,7 +4219,7 @@ createApp({
           description: newLib.description.trim(),
           enabled: true,
         };
-        const r = await apiFetch('/api/libraries/', {
+        const r = await apiFetch('/noid/api/libraries/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -4262,13 +4267,13 @@ createApp({
         };
         let resp;
         if (savedSceneId.value) {
-          resp = await apiFetch(`/api/scenes/${savedSceneId.value}/`, {
+          resp = await apiFetch(`/noid/api/scenes/${savedSceneId.value}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
         } else {
-          resp = await apiFetch('/api/scenes/', {
+          resp = await apiFetch('/noid/api/scenes/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -4307,7 +4312,7 @@ createApp({
 
     async function loadLastScene() {
       try {
-        const r = await apiFetch('/api/scenes/mine/');
+        const r = await apiFetch('/noid/api/scenes/mine/');
         if (!r.ok) return;
         const scenes = await r.json();
         if (scenes.length > 0) loadScene(scenes[0], true);
@@ -4319,7 +4324,7 @@ createApp({
        visitor can't accidentally overwrite someone else's scene on Save. */
     async function openSharedScene(sceneId, viewParam) {
       try {
-        const r = await apiFetch(`/api/scenes/${encodeURIComponent(sceneId)}/`);
+        const r = await apiFetch(`/noid/api/scenes/${encodeURIComponent(sceneId)}/`);
         if (r.ok) {
           loadScene(await r.json(), false);
           if (viewParam === 'true' || viewParam === '1') {
@@ -4347,7 +4352,7 @@ createApp({
     async function fetchMyScenes() {
       myScenesLoading.value = true;
       try {
-        const r = await apiFetch('/api/scenes/mine/');
+        const r = await apiFetch('/noid/api/scenes/mine/');
         myScenes.value = r.ok ? await r.json() : [];
       } catch(e) { myScenes.value = []; }
       finally { myScenesLoading.value = false; }
@@ -4356,7 +4361,7 @@ createApp({
     async function fetchPublicScenes() {
       publicScenesLoading.value = true;
       try {
-        const r = await apiFetch('/api/scenes/public/');
+        const r = await apiFetch('/noid/api/scenes/public/');
         publicScenes.value = r.ok ? await r.json() : [];
       } catch(e) { publicScenes.value = []; }
       finally { publicScenesLoading.value = false; }
@@ -4369,7 +4374,7 @@ createApp({
     }
 
     function shareLinkUrl(s) {
-      return `${window.location.origin}/?scene=${encodeURIComponent(s.id)}&view=true`;
+      return `${window.location.origin}/noid/?scene=${encodeURIComponent(s.id)}&view=true`;
     }
 
     async function copyShareLink(s) {
@@ -4385,7 +4390,7 @@ createApp({
     async function togglePublish(s) {
       const action = s.is_public ? 'unpublish' : 'publish';
       try {
-        const r = await apiFetch(`/api/scenes/${s.id}/${action}/`, { method: 'POST' });
+        const r = await apiFetch(`/noid/api/scenes/${s.id}/${action}/`, { method: 'POST' });
         if (r.ok) s.is_public = !s.is_public;
       } catch(e) { console.error('Publish toggle failed:', e); }
     }
@@ -4393,7 +4398,7 @@ createApp({
     async function deleteMyScene(s) {
       if (!confirm(`Delete "${s.title}"?\nThis will also remove its files from disk.`)) return;
       try {
-        const r = await apiFetch(`/api/scenes/${s.id}/`, { method: 'DELETE' });
+        const r = await apiFetch(`/noid/api/scenes/${s.id}/`, { method: 'DELETE' });
         if (r.ok) {
           myScenes.value = myScenes.value.filter(x => x.id !== s.id);
           if (savedSceneId.value === s.id) {
@@ -4427,7 +4432,7 @@ createApp({
     async function fetchRuns() {
       monitorLoading.value = true;
       try {
-        const resp = await apiFetch('/api/scenes/runs/');
+        const resp = await apiFetch('/noid/api/scenes/runs/');
         if (resp.ok) monitorRuns.value = await resp.json();
       } finally {
         monitorLoading.value = false;
@@ -4460,14 +4465,14 @@ createApp({
     }
 
     async function cancelRun(runId) {
-      await apiFetch(`/api/scenes/runs/${runId}/cancel/`, { method: 'POST' });
+      await apiFetch(`/noid/api/scenes/runs/${runId}/cancel/`, { method: 'POST' });
       await fetchRuns();
       if (activeRunCount.value > 0) _startMonitorPoll();
       else _stopMonitorPoll();
     }
 
     async function dismissRun(runId) {
-      await apiFetch(`/api/scenes/runs/${runId}/dismiss/`, { method: 'POST' });
+      await apiFetch(`/noid/api/scenes/runs/${runId}/dismiss/`, { method: 'POST' });
       monitorRuns.value = monitorRuns.value.filter(r => r.run_id !== runId);
     }
 
@@ -4885,7 +4890,7 @@ createApp({
       try {
         const params = new URLSearchParams({ address: item.address.trim() });
         if (savedSceneId.value) params.set('scene_id', savedSceneId.value);
-        const resp = await apiFetch(`/api/resources/read/?${params}`);
+        const resp = await apiFetch(`/noid/api/resources/read/?${params}`);
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({}));
           viewFileData[item.id] = { loading: false, text: '', error: err.detail || err.error || resp.statusText };
@@ -4922,7 +4927,7 @@ createApp({
       try {
         const params = new URLSearchParams({ address: item.address.trim() });
         if (savedSceneId.value) params.set('scene_id', savedSceneId.value);
-        const resp = await apiFetch(`/api/resources/read/?${params}`);
+        const resp = await apiFetch(`/noid/api/resources/read/?${params}`);
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({}));
           viewFileData[item.id] = { loading: false, html: '', error: err.detail || err.error || resp.statusText };
@@ -4961,7 +4966,7 @@ createApp({
         try {
           const params = new URLSearchParams({ address: String(msg.payload?.address || '') });
           if (savedSceneId.value) params.set('scene_id', savedSceneId.value);
-          const resp = await apiFetch(`/api/resources/read/?${params}`);
+          const resp = await apiFetch(`/noid/api/resources/read/?${params}`);
           const data = await resp.json().catch(() => ({}));
           if (!resp.ok) return reply(false, data.detail || data.error || resp.statusText);
           reply(true, data.content);
@@ -4978,7 +4983,7 @@ createApp({
           return reply(false, 'Save the scene before this app can write scene-scoped files.');
         }
         try {
-          const resp = await apiFetch('/api/resources/write_csv/', {
+          const resp = await apiFetch('/noid/api/resources/write_csv/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...payload, scene_id: savedSceneId.value }),
@@ -5298,7 +5303,7 @@ createApp({
       setTimeout(() => fetchRuns(), 800);
 
       const sceneParam = savedSceneId.value ? `&scene_id=${encodeURIComponent(savedSceneId.value)}` : '';
-      const url = `/api/play/stream/?verbose=${verbosePlay.value ? '1' : '0'}${sceneParam}`;
+      const url = `/noid/api/play/stream/?verbose=${verbosePlay.value ? '1' : '0'}${sceneParam}`;
       try {
         const response = await apiFetch(url, {
           method: 'POST',

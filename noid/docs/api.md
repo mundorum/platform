@@ -2,19 +2,25 @@
 
 ---
 
-## Authoring Machine (Django — port 8000)
+## Authoring (shared Django server, mounted at `/noid/`)
+
+noid's authoring apps run inside the platform's shared Django server (see
+[the platform architecture](../../docs/architecture.md)), so every path
+below is under `/noid/api/`. Sign-in endpoints are shared by all
+subprojects and live at `/auth/`. `/api/…` (without `/noid`) is a temporary
+alias kept for one release.
 
 ### Scene lifecycle
 
 | Method | Path | Body | Response |
 |--------|------|------|----------|
-| `POST` | `/api/scenes/` | JSON spec | `{id, title, created_at, …}` |
-| `POST` | `/api/scenes/import/` | ZIP (multipart) | `{id, …}` |
-| `GET` | `/api/scenes/` | — | list of scene summaries |
-| `GET` | `/api/scenes/{id}/` | — | scene record |
-| `PUT` | `/api/scenes/{id}/` | JSON spec | updated record |
-| `GET` | `/api/scenes/{id}/export/` | — | ZIP download (`Content-Disposition: attachment`) |
-| `DELETE` | `/api/scenes/{id}/` | — | 204 — removes DB record and all package files |
+| `POST` | `/noid/api/scenes/` | JSON spec | `{id, title, created_at, …}` |
+| `POST` | `/noid/api/scenes/import/` | ZIP (multipart) | `{id, …}` |
+| `GET` | `/noid/api/scenes/` | — | list of scene summaries |
+| `GET` | `/noid/api/scenes/{id}/` | — | scene record |
+| `PUT` | `/noid/api/scenes/{id}/` | JSON spec | updated record |
+| `GET` | `/noid/api/scenes/{id}/export/` | — | ZIP download (`Content-Disposition: attachment`) |
+| `DELETE` | `/noid/api/scenes/{id}/` | — | 204 — removes DB record and all package files |
 
 ### Execution (proxy to Processing Machine)
 
@@ -23,8 +29,8 @@ Authoring forwards these requests to Processing and passes the response back.
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/scenes/{id}/run/` | — | Run scene; block until done; return `{stdout, stderr, returncode, run_id}` |
-| `POST` | `/api/scenes/{id}/run/stream/` | — | Stream output lines (chunked transfer); creates and updates a `SceneRun` record |
+| `POST` | `/noid/api/scenes/{id}/run/` | — | Run scene; block until done; return `{stdout, stderr, returncode, run_id}` |
+| `POST` | `/noid/api/scenes/{id}/run/stream/` | — | Stream output lines (chunked transfer); creates and updates a `SceneRun` record |
 
 Both endpoints resolve the timeout from the scene's `timeout` field (see
 [Scene JSON — timeout field](#scene-json--timeout-field)).
@@ -33,8 +39,8 @@ Both endpoints resolve the timeout from the scene's `timeout` field (see
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/scenes/{id}/runs/` | — | 50 most recent runs for a specific scene |
-| `GET` | `/api/scenes/runs/` | — | All non-dismissed runs across all scenes (monitoring panel) |
+| `GET` | `/noid/api/scenes/{id}/runs/` | — | 50 most recent runs for a specific scene |
+| `GET` | `/noid/api/scenes/runs/` | — | All non-dismissed runs across all scenes (monitoring panel) |
 
 ### Run lifecycle — cancel and dismiss
 
@@ -50,8 +56,8 @@ Finished, failed, and interrupted runs persist until the user dismisses them.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/scenes/runs/{run_id}/cancel/` | Interrupt a `running` scene — signals Processing to kill the subprocess, sets status to `interrupted` |
-| `POST` | `/api/scenes/runs/{run_id}/dismiss/` | Mark a finished/failed/interrupted run as dismissed so it no longer appears in the monitoring panel |
+| `POST` | `/noid/api/scenes/runs/{run_id}/cancel/` | Interrupt a `running` scene — signals Processing to kill the subprocess, sets status to `interrupted` |
+| `POST` | `/noid/api/scenes/runs/{run_id}/dismiss/` | Mark a finished/failed/interrupted run as dismissed so it no longer appears in the monitoring panel |
 
 `run_id` is the UUID from the `SceneRun.run_id` field (not `SceneRun.id`).
 
@@ -82,12 +88,12 @@ under `SHARED_RESOURCES_DIR/`.
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/resources/` | multipart (`file`, `scope`, `scene_id?`, `slug?`, ...) | Upload a file; 409 if the address already exists |
-| `GET` | `/api/resources/{id}/download/` | — | Download the raw file |
-| `GET` | `/api/resources/read/` | query: `address`, `scene_id?` | Return UTF-8 text content: `{content, address, resource_type}` |
-| `POST` | `/api/resources/write_csv/` | JSON: `{scope, name, columns, rows, scene_id?, display_name?}` | Write/overwrite a CSV from structured data — see below |
-| `DELETE` | `/api/resources/{id}/` | — | Delete the resource (DB record + file) |
-| `GET` | `/api/resources/tags/` | — | Sorted list of all tags in use |
+| `POST` | `/noid/api/resources/` | multipart (`file`, `scope`, `scene_id?`, `slug?`, ...) | Upload a file; 409 if the address already exists |
+| `GET` | `/noid/api/resources/{id}/download/` | — | Download the raw file |
+| `GET` | `/noid/api/resources/read/` | query: `address`, `scene_id?` | Return UTF-8 text content: `{content, address, resource_type}` |
+| `POST` | `/noid/api/resources/write_csv/` | JSON: `{scope, name, columns, rows, scene_id?, display_name?}` | Write/overwrite a CSV from structured data — see below |
+| `DELETE` | `/noid/api/resources/{id}/` | — | Delete the resource (DB record + file) |
+| `GET` | `/noid/api/resources/tags/` | — | Sorted list of all tags in use |
 
 #### `write_csv` — structured CSV write
 
@@ -133,9 +139,9 @@ Accepts raw scene JSON directly; no DB record is created. Used by the editor's
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/catalog/` | Component catalog and load errors |
-| `POST` | `/api/play/` | Run raw scene JSON; return result when done |
-| `POST` | `/api/play/stream/` | Stream raw scene JSON output |
+| `GET` | `/noid/api/catalog/` | Component catalog and load errors |
+| `POST` | `/noid/api/play/` | Run raw scene JSON; return result when done |
+| `POST` | `/noid/api/play/stream/` | Stream raw scene JSON output |
 
 ---
 
@@ -184,7 +190,7 @@ skip the unpack and module-loading overhead.
 
 The `timeout` field in `scene.json` controls how long the runner waits before
 killing the scene process. It is read by both the Authoring scratch runner
-(`/api/play/stream/`) and the managed runner (`/api/scenes/{id}/run/stream/`).
+(`/noid/api/play/stream/`) and the managed runner (`/noid/api/scenes/{id}/run/stream/`).
 
 | Value | Seconds | Notes |
 |-------|---------|-------|

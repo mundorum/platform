@@ -1,0 +1,2 @@
+# Dependencies of vp's Django apps. Installed through server/requirements.txt.
+# The LLM client (openai SDK) is a shared-server dependency, not listed here.

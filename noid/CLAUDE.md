@@ -19,7 +19,11 @@ before making any structural change.
 ## Settled decisions — do not re-propose alternatives
 
 1. **Two servers**: Authoring = Django 5 + PostgreSQL. Processing = FastAPI +
-   Uvicorn. Both live under `noid/` and share a single `.venv` in development.
+   Uvicorn. Processing lives in `noid/processing/`. Authoring's apps live in
+   `noid/authoring/` but run inside the platform's **shared Django server**
+   (`../server/`, mounted at `/noid/`), next to VP Studio. The Django project
+   (settings, root URLs, wsgi), sign-in (`accounts`) and the Dockerfile
+   belong to `server/`, not to noid. Both share `noid/.venv` in development.
 2. **Shared package**: `runner/noid_runner/` is pure Python (no web framework
    imports). Both servers install it via `pip install -e runner/`.
 3. **Scene package**: a directory (and ZIP for transfer) with exactly four
@@ -33,10 +37,12 @@ before making any structural change.
 5. **`collections.yaml`** at `noid/` root. Both servers read it; path set via
    `COLLECTIONS_FILE` env var.
 6. **`storage/`** at `noid/` root in development contains `scene_packages/` and
-   `shared_resources/`. In Docker both servers mount a single `noid_storage`
-   named volume at `/srv/noid/storage`.
-7. **Docker build context** is always `noid/` (not a sub-directory) so both
-   Dockerfiles can `COPY runner/`. See `docker-compose.yml`.
+   `shared_resources/`. In Docker both servers mount the external
+   `mundorum_noid_storage` volume at `/srv/noid/storage`.
+7. **Docker build context** is the repository root (`platform/`), so the
+   shared server image and `processing/Dockerfile` can both `COPY
+   noid/runner/`. Compose lives at the root: `../docker-compose.yml`
+   (services `server`, `noid-processing`, `db`).
 8. **ZIP API**: `POST /scenes/import/` and `GET /scenes/{id}/export` handle a
    full scene package (spec + components + data) as a single ZIP. `DELETE
    /scenes/{id}/` removes everything — DB record, component files, data files.
@@ -55,11 +61,9 @@ noid/
 │       ├── scene_store.py   ZIP pack/unpack + disk CRUD
 │       └── registry.py      SceneRegistry in-memory cache
 │
-├── authoring/               Django server — Authoring Machine
-│   ├── manage.py
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   ├── config/              settings, urls, wsgi
+├── authoring/               Authoring Machine apps (run by ../server/)
+│   ├── noid_urls.py         noid's URL tree, mounted at /noid/ by the server
+│   ├── requirements.txt     deps of these apps (pulled in by server/requirements.txt)
 │   ├── scenes/              Django app: Scene + SceneRun models, CRUD, ZIP, proxy
 │   ├── editor/              Django app: CatalogView + scratch PlayView (v1 compat)
 │   └── static/              editor.html and built frontend assets
@@ -81,9 +85,11 @@ noid/
 │   ├── scene_packages/      scene package directories
 │   └── shared_resources/    shared data files (shared: namespace)
 ├── collections.yaml         component collections config
-├── docker-compose.yml       dev orchestration
-├── .env.example             env vars template
 └── docs/                    human-readable documentation
+
+Moved to the repository root when the server became shared:
+../server/ (Django project, accounts, Dockerfile), ../docker-compose.yml,
+../.env.example, ../.dockerignore, ../dbms/ (dev PostgreSQL).
 ```
 
 ---
@@ -113,6 +119,12 @@ noid/
 - Must be importable without any server running (used in tests and scripts).
 - `catalog.py` and `runner.py` are direct moves from the old `editor/` app;
   do not change their external interface without updating both servers.
+- `runner.py`'s `_subprocess_env()` strips secret-looking env vars
+  (`SECRET_KEY`, `DATABASE_URL`, `*API_KEY*`, `*SECRET*`, `*PASSWORD*`,
+  `*TOKEN*`, `POSTGRES_*`) before starting a scene subprocess, because
+  components are user-authored code running beside the shared server's
+  secrets. Keep it a denylist (components' libraries read their own env
+  vars); `NOID_SUBPROCESS_ENV_PASSTHROUGH` re-admits a named variable.
 
 ### authoring (Django)
 - Class-based views: `ModelViewSet` for CRUD, `APIView` for custom actions.
@@ -122,10 +134,14 @@ noid/
 - `PROCESSING_URL` and `PROCESSING_API_KEY` control where the proxy sends
   requests.
 - The `editor/` app must remain backward-compatible with the existing frontend:
-  do not rename or remove its URL patterns (`/api/catalog/`, `/api/play/`,
-  `/api/play/stream/`).
+  do not rename or remove its URL patterns (`catalog/`, `play/`,
+  `play/stream/`, now under `/noid/api/`). The old `/api/` prefix is still
+  mounted as a temporary alias (`server/config/urls.py`).
+- The frontend (`static/editor.html`) calls `/noid/api/…` and keeps the
+  sign-in token in `localStorage.mundorum_token`, shared with the other
+  subprojects (it still reads the old `noid_token` once as a fallback).
 - `pytest-django` for tests; real database, no mocks.
-- `authoring/Dockerfile`'s gunicorn `CMD` sets `--timeout 3700` deliberately —
+- `server/Dockerfile`'s gunicorn `CMD` sets `--timeout 3700` deliberately —
   don't drop it back to the default (30s) or disable it (`0`).
   `/api/play/stream/` and `/api/scenes/{id}/run/stream/` are long-running
   streaming responses whose duration is controlled by the scene's own
@@ -142,7 +158,7 @@ noid/
   (3600s), but still a hard ceiling gunicorn can use to reclaim a worker from
   a truly stuck request. Pair any increase to this value with more
   `--workers`, not with disabling the timeout again.
-- `config/settings.py` sets `SECURE_PROXY_SSL_HEADER =
+- `server/config/settings.py` sets `SECURE_PROXY_SSL_HEADER =
   ('HTTP_X_FORWARDED_PROTO', 'https')` unconditionally — don't remove it.
   Behind a TLS-terminating reverse proxy (NPM in production) the container
   only ever sees plain HTTP, so without this `request.is_secure()` is always
@@ -158,7 +174,7 @@ noid/
   `SecurityMiddleware`, `STORAGES['staticfiles']` using
   `CompressedManifestStaticFilesStorage`), because gunicorn never serves
   `/static/` on its own and there's no separate web server or nginx location
-  for it in front of the container. `authoring/Dockerfile` runs `python
+  for it in front of the container. `server/Dockerfile` runs `python
   manage.py collectstatic --noinput` at build time to build the manifest —
   keep that step if you touch the Dockerfile. Without it, admin's own
   CSS/JS 404s in production (silently fine under `DEBUG=True` `runserver`,
@@ -182,17 +198,21 @@ noid/
 |----------|---------|---------|
 | `COLLECTIONS_FILE` | both | absolute path to `collections.yaml` |
 | `SCENE_PACKAGES_DIR` | both | root directory for scene packages |
-| `DATABASE_URL` | authoring | PostgreSQL connection string |
-| `PROCESSING_URL` | authoring | base URL of the Processing server |
+| `DATABASE_URL` | server | PostgreSQL connection string |
+| `PROCESSING_URL` | server | base URL of the Processing server |
 | `PROCESSING_API_KEY` | both | shared secret for machine-to-machine auth |
 
+> The shared server reads the root `.env` first, then `noid/.env` as a
+> fallback; relative noid paths are anchored at `noid/`. Processing (run
+> bare from `noid/`) reads `noid/.env`.
+>
 > Under Docker Compose, `COLLECTIONS_FILE`, `SCENE_PACKAGES_DIR`,
 > `SHARED_RESOURCES_DIR`, `PROCESSING_URL`, and `SCENES_DIR` are hardcoded in
-> `docker-compose.yml`'s `environment:` blocks and silently override whatever
+> `../docker-compose.yml`'s `environment:` blocks and silently override whatever
 > `.env` says — editing `.env` has no effect on these under Docker. They only
 > take their `.env` value when running bare (`manage.py runserver` /
 > `uvicorn --reload`, no containers). When debugging container behavior for
-> any of these, check `docker-compose.yml` directly, not `.env`.
+> any of these, check `../docker-compose.yml` directly, not `.env`.
 
 `collections.yaml` entries reference importable module paths (e.g.
 `noid_collections.lm_agents.lm`) — the pip package providing them
@@ -209,27 +229,22 @@ error.
 ## Development commands
 
 ```bash
-# from noid/
-source .venv/bin/activate
-
-# First-time setup
-pip install -e runner/
-pip install -r authoring/requirements.txt
-pip install -r processing/requirements.txt
-python authoring/manage.py migrate
+# from the repository root (platform/) — full setup in docs/dev-setup.md
+source noid/.venv/bin/activate
 
 # Run both servers
-python authoring/manage.py runserver 8000   # terminal 1
-uvicorn processing.main:app --reload --port 8001  # terminal 2
+python server/manage.py runserver 8000                      # terminal 1: shared server
+(cd noid && uvicorn processing.main:app --reload --port 8001)   # terminal 2
 
-# Run with Docker
+# Run with Docker (from the repository root)
 docker compose up --build
 
 # Tests
-pytest runner/        # noid_runner unit tests
-pytest authoring/     # Django integration tests (needs PostgreSQL)
-pytest processing/    # FastAPI tests
+(cd noid && pytest runner/)       # noid_runner unit tests
+(cd noid && pytest authoring/)    # noid's Django apps (needs PostgreSQL)
+(cd noid && pytest processing/)   # FastAPI tests
+(cd server && pytest)             # everything on the shared server
 ```
 
-Authoring: http://localhost:8000
+Editor: http://localhost:8000/noid/
 Processing: http://localhost:8001/docs

@@ -1,0 +1,16 @@
+/* Mundorum palette for MkDocs Material (see server/static/common/tokens.css) */
+:root, [data-md-color-scheme="default"] {
+  --md-primary-fg-color: #7a3e1a;
+  --md-primary-fg-color--light: #9a5e3a;
+  --md-primary-fg-color--dark: #5a2e10;
+  --md-accent-fg-color: #7a3e1a;
+  --md-default-bg-color: #f5f2ec;
+  --md-typeset-a-color: #7a3e1a;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #2a1e14;
+  --md-accent-fg-color: #d08050;
+  --md-default-bg-color: #1a1810;
+  --md-typeset-a-color: #d08050;
+}
+.md-typeset h1, .md-typeset h2, .md-typeset h3 { font-family: 'Lora', serif; font-weight: 500; }

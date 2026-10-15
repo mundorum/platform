@@ -1,0 +1,96 @@
+# Mundorum platform — shared server + noid processing + PostgreSQL.
+# Build context for every image is the repository root.
+#
+# Volumes are EXTERNAL on purpose: Compose refuses to start if one is
+# missing instead of silently creating an empty one (which would look like
+# total data loss), and `docker compose down -v` cannot delete them.
+# Create them once before the first `up`:
+#
+#   docker volume create mundorum_db
+#   docker volume create mundorum_noid_storage
+#
+# (Production migrated these from the old noid_noid_* volumes — see the
+# internal deployment notes.)
+
+name: mundorum
+
+services:
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-noid}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-noid}
+      POSTGRES_DB: ${POSTGRES_DB:-noid}
+    volumes:
+      - mundorum_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-noid}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Shared Django server: portal (/), noid (/noid/), vp (/vp/), /auth/, /admin/
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      # AUTHORING_PORT is the pre-shared-server name, still honoured so an
+      # existing .env keeps publishing on the same host port.
+      - "${SERVER_PORT:-${AUTHORING_PORT:-8000}}:8000"
+    volumes:
+      - mundorum_noid_storage:/srv/noid/storage
+      # LLM provider keys as files, never as env vars (env is inherited by
+      # every subprocess, including user-authored noid scene components).
+      - ./secrets:/run/secrets:ro
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-mundorum-server-dev-key-change-in-production}
+      DEBUG: ${DEBUG:-true}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8000}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      INITIAL_MANAGER_EMAIL: ${INITIAL_MANAGER_EMAIL:-}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://noid:noid@db:5432/noid}
+      # noid
+      SCENE_PACKAGES_DIR: /srv/noid/storage/scene_packages
+      SHARED_RESOURCES_DIR: /srv/noid/storage/shared_resources
+      PROCESSING_URL: http://noid-processing:8001
+      PROCESSING_API_KEY: ${PROCESSING_API_KEY:-dev-key}
+      COLLECTIONS_FILE: /app/noid/collections.yaml
+      # LLM gateway (keys come from /run/secrets, see above)
+      LLM_SECRETS_DIR: /run/secrets
+      LLM_DEFAULT_PROVIDER: ${LLM_DEFAULT_PROVIDER:-groq}
+      LLM_DEFAULT_MODEL: ${LLM_DEFAULT_MODEL:-}
+      GROQ_MODEL: ${GROQ_MODEL:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      MISTRAL_MODEL: ${MISTRAL_MODEL:-}
+      LLM_APP_URL: ${LLM_APP_URL:-}
+      LLM_USER_CALLS_PER_HOUR: ${LLM_USER_CALLS_PER_HOUR:-300}
+    depends_on:
+      db:
+        condition: service_healthy
+      noid-processing:
+        condition: service_started
+
+  noid-processing:
+    build:
+      context: .
+      dockerfile: noid/processing/Dockerfile
+    ports:
+      - "${PROCESSING_PORT:-8001}:8001"
+    volumes:
+      - mundorum_noid_storage:/srv/noid/storage
+    environment:
+      PROCESSING_API_KEY: ${PROCESSING_API_KEY:-dev-key}
+      SCENES_DIR: /srv/noid/storage/scene_packages
+      COLLECTIONS_FILE: /app/collections.yaml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  mundorum_db:
+    external: true
+  mundorum_noid_storage:
+    external: true

@@ -1,0 +1,53 @@
+# Built from build/docs-site/ (tools/stage-docs.sh assembles docs/,
+# noid/docs/ and vp/docs/ there). Published by .github/workflows/docs.yml.
+site_name: Mundorum Platform
+site_url: https://mundorum.github.io/platform/
+repo_url: https://github.com/mundorum/platform
+edit_uri: ""
+docs_dir: docs
+
+theme:
+  name: material
+  font:
+    text: Outfit
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-night, name: Dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle: { icon: material/weather-sunny, name: Light mode }
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+extra_css:
+  - stylesheets/mundorum.css
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Platform:
+      - Architecture: architecture.md
+      - Development setup: dev-setup.md
+      - Docker deployment: deployment.md
+      - LLM gateway: llm-gateway.md
+  - noid:
+      - Architecture: noid/architecture.md
+      - Scene package: noid/scene-package.md
+      - API reference: noid/api.md
+      - Development tasks: noid/dev-setup.md
+  - VP Studio:
+      - Overview: vp/index.md

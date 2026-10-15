@@ -1,0 +1,41 @@
+# Build context is the repository root — keep it to what the images need.
+# Anything not excluded here can end up inside an image.
+
+# secrets and local env (NEVER in an image)
+.env
+.env.*
+*.env
+secrets/
+groq.txt
+*.key
+
+# dev state and scratch
+**/.venv/
+**/storage/
+**/temp/
+**/playground/
+memory/
+dbms/
+**/*.db
+server/staticfiles/
+
+# subprojects that don't share the server
+gno/
+example/
+
+# docs (published separately to GitHub Pages)
+docs/
+noid/docs/
+vp/docs/
+site/
+
+# VCS / tooling
+.git/
+.claude/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.egg-info/
+**/.pytest_cache/
+**/node_modules/
+build/

@@ -1,13 +1,40 @@
 # Mundorum Platform — CLAUDE.md
 
-## App Isolation: `noid/` vs `gno/`
+## Subprojects and the shared server
 
-This repository contains two apps, `noid/` and `gno/`, that are (for now) **completely separate** from each other and from the rest of the platform (backend/, frontend/). They do not share code.
+| Subproject | Shares the server? | Docs |
+|---|---|---|
+| `noid/` | yes, mounted at `/noid/` | `noid/CLAUDE.md`, `noid/docs/` |
+| `vp/` | yes, mounted at `/vp/` | `vp/CLAUDE.md`, `vp/docs/` |
+| `gno/` | **no**: standalone client-side app | `gno/README.md` |
 
-**Rule: when a request targets one app, do not make changes in the other app, unless the user explicitly says otherwise.** If a request is ambiguous about which app it concerns, ask before touching files in either.
+`noid/` and `vp/` run on **one shared Django server** (`server/`) with one
+PostgreSQL database and one Google sign-in. The server owns `config/`
+(settings, root URLs), `accounts/` (sign-in), `portal/` (the `/` chooser
+page) and `llm/` (LLM gateway). Each subproject keeps its own Django apps in
+its own folder (`noid/authoring/`, `vp/server/`). `settings.py` puts those
+folders on `sys.path`. Read `docs/architecture.md` before any structural
+change to the server.
 
-- `noid/` — has its own `CLAUDE.md`; read it first for anything noid-related (see "noid Sub-project" section below).
-- `gno/` — narrative scene/divert format described in `gno/README.md`; no dedicated CLAUDE.md yet.
+**Rule: a request that targets one subproject must not change another
+subproject's folder unless the user explicitly says so.** `gno/` stays fully
+isolated. Changes to `server/` affect both noid and vp: say so when you make
+one. If it's unclear which subproject a request concerns, ask before
+touching files.
+
+- Docker build context for every image is the repository root;
+  `docker-compose.yml` lives at the root. Its volumes (`mundorum_db`,
+  `mundorum_noid_storage`) are `external` on purpose — never make them
+  Compose-managed again (an empty volume would silently replace the data).
+- LLM provider keys are files in `secrets/` (mounted at `/run/secrets`),
+  never env vars or database rows. See `docs/llm-gateway.md`.
+- Public docs: `docs/` (platform), `noid/docs/`, `vp/docs/`, published
+  together to GitHub Pages via `mkdocs.yml` + `tools/stage-docs.sh`. Link
+  between them with repo-relative paths (`../noid/docs/x.md`); the staging
+  script rewrites them.
+- Private material (design handoffs, real VP activity prompts, internal
+  deployment notes) lives in the private sibling repo `mundorum-private`.
+  Never copy it into this public repository.
 
 ## Project Purpose
 
@@ -171,18 +198,24 @@ CodeMirror 6 instance with:
 
 ---
 
-## noid Sub-project
+## noid and vp Sub-projects
 
-`noid/` is a separate sub-system for composing and executing **n-o-id scenes**.
-It has its own servers, dependencies, and documentation. It does not share code
-with the Mundorum composition platform above.
+`noid/` composes and executes **n-o-id scenes**; `vp/` authors and plays
+**virtual patient** activities with LLM agents. Both run their Django apps on
+the shared server described above; neither shares code with the composition
+platform (backend/, frontend/) described earlier in this file.
 
-For everything noid-related read `noid/CLAUDE.md` first. The human-readable
-docs are in `noid/docs/`:
+For anything noid-related read `noid/CLAUDE.md` first; for anything
+vp-related read `vp/CLAUDE.md` first.
 
 | File | Contents |
 |------|----------|
-| `noid/docs/architecture.md` | Two-machine model, data flows, tech choices |
+| `docs/architecture.md` | Shared server, database, sign-in, URL map, containers |
+| `docs/dev-setup.md` | Local setup for the shared server and noid processing |
+| `docs/deployment.md` | Docker deployment (incl. upgrade from the noid-only stack) |
+| `docs/llm-gateway.md` | LLM providers, key storage, usage logging |
+| `noid/docs/architecture.md` | noid two-machine model, data flows, tech choices |
 | `noid/docs/scene-package.md` | ZIP format spec for the four scene elements |
-| `noid/docs/api.md` | Full endpoint reference for both servers |
-| `noid/docs/dev-setup.md` | Step-by-step setup and common tasks |
+| `noid/docs/api.md` | Endpoint reference for noid authoring and processing |
+| `noid/docs/dev-setup.md` | noid-specific development tasks |
+| `vp/docs/index.md` | VP Studio overview |

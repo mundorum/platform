@@ -30,7 +30,7 @@ def _write(api_client, **overrides):
         'rows': [['1', '2'], ['3', '4']],
     }
     body.update(overrides)
-    return api_client.post('/api/resources/write_csv/', body, format='json')
+    return api_client.post('/noid/api/resources/write_csv/', body, format='json')
 
 
 @pytest.mark.django_db

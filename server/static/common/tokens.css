@@ -1,0 +1,75 @@
+/*
+ * Mundorum shared design tokens (Marginalium aesthetic).
+ * Used by the portal and VP Studio. noid's editor.html carries its own copy
+ * of the same base palette inline.
+ */
+:root {
+  --c-bg:            #f5f2ec;
+  --c-surface:       #fffef9;
+  --c-border:        rgba(60,50,30,0.12);
+  --c-border-strong: rgba(60,50,30,0.22);
+  --c-border-card:   rgba(60,50,30,0.30);
+  --c-text:          #1a1610;
+  --c-muted:         #6b6050;
+  --c-hover:         #ebe2d6;
+  --c-accent:        #7a3e1a;
+  --c-accent-light:  #f0e8de;
+  --c-on-accent:     #fffef9;
+  --c-warn-border:   #c8a86a;
+  --c-success:       #3a8a5a;
+  --c-track:         #ebe6dc;
+  --c-mark-line-bg:  #fdf8f0;
+  --c-mark-line-bdr: #e8c88a;
+
+  /* colour pairs (fg / bg) */
+  --c-tag-char:      #4a2a6a;  --c-tag-char-bg:  #ede8f5;
+  --c-tag-place:     #1a3a5a;  --c-tag-place-bg: #deeaf5;
+  --c-tag-trans:     #1a3a30;  --c-tag-trans-bg: #daf5ee;
+  --c-tag-text:      #3a4a1a;  --c-tag-text-bg:  #e8eedd;
+  --c-tag-state:     #7a5a1a;  --c-tag-state-bg: #f0e8d4;
+  --c-tag-err:       #8a2a1a;  --c-tag-err-bg:   #f6e2da;
+
+  --shadow-popover:  0 4px 20px rgba(0,0,0,0.15);
+  --shadow-card:     0 2px 12px rgba(60,40,20,0.08);
+
+  --font-ui:         'Outfit', sans-serif;
+  --font-doc:        'Lora', serif;
+  --font-mono:       'JetBrains Mono', monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg:            #1a1810;
+    --c-surface:       #211f17;
+    --c-border:        rgba(200,180,140,0.12);
+    --c-border-strong: rgba(200,180,140,0.22);
+    --c-border-card:   rgba(200,180,140,0.30);
+    --c-text:          #ede8dc;
+    --c-muted:         #9a8e78;
+    --c-hover:         #2c2820;
+    --c-accent:        #d08050;
+    --c-accent-light:  #2a1e14;
+    --c-on-accent:     #1a1810;
+    --c-warn-border:   #a8884a;
+    --c-success:       #5aaa7a;
+    --c-track:         #2a271e;
+    --c-mark-line-bg:  #221e14;
+    --c-mark-line-bdr: #6a5a3a;
+
+    --c-tag-char:      #c8b0e8;  --c-tag-char-bg:  #2a2238;
+    --c-tag-place:     #98c0e8;  --c-tag-place-bg: #1a2838;
+    --c-tag-trans:     #90d8c0;  --c-tag-trans-bg: #16302a;
+    --c-tag-text:      #b8d090;  --c-tag-text-bg:  #252e1a;
+    --c-tag-state:     #e0c080;  --c-tag-state-bg: #302818;
+    --c-tag-err:       #f0a090;  --c-tag-err-bg:   #3a1e18;
+
+    --shadow-popover:  0 4px 20px rgba(0,0,0,0.45);
+    --shadow-card:     0 2px 12px rgba(0,0,0,0.30);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-border-strong); border-radius: 3px; }

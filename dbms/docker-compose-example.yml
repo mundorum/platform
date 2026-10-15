@@ -1,0 +1,24 @@
+services:
+  mundorum-dbms:
+    image: postgres
+    container_name: mundorum-dbms
+    volumes:
+      - mundorum-db:/var/lib/postgresql
+    restart: on-failure:5
+    shm_size: 128mb
+    environment:
+      # Matches DATABASE_URL=postgres://noid:noid@localhost:5432/noid (dev only)
+      POSTGRES_USER: noid
+      POSTGRES_PASSWORD: noid
+      POSTGRES_DB: noid
+    ports:
+      - "5432:5432"
+
+volumes:
+  mundorum-db:
+    driver: "local"
+    driver_opts:
+      type: "none"
+      device: "/home/user/data/pgsql/mundorum-db"
+      o: "bind" 
+

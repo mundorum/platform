@@ -4,19 +4,21 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install shared runner package first (build context is noid/)
-COPY runner/ runner/
+# Build context is the repository root (platform/); the image layout
+# under /app is unchanged from when the context was noid/.
+# Install shared runner package first
+COPY noid/runner/ runner/
 RUN pip install --no-cache-dir -e runner/
 
 # Install processing dependencies
-COPY processing/requirements.txt .
+COPY noid/processing/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy processing source
-COPY processing/ processing/
+COPY noid/processing/ processing/
 
 # Shared collections config (read by both authoring and processing)
-COPY collections.yaml .
+COPY noid/collections.yaml .
 
 ENV PYTHONUNBUFFERED=1
 

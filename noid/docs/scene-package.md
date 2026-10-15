@@ -3,7 +3,7 @@
 The canonical scene package format (on-disk directory structure, `scene.json`
 spec, `components/`, and `data/`) is defined in the core noid framework:
 
-> **[~/git/mundorum/noid/docs/scene-package.md](../../../../noid/docs/scene-package.md)**
+> **[mundorum/noid — docs/scene-package.md](https://github.com/mundorum/noid/blob/main/docs/scene-package.md)**
 
 This document covers the platform-specific extensions: ZIP packaging for network
 transfer, the API endpoints that accept/emit ZIPs, and the runner's scene-directory
@@ -140,7 +140,7 @@ prev/next controls in the Preview view — useful for long free-text columns
 
 Renders an uploaded single-file HTML/JS resource (`address`, e.g.
 `scene:tools/app.html` — stored under `data/` like any other scene resource, see
-the core [`data/` section](../../../../noid/docs/scene-package.md#data) linked
+the core [`data/` section](https://github.com/mundorum/noid/blob/main/docs/scene-package.md#data) linked
 above) inside a sandboxed `<iframe
 sandbox="allow-scripts allow-forms allow-modals allow-popups">` in the editor's
 Preview mode. Deliberately omits `allow-same-origin`: with `srcdoc` content, that
@@ -188,5 +188,5 @@ The platform defines project-level namespaces in `noid/noid-namespaces.yaml`.
 scenes deployed anywhere under `noid/` inherit both the `noid:` module namespace
 and the `shared:` resource namespace automatically.
 
-See [~/git/mundorum/noid/docs/namespaces.md](../../../../noid/docs/namespaces.md)
+See [mundorum/noid — docs/namespaces.md](https://github.com/mundorum/noid/blob/main/docs/namespaces.md)
 for the namespace file format and resolution rules.

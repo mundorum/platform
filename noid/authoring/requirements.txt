@@ -1,15 +1,8 @@
-django>=5.0
-djangorestframework>=3.15
-dj-database-url>=2.1
+# Dependencies of noid's Django apps (scenes, editor, libraries, resources).
+# Installed through server/requirements.txt — the shared server runs them.
+# mundorum-noid-collections must also stay in processing/requirements.txt
+# (see noid/CLAUDE.md, "Environment variables").
 pyyaml>=6.0
 requests>=2.31
-gunicorn>=21.2
 mundorum-noid>=0.1.1
 mundorum-noid-collections[lm]>=0.1.14
-google-auth>=2.38
-django-cors-headers>=4.7
-python-dotenv>=1.1
-psycopg2-binary>=2.9
-whitenoise>=6.7
-pytest>=8.0
-pytest-django>=4.9

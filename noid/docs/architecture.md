@@ -7,6 +7,13 @@ The noid sub-system is a two-server platform for composing and executing
 edges. It lives under `platform/noid/` and is deployed as two independent
 Docker images that communicate over HTTPS.
 
+> **Shared server.** The Authoring Machine is no longer a Django project of
+> its own: noid's authoring apps (`scenes`, `editor`, `libraries`,
+> `resources`) run inside the platform's shared Django server (`server/`),
+> mounted at `/noid/`, next to VP Studio (`/vp/`). Sign-in (`accounts`) moved
+> to the shared server. See [the platform architecture](../../docs/architecture.md).
+> The Processing Machine is unchanged.
+
 ---
 
 ## Two-machine model
@@ -22,7 +29,7 @@ Docker images that communicate over HTTPS.
 │  • noid scene editor  (Vue frontend)                 │
 │  • Scene CRUD + ZIP import/export API                │
 │  • Job submission → Processing Machine               │
-│  • Authentication (future)                           │
+│  • Authentication  (shared Google sign-in)           │
 │                                                      │
 └────────────────────────┬─────────────────────────────┘
                          │
@@ -157,5 +164,5 @@ production networks that are not fully trusted, add mutual TLS.
 | Processing server | FastAPI + Uvicorn | Native async streaming; no DB needed; minimal footprint |
 | Database | PostgreSQL | Authoring Machine only; no DB on Processing |
 | Shared logic | `noid_runner` package | No framework coupling; independently testable |
-| Containerization | Docker + Compose | Build context at `noid/` lets both Dockerfiles share `runner/` |
+| Containerization | Docker + Compose | Build context at the repository root lets both images share `noid/runner/`; the authoring apps ship in the shared `server` image |
 | Scene isolation | subprocess per run | Component code runs isolated; crash does not kill the server |

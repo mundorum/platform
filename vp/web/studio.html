@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VP Studio</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%237a3e1a'/%3E%3Ctext x='13' y='17' text-anchor='middle' font-family='monospace' font-size='11' font-weight='500' fill='%23f8f3e8'%3Evp%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/common/tokens.css">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+html, body { margin: 0; min-height: 100%; }
+body { font-family: var(--font-ui); background: var(--c-bg); color: var(--c-text); }
+
+#topbar {
+  height: 52px;
+  background: var(--c-surface);
+  border-bottom: 0.5px solid var(--c-border-strong);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+}
+.logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+.logo-tile {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: var(--c-accent); color: var(--c-on-accent);
+  font: 500 11px var(--font-mono);
+  display: grid; place-items: center;
+}
+.logo-name { font-size: 15px; font-weight: 600; color: var(--c-accent); letter-spacing: 0.03em; }
+.spacer { flex: 1; }
+.home { color: var(--c-muted); font-size: 12px; text-decoration: none; display: inline-flex; gap: 5px; align-items: center; }
+.home:hover { color: var(--c-accent); }
+
+main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 16px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.card {
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-card);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+h1 { font: 500 28px var(--font-doc); margin: 0; }
+p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--c-muted); }
+.eyebrow { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--c-muted); }
+.providers { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { font: 500 11px var(--font-ui); border-radius: 10px; padding: 2px 9px; }
+.pill.ok  { background: var(--c-tag-text-bg);  color: var(--c-tag-text); }
+.pill.off { background: var(--c-tag-state-bg); color: var(--c-tag-state); }
+.mono { font-family: var(--font-mono); font-size: 11px; }
+
+#signin { display: none; align-items: flex-start; }
+#signin.on { display: flex; }
+#studio { display: none; }
+#studio.on { display: flex; }
+.error { font: 400 11.5px var(--font-mono); color: var(--c-tag-err); }
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <a class="logo" href="/vp/"><span class="logo-tile">vp</span><span class="logo-name">vp-studio</span></a>
+  <span class="spacer"></span>
+  <a class="home" href="/"><i class="ti ti-apps"></i> Mundorum</a>
+</header>
+
+<main>
+  <section class="card" id="signin">
+    <h1>VP Studio</h1>
+    <p>Sign in with a pre-authorized Google account.</p>
+    <div id="google-signin-btn"></div>
+    <p class="error" id="error"></p>
+  </section>
+
+  <section class="card" id="studio">
+    <h1>VP Studio</h1>
+    <p>Signed in as <span id="user-name"></span>. The Simple mode editor is under construction.</p>
+    <span class="eyebrow">LLM providers</span>
+    <div class="providers" id="providers"></div>
+  </section>
+</main>
+
+<script type="module">
+import { initAuth, apiFetch } from '/static/common/auth.js';
+
+const $ = id => document.getElementById(id);
+
+async function start() {
+  const { user, error } = await initAuth({ app: 'vp', buttonEl: $('google-signin-btn') });
+  if (!user) {
+    $('signin').classList.add('on');
+    $('error').textContent = error;
+    return;
+  }
+  $('user-name').textContent = user.name || user.email;
+  $('studio').classList.add('on');
+  const status = await (await apiFetch('/vp/api/status/')).json();
+  for (const p of status.llm_providers) {
+    const pill = document.createElement('span');
+    pill.className = `pill ${p.configured ? 'ok' : 'off'}`;
+    pill.textContent = `${p.label}${p.is_default ? ' · default' : ''}${p.configured ? '' : ' · no key'}`;
+    if (p.default_model) pill.title = p.default_model;
+    $('providers').append(pill);
+  }
+}
+start();
+</script>
+</body>
+</html>

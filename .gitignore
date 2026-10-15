@@ -229,3 +229,15 @@ noid/docs/internal/
 temp/
 
 .claude
+groq.txt
+
+# LLM provider keys (see secrets/README.md)
+secrets/*
+!secrets/README.md
+
+# shared server: dev SQLite + collected static
+server/server.db
+server/staticfiles/
+
+# MkDocs build output
+site/

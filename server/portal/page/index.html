@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mundorum</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='7' fill='%237a3e1a'/%3E%3Ctext x='13' y='17.5' text-anchor='middle' font-family='monospace' font-size='12' font-weight='500' fill='%23f8f3e8'%3Em%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/common/tokens.css">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+html, body { margin: 0; min-height: 100%; }
+body { font-family: var(--font-ui); background: var(--c-bg); color: var(--c-text); }
+
+#topbar {
+  height: 52px;
+  background: var(--c-surface);
+  border-bottom: 0.5px solid var(--c-border-strong);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+}
+.logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+.logo-tile {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: var(--c-accent); color: var(--c-on-accent);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  display: grid; place-items: center;
+}
+.logo-name { font-size: 15px; font-weight: 600; color: var(--c-accent); letter-spacing: 0.03em; }
+.spacer { flex: 1; }
+
+.user { display: none; align-items: center; gap: 10px; font-size: 13px; color: var(--c-muted); min-width: 0; }
+.user.on { display: flex; }
+.user img { width: 26px; height: 26px; border-radius: 50%; }
+.user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-ghost {
+  font: 500 12px var(--font-ui);
+  color: var(--c-accent);
+  background: transparent;
+  border: 0.5px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.btn-ghost:hover { border-color: var(--c-accent); }
+
+main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 56px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+h1 { font: 500 32px/1.25 var(--font-doc); margin: 0; }
+.lede { font: 400 15px/1.65 var(--font-doc); color: var(--c-muted); margin: 8px 0 0; max-width: 620px; }
+
+.eyebrow {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--c-muted);
+}
+.apps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+}
+.app-card {
+  display: flex;
+  gap: 14px;
+  padding: 18px 18px 20px;
+  background: var(--c-surface);
+  border: 0.5px solid var(--c-border-card);
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .12s, box-shadow .12s;
+}
+.app-card:hover { border-color: var(--c-accent); box-shadow: var(--shadow-card); }
+.app-icon {
+  width: 44px; height: 44px; flex: none;
+  border-radius: 10px;
+  display: grid; place-items: center;
+  font-size: 22px;
+}
+.app-icon.noid { background: var(--c-accent-light); color: var(--c-accent); }
+.app-icon.vp   { background: var(--c-tag-place-bg); color: var(--c-tag-place); }
+.app-body { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.app-title { display: flex; align-items: baseline; gap: 8px; }
+.app-name { font: 500 17px var(--font-doc); }
+.app-path { font: 400 11px var(--font-mono); color: var(--c-muted); }
+.app-desc { font-size: 13px; line-height: 1.55; color: var(--c-muted); }
+.app-go { margin-left: auto; align-self: center; color: var(--c-accent); font-size: 18px; }
+
+.signin {
+  display: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 0.5px dashed var(--c-border-card);
+  border-radius: 12px;
+}
+.signin.on { display: flex; }
+.signin p { margin: 0; font-size: 13px; color: var(--c-muted); line-height: 1.5; }
+.error {
+  display: none;
+  font: 400 11.5px var(--font-mono);
+  color: var(--c-tag-err);
+  background: var(--c-tag-err-bg);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.error.on { display: block; }
+
+footer {
+  display: flex; flex-wrap: wrap; gap: 6px 18px;
+  font-size: 12px; color: var(--c-muted);
+  border-top: 0.5px solid var(--c-border);
+  padding-top: 18px;
+}
+footer a { color: var(--c-accent); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <a class="logo" href="/"><span class="logo-tile">m</span><span class="logo-name">mundorum</span></a>
+  <span class="spacer"></span>
+  <div class="user" id="user">
+    <img id="user-pic" alt="" referrerpolicy="no-referrer">
+    <span class="user-name" id="user-name"></span>
+    <button class="btn-ghost" id="signout"><i class="ti ti-logout"></i> Sign out</button>
+  </div>
+</header>
+
+<main>
+  <section>
+    <h1>Mundorum</h1>
+    <p class="lede">An umbrella for authoring and playing interactive compositions. Choose an environment to continue. One sign-in works for all of them.</p>
+  </section>
+
+  <section class="signin" id="signin">
+    <p>Sign in with a pre-authorized Google account.</p>
+    <div id="google-signin-btn"></div>
+  </section>
+  <div class="error" id="error"></div>
+
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">Environments</span>
+    <div class="apps">
+      <a class="app-card" href="/noid/">
+        <span class="app-icon noid"><i class="ti ti-topology-complex"></i></span>
+        <span class="app-body">
+          <span class="app-title"><span class="app-name">noid</span><span class="app-path">/noid/</span></span>
+          <span class="app-desc">Compose and run n-o-id scenes: graphs of components connected by publish/subscribe edges.</span>
+        </span>
+        <i class="ti ti-arrow-right app-go"></i>
+      </a>
+      <a class="app-card" href="/vp/">
+        <span class="app-icon vp"><i class="ti ti-stethoscope"></i></span>
+        <span class="app-body">
+          <span class="app-title"><span class="app-name">VP Studio</span><span class="app-path">/vp/</span></span>
+          <span class="app-desc">Author and play virtual patient activities guided by LLM tutor and patient agents.</span>
+        </span>
+        <i class="ti ti-arrow-right app-go"></i>
+      </a>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://mundorum.github.io/platform/" target="_blank" rel="noopener"><i class="ti ti-book"></i> Documentation</a>
+    <a href="https://github.com/mundorum/platform" target="_blank" rel="noopener"><i class="ti ti-brand-github"></i> Source</a>
+  </footer>
+</main>
+
+<script type="module">
+import { initAuth, signOut } from '/static/common/auth.js';
+
+const $ = id => document.getElementById(id);
+
+async function start() {
+  const { user, error } = await initAuth({ app: '', buttonEl: $('google-signin-btn') });
+  if (user) {
+    $('user-name').textContent = user.name || user.email;
+    if (user.picture) $('user-pic').src = user.picture; else $('user-pic').remove();
+    $('user').classList.add('on');
+  } else {
+    $('signin').classList.add('on');
+  }
+  if (error) {
+    $('error').textContent = error;
+    $('error').classList.add('on');
+  }
+}
+
+$('signout').addEventListener('click', () => { signOut(); location.reload(); });
+start();
+</script>
+</body>
+</html>

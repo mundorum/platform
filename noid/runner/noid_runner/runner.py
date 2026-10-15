@@ -26,9 +26,36 @@ def _build_imports(scene: dict, catalog: list[dict]) -> list[str]:
     return list(existing | modules)
 
 
+# Scene components are user-authored code, so the subprocess must not inherit
+# the server's own secrets (Django SECRET_KEY, DATABASE_URL, the processing
+# bearer token, LLM provider keys, ...). A denylist rather than an allowlist,
+# because third-party libraries used by components read their own env vars
+# (OLLAMA_HOST, HF_HOME, CUDA_VISIBLE_DEVICES, proxies, ...) and an allowlist
+# would silently break them. NOID_SUBPROCESS_ENV_PASSTHROUGH (comma-separated
+# names) re-admits a specific variable that matches a pattern on purpose,
+# e.g. HF_TOKEN on a processing machine that downloads gated models.
+_SECRET_ENV_NAMES = {'SECRET_KEY', 'DATABASE_URL'}
+_SECRET_ENV_MARKERS = ('API_KEY', 'SECRET', 'PASSWORD', 'TOKEN', 'POSTGRES_')
+
+
+def _is_secret_env(name: str) -> bool:
+    upper = name.upper()
+    return upper in _SECRET_ENV_NAMES or any(m in upper for m in _SECRET_ENV_MARKERS)
+
+
 def _subprocess_env(extra: Optional[dict] = None) -> dict:
-    """Build a subprocess environment, forwarding NOID_NAMESPACES if set."""
-    env = os.environ.copy()
+    """Build a subprocess environment without the server's secrets.
+
+    NOID_NAMESPACES and everything else non-secret is forwarded unchanged.
+    """
+    passthrough = {
+        n.strip() for n in os.environ.get('NOID_SUBPROCESS_ENV_PASSTHROUGH', '').split(',')
+        if n.strip()
+    }
+    env = {
+        k: v for k, v in os.environ.items()
+        if k in passthrough or not _is_secret_env(k)
+    }
     if extra:
         env.update(extra)
     return env
