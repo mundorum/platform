@@ -1,3 +1,5 @@
+source noid/.venv/bin/activate
+uv pip install -r server/requirements.txt -r noid/processing/requirements.txt
 uv pip install --upgrade mundorum-noid mundorum-noid-collections
-cd noid/authoring
+cd server
 python manage.py migrate
