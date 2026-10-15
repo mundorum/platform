@@ -46,6 +46,16 @@ python manage.py seed_initial_manager
 > the root file doesn't set. Relative noid paths (`COLLECTIONS_FILE`,
 > `SCENE_PACKAGES_DIR`, `SHARED_RESOURCES_DIR`) are resolved against `noid/`.
 
+### VP Studio content
+
+Without a content pack, VP Studio uses neutral placeholder scripts and
+prompts. To work with real content, load a pack
+(see [content packs](../vp/docs/content-packs.md)):
+
+```bash
+python server/manage.py load_vp_content <path/to/pack.json>
+```
+
 ### LLM keys (for VP Studio)
 
 ```bash
@@ -84,6 +94,7 @@ cd server && pytest                # every app on the shared server (server/, no
 cd noid && pytest runner/          # noid_runner (no DB)
 cd noid && pytest authoring/       # just noid's Django apps
 cd noid && pytest processing/      # noid's FastAPI server
+node --test vp/web/tests/*.test.mjs   # VP Studio's browser-side rules (Node 22+, from the repo root)
 ```
 
 Django tests use a real PostgreSQL test database (created and dropped by

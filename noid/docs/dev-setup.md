@@ -8,11 +8,9 @@ tasks.
 noid's authoring API is served by the shared server under `/noid/api/`
 (port 8000 in development). The processing server runs on port 8001.
 
-The scene, resource and library endpoints need the shared sign-in token:
+Every endpoint except the public `catalog/` needs the shared sign-in token:
 `-H "Authorization: Token <token>"`. Take it from the browser's
 `localStorage.mundorum_token` after signing in at http://localhost:8000/noid/.
-(The editor's `catalog/` and scratch `play/` endpoints currently don't check
-it; the examples send it anyway.)
 
 ---
 

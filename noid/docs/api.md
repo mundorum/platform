@@ -136,6 +136,9 @@ Unlike the upload endpoint, this action **upserts** — a second call with the s
 
 Accepts raw scene JSON directly; no DB record is created. Used by the editor's
 "Quick Run" panel. URL patterns must not change (existing frontend depends on them).
+`catalog/` is public; `play/` and `play/stream/` run code on the server and
+require the sign-in token (`Authorization: Token <key>`), like every other
+authoring endpoint.
 
 | Method | Path | Description |
 |--------|------|-------------|

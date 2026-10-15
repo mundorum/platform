@@ -83,6 +83,10 @@ LOGGING = {
             'handlers': ['console'],
             'level': 'INFO',
         },
+        'vp': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
     },
 }
 
@@ -161,7 +165,11 @@ else:
 # the app itself. Whitenoise does that, backed by a manifest built by
 # `collectstatic` at image build time (see server/Dockerfile).
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+    # Subproject frontends, each under its own prefix: /static/vp/...
+    ('vp', VP_ROOT / 'web' / 'static'),
+]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
     'default': {

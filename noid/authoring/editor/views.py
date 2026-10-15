@@ -12,6 +12,8 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.exceptions import AuthenticationFailed
 
 from noid_runner.catalog import load_modules, build_catalog, get_load_errors
 
@@ -128,8 +130,32 @@ class CatalogView(View):
         return JsonResponse({'components': catalog, 'errors': errors})
 
 
+class TokenRequiredMixin:
+    """Require the shared DRF token (Authorization: Token <key>) on a plain
+    Django view, and set request.user to its owner.
+
+    The play views run scene code on the server, so they must never be
+    anonymous. They stay plain Views (not DRF APIViews) because they read
+    request.body directly and stream plain-text responses. csrf_exempt is
+    safe here: the token travels in a header, not a cookie, so a cross-site
+    request can't carry it.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            result = TokenAuthentication().authenticate(request)
+        except AuthenticationFailed as exc:
+            return JsonResponse({'detail': str(exc.detail)}, status=401)
+        if result is None:
+            return JsonResponse(
+                {'detail': 'Authentication credentials were not provided.'}, status=401,
+            )
+        request.user = result[0]
+        return super().dispatch(request, *args, **kwargs)
+
+
 @method_decorator(csrf_exempt, name='dispatch')
-class PlayView(View):
+class PlayView(TokenRequiredMixin, View):
     """Run a scene and return the complete output once finished."""
 
     def post(self, request):
@@ -148,15 +174,19 @@ class PlayView(View):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
-class PlayStreamView(View):
+class PlayStreamView(TokenRequiredMixin, View):
     """Stream scene output line-by-line and record the run in SceneRun."""
 
     def post(self, request):
         try:
             scene_spec = json.loads(request.body)
         except json.JSONDecodeError as exc:
+            # Python unbinds `exc` when the except block ends, before the
+            # generator runs — capture the message now.
+            message = f'Error parsing scene JSON: {exc}\n'
+
             def _err():
-                yield f'Error parsing scene JSON: {exc}\n'
+                yield message
             return StreamingHttpResponse(_err(), content_type='text/plain; charset=utf-8')
 
         from scenes.models import SceneRun

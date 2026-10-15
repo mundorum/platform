@@ -51,3 +51,4 @@ nav:
       - Development tasks: noid/dev-setup.md
   - VP Studio:
       - Overview: vp/index.md
+      - Content packs: vp/content-packs.md
