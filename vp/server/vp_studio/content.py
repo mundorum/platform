@@ -9,6 +9,7 @@ and stores it in the database (ContentPack). See vp/docs/content-packs.md.
 """
 from __future__ import annotations
 
+import itertools
 import json
 from pathlib import Path
 
@@ -24,6 +25,12 @@ AGENT_PROMPTS = ('tutor_persona', 'patient_persona', 'guardrails')
 RUNTIME_PROMPTS = ('generated', 'exit_check', 'evaluator', 'progress_feedback')
 PREVIEW_KINDS = ('generated', 'interaction', 'final_feedback')
 STRATEGY_CATEGORY_NAMES = ('Feedback', 'Final feedback', 'Patient', 'Gamification')
+# Texts the authoring assistant drafts, and the case element (by ref) each
+# one fills in the new case. The vignette is the author's own.
+AUTHORING_PARTS = ('explanation', 'summary')
+AUTHORING_REFS = {'vignette': 'case1.vignette', 'explanation': 'case1.expert', 'summary': 'knowledge'}
+# Steps the fallback authoring template has when a pack doesn't name one.
+AUTHORING_FALLBACK_STEPS = ['know', 'explain', 'transfer']
 
 # Placeholder for the case number inside transfer-step defaults.
 CASE_N = '{N}'
@@ -156,6 +163,27 @@ def validate_pack(pack) -> None:
     for kind in PREVIEW_KINDS:
         _text(preview.get(kind), f'preview.{kind}')
 
+    # Optional: packs written before the authoring assistant existed get the
+    # placeholder's instructions (see authoring_section).
+    if 'authoring' in pack:
+        _validate_authoring(pack)
+
+
+def _validate_authoring(pack: dict) -> None:
+    section = pack['authoring']
+    _require(isinstance(section, dict), 'authoring must be an object.')
+    template = section.get('template')
+    _require(any(t['id'] == template for t in pack['templates']),
+             'authoring.template must name one of the templates.')
+    for key in ('system', *AUTHORING_PARTS):
+        _text(section.get(key), f'authoring.{key}')
+    words = section.get('summary_words')
+    _require(isinstance(words, int) and not isinstance(words, bool) and words > 0,
+             'authoring.summary_words must be a positive whole number.')
+    refs = _refs(new_case_document(pack, template, _counter_ids()))
+    missing = [ref for ref in AUTHORING_REFS.values() if ref not in refs]
+    _require(not missing, f'authoring.template has no element for {", ".join(missing)}.')
+
 
 def load_pack_file(path) -> dict:
     try:
@@ -174,6 +202,17 @@ def placeholder_pack() -> dict:
 
 def strategy_map(pack: dict) -> dict[str, dict]:
     return {s['key']: s for s in pack['strategies']}
+
+
+def authoring_section(pack: dict) -> dict:
+    """The pack's authoring-assistant instructions and template. A pack
+    without them uses the placeholder's instructions with its own template
+    whose steps are AUTHORING_FALLBACK_STEPS (else its default template)."""
+    if 'authoring' in pack:
+        return pack['authoring']
+    template = next((t['id'] for t in pack['templates'] if t['steps'] == AUTHORING_FALLBACK_STEPS),
+                    pack['default_template'])
+    return {**placeholder_pack()['authoring'], 'template': template}
 
 
 # ── building new cases (mirrors casemodel.js newCase/instantiateStep) ─────────
@@ -239,6 +278,37 @@ def new_case_document(pack: dict, template_id: str | None, new_id) -> dict:
         'steps': steps,
         **default_prompts(pack),
     }
+
+
+def _counter_ids():
+    counter = itertools.count(1)
+    return lambda prefix: f'{prefix}_{next(counter)}'
+
+
+def _refs(doc: dict) -> set[str]:
+    refs = set()
+    for step in doc['steps']:
+        for el in step['elements']:
+            refs.add(el.get('ref'))
+            refs.update(side.get('ref') for side in el['sideInfo'])
+    refs.discard(None)
+    return refs
+
+
+def assisted_case_document(pack: dict, new_id, *, title: str, vignette: str,
+                           explanation: str, summary: str) -> dict:
+    """A new case from the authoring assistant: the pack's authoring
+    template, with the vignette, the expert explanation and the summary of
+    the documents (the knowledge text) in place."""
+    doc = new_case_document(pack, authoring_section(pack)['template'], new_id)
+    doc['title'] = title
+    texts = {AUTHORING_REFS['vignette']: vignette, AUTHORING_REFS['explanation']: explanation,
+             AUTHORING_REFS['summary']: summary}
+    for step in doc['steps']:
+        for item in (x for el in step['elements'] for x in (el, *el['sideInfo'])):
+            if item.get('ref') in texts:
+                item['text'] = texts[item['ref']]
+    return doc
 
 
 # The agent and strategy prompts a new case stores (editable per case).

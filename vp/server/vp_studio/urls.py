@@ -3,7 +3,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
-    AssistView, CaseViewSet, ContentView, PlayInfoView, PreviewSampleView, SessionsView,
+    AssistView, AuthoringCaseView, AuthoringDraftView, AuthoringSourcesView, CaseViewSet, ContentView, PlayInfoView, PreviewSampleView, SessionsView,
     SessionView, StatusView, studio_html,
 )
 
@@ -18,6 +18,9 @@ urlpatterns = [
     path('api/content/', ContentView.as_view(), name='vp-content'),
     path('api/assist/', AssistView.as_view(), name='vp-assist'),
     path('api/preview-sample/', PreviewSampleView.as_view(), name='vp-preview-sample'),
+    path('api/authoring/sources/', AuthoringSourcesView.as_view(), name='vp-authoring-sources'),
+    path('api/authoring/draft/', AuthoringDraftView.as_view(), name='vp-authoring-draft'),
+    path('api/authoring/case/', AuthoringCaseView.as_view(), name='vp-authoring-case'),
     path('api/play/<uuid:case_id>/', PlayInfoView.as_view(), name='vp-play-info'),
     path('api/sessions/', SessionsView.as_view(), name='vp-sessions'),
     path('api/sessions/<uuid:session_id>/', SessionView.as_view(), name='vp-session'),

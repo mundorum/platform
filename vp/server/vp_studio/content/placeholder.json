@@ -360,6 +360,13 @@
       "expert": "Write the expert explanation of this case: the reasoning a strong student should reach, as short numbered points linking the findings to the underlying mechanisms. Base it on the knowledge text and the case vignette."
     }
   },
+  "authoring": {
+    "template": "recall_explain_transfer",
+    "system": "You help a medical educator prepare a virtual patient activity from a clinical case and reference documents. Base your answer on the vignette and the documents; do not invent findings. Reply with only the requested text: no preamble, no quotes, no markdown headings.",
+    "explanation": "Explain why this patient has the symptoms listed below, given the vignette and the reference documents. Write it as the expert explanation a strong student should reach: short numbered points linking the findings to the underlying mechanisms.",
+    "summary": "Summarize the reference documents below as a knowledge text for the activity: the key concepts a student needs in order to explain the case, in plain paragraphs.",
+    "summary_words": 400
+  },
   "preview": {
     "system": "You produce short preview samples of what a student will see in a virtual patient activity. Follow the author's prompt and strategies faithfully, at the given student level. Never mention that this is a sample.",
     "generated": "Write the text this prompt would produce for the student.",

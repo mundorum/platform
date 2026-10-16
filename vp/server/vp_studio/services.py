@@ -13,8 +13,11 @@ from django.utils import timezone
 
 from llm import services as llm
 
-from . import casedoc, gnoexport, runtime
-from .content import ContentError, placeholder_pack, strategy_map, validate_pack
+from . import casedoc, gnoexport, runtime, sources
+from .content import (
+    AUTHORING_PARTS, ContentError, assisted_case_document, authoring_section, placeholder_pack,
+    strategy_map, validate_pack,
+)
 from .models import Case, ContentPack, PreviewSample, Session
 
 log = logging.getLogger('vp')
@@ -57,6 +60,7 @@ def public_pack(pack: dict) -> dict:
     default prompts and the agent prompts (authors edit both per case).
     The assistant's, preview's and player's own instructions stay on the
     server."""
+    authoring = authoring_section(pack)
     return {
         'name': pack['name'],
         'placeholder': bool(pack.get('placeholder')),
@@ -65,6 +69,7 @@ def public_pack(pack: dict) -> dict:
         'strategies': pack['strategies'],
         'agents': pack['agents'],
         'step_defaults': pack['step_defaults'],
+        'authoring': {'template': authoring['template'], 'summary_words': authoring['summary_words']},
     }
 
 
@@ -171,6 +176,83 @@ def assist(user, *, mode: str, doc: dict, step_id: str, element_id: str,
     ]
     result = llm.chat(user, messages, purpose=f'vp.assist.{mode}', temperature=0.7)
     return _clean(result.text)
+
+
+# ── authoring assistant ───────────────────────────────────────────────────────
+
+def extract_sources(files) -> list[dict]:
+    """The text of each uploaded (name, bytes) file. A file that can't be
+    used gets an `error` instead of failing the others."""
+    if not files:
+        raise StudioError('Add at least one PDF or TXT file.')
+    if len(files) > sources.MAX_FILES:
+        raise StudioError(f'Upload at most {sources.MAX_FILES} files at a time.')
+    out = []
+    for name, data in files:
+        try:
+            text = sources.extract_text(name, data)
+        except sources.SourceError as exc:
+            out.append({'name': name, 'text': '', 'words': 0, 'error': str(exc)})
+            continue
+        if not text:
+            out.append({'name': name, 'text': '', 'words': 0,
+                        'error': 'No text found (a scanned PDF needs text recognition first).'})
+            continue
+        # The prompt never carries more than this, so neither does the browser.
+        cut = len(text) > sources.MAX_SOURCE_CHARS
+        text = text[:sources.MAX_SOURCE_CHARS]
+        out.append({'name': name, 'text': text, 'words': sources.word_count(text), 'truncated': cut})
+    return out
+
+
+def _clean_documents(documents) -> list[dict]:
+    if not isinstance(documents, list) or len(documents) > sources.MAX_FILES:
+        raise StudioError('The reference documents are invalid.')
+    out = []
+    for d in documents:
+        if not isinstance(d, dict) or not isinstance(d.get('text', ''), str):
+            raise StudioError('The reference documents are invalid.')
+        out.append({'name': str(d.get('name', ''))[:200], 'text': d.get('text', '')[:sources.MAX_SOURCE_CHARS]})
+    return [d for d in out if d['text'].strip()]
+
+
+def authoring_draft(user, *, part: str, vignette: str, symptoms: str, documents) -> dict:
+    """Draft one text of a new case from the author's material:
+    'explanation' (why the patient has the symptoms) or 'summary' (of the
+    documents). Returns {text, truncated}."""
+    if part not in AUTHORING_PARTS:
+        raise StudioError(f'Unknown part {part!r}.')
+    section = authoring_section(active_pack())
+    documents = _clean_documents(documents)
+    vignette, symptoms = vignette.strip(), symptoms.strip()
+    if not documents:
+        raise StudioError('Add at least one document with text.')
+    block, truncated = sources.source_block(documents)
+    if part == 'explanation':
+        if not vignette or not symptoms:
+            raise StudioError('Write the vignette and the symptoms to explain first.')
+        lines = [f'Vignette:\n{vignette}', f'Symptoms to explain:\n{symptoms}']
+    else:
+        lines = [f"Length: at most {section['summary_words']} words."]
+    lines.append(f'Reference documents:\n{block}')
+    messages = [
+        {'role': 'system', 'content': section['system']},
+        {'role': 'user', 'content': f'{section[part]}\n\n' + '\n\n'.join(lines)},
+    ]
+    result = llm.chat(user, messages, purpose=f'vp.author.{part}', temperature=0.4)
+    return {'text': _clean(result.text), 'truncated': truncated}
+
+
+def _new_id(prefix: str) -> str:
+    return f'{prefix}_{uuid.uuid4().hex[:10]}'
+
+
+def create_assisted_case(user, *, title: str, vignette: str, explanation: str, summary: str) -> Case:
+    """A new draft case on the pack's authoring template, with the texts in place."""
+    doc = assisted_case_document(active_pack(), _new_id, title=title.strip()[:300],
+                                 vignette=vignette.strip(), explanation=explanation.strip(),
+                                 summary=summary.strip())
+    return Case.objects.create(owner=user, title=doc['title'], document=doc)
 
 
 # ── preview samples ───────────────────────────────────────────────────────────
@@ -367,4 +449,5 @@ def session_view(session: Session) -> dict:
 
 __all__ = ['StudioError', 'ContentError', 'active_pack', 'load_pack', 'public_pack',
            'assist', 'preview_sample', 'publish', 'NotAllowed', 'playable_case', 'start_session',
-           'act', 'session_view', 'export_case', 'export_gno', 'import_case']
+           'act', 'session_view', 'export_case', 'export_gno', 'import_case',
+           'extract_sources', 'authoring_draft', 'create_assisted_case']

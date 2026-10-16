@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from llm.gateway import LLMError, ModelNotConfigured, ProviderNotConfigured
 from llm.services import RateLimited, provider_status
 
-from . import casedoc, services
+from . import casedoc, services, sources
 from .models import Case, Session
 from .runtime import PlayerError
 from .serializers import CaseListSerializer, CaseSerializer
@@ -187,6 +187,49 @@ class PreviewSampleView(APIView):
         except (LLMError, APIError, services.StudioError) as exc:
             return _llm_error_response(exc)
         return Response(sample)
+
+
+# ── authoring assistant ───────────────────────────────────────────────────────
+
+class AuthoringSourcesView(APIView):
+    """POST multipart `files` (PDF/TXT) → {documents: [{name, text, words,
+    truncated?, error?}]}. Nothing is stored."""
+
+    def post(self, request):
+        # Read one byte past the limit so an oversized file is reported, not cut.
+        files = [(f.name, f.read(sources.MAX_FILE_BYTES + 1)) for f in request.FILES.getlist('files')]
+        try:
+            documents = services.extract_sources(files)
+        except services.StudioError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'documents': documents})
+
+
+class AuthoringDraftView(APIView):
+    """POST {part: 'explanation'|'summary', vignette, symptoms, documents} → {text, truncated}."""
+
+    def post(self, request):
+        try:
+            draft = services.authoring_draft(
+                request.user,
+                part=request.data.get('part', ''),
+                vignette=str(request.data.get('vignette', ''))[:8000],
+                symptoms=str(request.data.get('symptoms', ''))[:4000],
+                documents=request.data.get('documents', []),
+            )
+        except (LLMError, APIError, services.StudioError) as exc:
+            return _llm_error_response(exc)
+        return Response(draft)
+
+
+class AuthoringCaseView(APIView):
+    """POST {title, vignette, explanation, summary} → a new draft case on
+    the pack's authoring template."""
+
+    def post(self, request):
+        texts = {k: str(request.data.get(k, '')) for k in ('title', 'vignette', 'explanation', 'summary')}
+        case = services.create_assisted_case(request.user, **texts)
+        return Response(CaseSerializer(case).data, status=status.HTTP_201_CREATED)
 
 
 # ── player ────────────────────────────────────────────────────────────────────

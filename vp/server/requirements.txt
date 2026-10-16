@@ -1,2 +1,3 @@
 # Dependencies of vp's Django apps. Installed through server/requirements.txt.
 # The LLM client (openai SDK) is a shared-server dependency, not listed here.
+pypdf>=5.0                  # text of PDFs uploaded to the authoring assistant

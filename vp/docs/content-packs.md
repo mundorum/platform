@@ -6,7 +6,7 @@ A content pack holds VP Studio's pedagogical content:
 - the **default elements** each step type starts with (labels, prompts, side information, strategies);
 - the **strategy catalogue**;
 - the **agent prompts** (tutor persona, patient persona, guardrails) new cases start with;
-- the instructions the **assistant**, the **preview** and the **player** use when they call the LLM.
+- the instructions the **assistant**, the **authoring assistant**, the **preview** and the **player** use when they call the LLM.
 
 Code and content are kept apart on purpose. The public repository ships only
 neutral placeholder content (`vp/server/vp_studio/content/placeholder.json`).
@@ -38,7 +38,8 @@ A pack is one JSON file:
   "step_defaults": { ... },
   "runtime": { ... },
   "assist": { ... },
-  "preview": { ... }
+  "preview": { ... },
+  "authoring": { ... }
 }
 ```
 
@@ -171,3 +172,28 @@ Server-only instructions used by the player:
 These are used by the preview's **Generate sample** buttons. The
 `interaction` instruction must ask for one turn per line, prefixed with
 `STUDENT:`, `TUTOR:` or `PATIENT:`. The editor parses that format.
+
+### authoring (optional)
+
+Used by the **Authoring Assistant** (New case gallery), which drafts a case
+from the author's vignette, the symptoms to explain and reference documents:
+
+```json
+{"template": "explain_transfer", "system": "…", "explanation": "…", "summary": "…",
+ "summary_words": 400}
+```
+
+| Key | Used for |
+|-----|----------|
+| `template` | the script template the new case uses. Its steps must contain the `case1.vignette`, `case1.expert` and `knowledge` elements |
+| `system` | system prompt for both calls |
+| `explanation` | task for the explanation of the symptoms. The server appends the vignette, the symptoms and the documents |
+| `summary` | task for the summary of the documents. The server appends `Length: at most <summary_words> words.` and the documents |
+| `summary_words` | the summary's word limit (the editor shows a word count against it) |
+
+The new case gets the vignette as case 1, the explanation as case 1's expert
+explanation and the summary as the knowledge text.
+
+A pack without this section uses the placeholder's instructions with the
+pack's own template whose steps are `know`, `explain`, `transfer` (or its
+`default_template` if it has none).

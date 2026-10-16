@@ -31,7 +31,8 @@ const store = reactive({
   saved: '',              // JSON of the last saved document
   saving: false,
   mode: 'author',         // 'author' | 'player'
-  view: 'gallery',        // 'gallery' | 'editor'
+  view: 'gallery',        // 'gallery' | 'editor' | 'assistant'
+  assistant: null,        // authoring assistant's work in progress (see blankAssistant)
   ui: {
     openStep: null, settingsOpen: false, legendOpen: false, tplOpen: false,
     previewOpen: false, previewWidth: Number(lsGet(LS_PREVIEW_WIDTH)) || 400, stratOpen: false, stratSel: null,
@@ -57,10 +58,11 @@ const tok = key => `{{${key}}}`;
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 async function api(path, { method = 'GET', body } = {}) {
+  const form = body instanceof FormData;
   const r = await apiFetch(path, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
+    headers: body && !form ? { 'Content-Type': 'application/json' } : {},
+    body: body && !form ? JSON.stringify(body) : body,
   });
   let data = null;
   try { data = await r.json(); } catch { /* empty body */ }
@@ -108,6 +110,9 @@ function relativeTime(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
+// Mirrors sources.MAX_FILES on the server.
+const MAX_SOURCE_FILES = 10;
+
 const STATUS_LABEL = { draft: 'draft', published: 'published', changed: 'edited' };
 
 // ── case lifecycle ───────────────────────────────────────────────────────────
@@ -132,6 +137,33 @@ function setCurrent(data) {
 
 function confirmDiscard() {
   return !dirty.value || window.confirm('You have unsaved changes in this case. Discard them?');
+}
+
+// ── authoring assistant: material → drafts → new case ────────────────────────
+
+function blankAssistant() {
+  return {
+    title: '', vignette: '', symptoms: '',
+    files: [],              // File objects the author added
+    documents: null,        // their extracted text [{name, text, words, truncated?, error?}]; null = not extracted yet
+    explanation: '', summary: '',
+    drafted: false,         // a full generation (both drafts) has succeeded
+    draftedFrom: '',        // material signature of the last full generation
+    stage: '',              // '' | 'extract' | 'draft' | 'create'
+    partBusy: { explanation: false, summary: false },
+    truncated: false, error: '',
+  };
+}
+
+const assistantStarted = computed(() => {
+  const a = store.assistant;
+  return !!a && (has(a.vignette) || has(a.symptoms) || a.files.length > 0 || has(a.explanation) || has(a.summary));
+});
+
+function openAssistant() {
+  store.assistant ||= blankAssistant();
+  store.view = 'assistant';
+  closePops();
 }
 
 async function refreshCases() {
@@ -377,7 +409,7 @@ const GalleryView = {
     function pickFile() { fileInput.value.value = ''; fileInput.value.click(); }
     function onFile(e) { importCaseFile(e.target.files[0]); }
     return { store, templates, startCase, openCase, deleteCase, back, relativeTime, STATUS_LABEL, copyStudentLink,
-             exportCase, fileInput, pickFile, onFile };
+             exportCase, fileInput, pickFile, onFile, openAssistant, assistantStarted };
   },
   template: `
   <div class="gallery">
@@ -397,11 +429,20 @@ const GalleryView = {
       <i class="ti ti-info-circle"></i>
       <span>These scripts and default texts are neutral placeholders. A deployment loads its own with <code>manage.py load_vp_content</code>.</span>
     </div>
-    <button class="scratch" @click="startCase(null)">
-      <span class="tile c-accent"><i class="ti ti-file-plus"></i></span>
-      <span class="scratch-body"><b>Start from scratch</b><span>Only Welcome and Final feedback. Add the steps in between yourself.</span></span>
-      <i class="ti ti-arrow-right"></i>
-    </button>
+    <div class="start-row">
+      <button class="scratch" @click="startCase(null)">
+        <span class="tile c-accent"><i class="ti ti-file-plus"></i></span>
+        <span class="scratch-body"><b>Start from scratch</b><span>Only Welcome and Final feedback. Add the steps in between yourself.</span></span>
+        <i class="ti ti-arrow-right"></i>
+      </button>
+      <button class="scratch" @click="openAssistant">
+        <span class="tile c-char"><i class="ti ti-sparkles"></i></span>
+        <span class="scratch-body"><b>Authoring Assistant</b>
+          <span v-if="assistantStarted">Continue where you left off.</span>
+          <span v-else>Give a vignette, the symptoms to explain and reference documents. The assistant drafts the explanation and the knowledge text.</span></span>
+        <i class="ti ti-arrow-right"></i>
+      </button>
+    </div>
     <div class="eyebrow" style="margin-top:6px">Or start from a script</div>
     <div class="tpl-grid">
       <button v-for="t in templates" :key="t.id" class="tpl-card" @click="startCase(t.id)">
@@ -427,6 +468,223 @@ const GalleryView = {
         </div>
       </div>
     </template>
+  </div>`,
+};
+
+const words = text => (text || '').split(/\s+/).filter(Boolean).length;
+const materialSig = a => JSON.stringify([a.vignette.trim(), a.symptoms.trim(), a.files.map(f => [f.name, f.size, f.lastModified])]);
+
+const AssistantView = {
+  setup() {
+    const a = computed(() => store.assistant);
+    const fileInput = ref(null);
+    const dragging = ref(false);
+    const tpl = computed(() => store.pack.templates.find(t => t.id === store.pack.authoring.template));
+    const limit = computed(() => store.pack.authoring.summary_words);
+    const busy = computed(() => !!a.value.stage || a.value.partBusy.explanation || a.value.partBusy.summary);
+    const usable = computed(() => (a.value.documents || []).filter(d => !d.error));
+    const canGenerate = computed(() => has(a.value.vignette) && has(a.value.symptoms) && a.value.files.length > 0);
+    const stale = computed(() => a.value.drafted && a.value.draftedFrom !== materialSig(a.value));
+    const hasDrafts = computed(() => has(a.value.explanation) || has(a.value.summary));
+    const canCreate = computed(() => has(a.value.vignette) && has(a.value.explanation) && has(a.value.summary));
+    const progress = computed(() => ({
+      extract: `Extracting the text of ${a.value.files.length} file${a.value.files.length === 1 ? '' : 's'}…`,
+      draft: 'Writing the explanation and the summary…',
+      create: 'Creating the case…',
+    })[a.value.stage] || '');
+
+    function pickFiles() { fileInput.value.value = ''; fileInput.value.click(); }
+    function addFiles(list) {
+      const known = new Set(a.value.files.map(f => `${f.name}:${f.size}`));
+      const fresh = [...list].filter(f => !known.has(`${f.name}:${f.size}`));
+      const room = MAX_SOURCE_FILES - a.value.files.length;
+      if (fresh.length > room) toast(`At most ${MAX_SOURCE_FILES} files; the others were left out.`, { kind: 'error' });
+      if (!fresh.length || room <= 0) return;
+      a.value.files.push(...fresh.slice(0, room));
+      a.value.documents = null;
+    }
+    function removeFile(i) { a.value.files.splice(i, 1); a.value.documents = null; }
+    function onDrop(e) { dragging.value = false; addFiles(e.dataTransfer.files); }
+    const docFor = f => (a.value.documents || []).find(d => d.name === f.name);
+    const isPdf = f => f.name.toLowerCase().endsWith('.pdf');
+
+    async function extract() {
+      a.value.stage = 'extract';
+      const form = new FormData();
+      for (const f of a.value.files) form.append('files', f, f.name);
+      a.value.documents = (await api('/vp/api/authoring/sources/', { method: 'POST', body: form })).documents;
+      if (!usable.value.length) throw new Error('None of the files has text the assistant can use.');
+    }
+    async function draft(part) {
+      const { text, truncated } = await api('/vp/api/authoring/draft/', { method: 'POST', body: {
+        part, vignette: a.value.vignette, symptoms: a.value.symptoms,
+        documents: usable.value.map(({ name, text }) => ({ name, text })),
+      } });
+      a.value[part] = text;
+      a.value.truncated = truncated;
+    }
+
+    /** Stage (a): extract the files (once per set of files); stage (b): both drafts. */
+    async function generate() {
+      const target = a.value;
+      if ((has(target.explanation) || has(target.summary))
+          && !window.confirm('Replace the explanation and the summary with new drafts?')) return;
+      target.error = '';
+      try {
+        if (!target.documents) await extract();
+        target.stage = 'draft';
+        const sig = materialSig(target);
+        const results = await Promise.allSettled(['explanation', 'summary'].map(draft));
+        const failed = results.find(r => r.status === 'rejected');
+        if (failed) throw failed.reason;
+        target.drafted = true;
+        target.draftedFrom = sig;
+      } catch (e) {
+        target.error = e.message;
+      } finally {
+        target.stage = '';
+      }
+    }
+
+    async function regenerate(part) {
+      const target = a.value;
+      const before = target[part];
+      target.error = '';
+      target.partBusy[part] = true;
+      try {
+        if (!target.documents) { await extract(); target.stage = ''; }
+        await draft(part);
+        if (has(before)) toast(`New ${part} drafted.`, { action: () => { target[part] = before; store.toast = null; } });
+      } catch (e) {
+        target.error = e.message;
+      } finally {
+        target.stage = '';
+        target.partBusy[part] = false;
+      }
+    }
+
+    async function createCase() {
+      if (!confirmDiscard()) return;
+      const target = a.value;
+      target.error = '';
+      target.stage = 'create';
+      try {
+        const data = await api('/vp/api/authoring/case/', { method: 'POST', body: {
+          title: target.title, vignette: target.vignette, explanation: target.explanation, summary: target.summary,
+        } });
+        store.assistant = null;
+        setCurrent(data);
+        refreshCases();
+        toast('Case created. Review each step, then publish.', { ms: 4000 });
+      } catch (e) {
+        target.error = `Could not create the case: ${e.message}`;
+        target.stage = '';
+      }
+    }
+
+    function startOver() {
+      if (assistantStarted.value && !window.confirm('Clear everything in the assistant and start over?')) return;
+      store.assistant = blankAssistant();
+    }
+    function back() { store.view = 'gallery'; }
+    function size(n) { return n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`; }
+
+    return { store, a, fileInput, dragging, tpl, limit, busy, usable, canGenerate, stale, hasDrafts, canCreate, progress,
+             pickFiles, addFiles, removeFile, onDrop, docFor, isPdf, generate, regenerate, createCase, startOver, back,
+             size, words, has };
+  },
+  template: `
+  <div class="gallery assistant">
+    <div class="gallery-head">
+      <div>
+        <h1>Authoring Assistant</h1>
+        <span class="gallery-sub">Give the case and your reference documents. The assistant drafts the expert explanation and a summary of the documents; you edit both, then create the case.</span>
+      </div>
+      <div class="gallery-actions">
+        <button class="btn-back" :disabled="busy" @click="startOver"><i class="ti ti-eraser"></i>Start over</button>
+        <button class="btn-back" @click="back"><i class="ti ti-arrow-left"></i>Back</button>
+      </div>
+    </div>
+
+    <section class="as-card">
+      <div class="as-card-head"><span class="as-num">1</span><b>Case material</b></div>
+      <label class="as-field">
+        <span class="as-label">Title <span class="as-opt">optional</span></span>
+        <input class="as-input" v-model="a.title" placeholder="e.g. Fatigue in a young adult" maxlength="300">
+      </label>
+      <label class="as-field">
+        <span class="as-label">Vignette</span>
+        <textarea class="literal-text" :class="{empty: !has(a.vignette)}" v-model="a.vignette" rows="6"
+                  placeholder="The patient’s presentation: history, examination, key results…"></textarea>
+      </label>
+      <label class="as-field">
+        <span class="as-label">Symptoms the student should explain</span>
+        <textarea class="literal-text" :class="{empty: !has(a.symptoms)}" v-model="a.symptoms" rows="2"
+                  placeholder="e.g. fatigue, pale skin, shortness of breath on exertion"></textarea>
+      </label>
+      <div class="as-field">
+        <span class="as-label">Reference documents <span class="as-opt">PDF or TXT</span></span>
+        <div class="as-drop" :class="{over: dragging}" @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop">
+          <i class="ti ti-file-upload"></i>
+          <span>Drop files here, or <button class="as-link" @click="pickFiles">choose files</button></span>
+          <input ref="fileInput" type="file" multiple accept=".pdf,.txt,application/pdf,text/plain" hidden @change="addFiles($event.target.files)">
+        </div>
+        <ul class="as-files" v-if="a.files.length">
+          <li v-for="(f, i) in a.files" :key="f.name + f.size">
+            <i class="ti" :class="isPdf(f) ? 'ti-file-type-pdf' : 'ti-file-text'"></i>
+            <span class="as-fname">[[ f.name ]]</span>
+            <span class="as-fmeta err" v-if="docFor(f)?.error">[[ docFor(f).error ]]</span>
+            <span class="as-fmeta" v-else-if="docFor(f)">[[ docFor(f).words ]] words[[ docFor(f).truncated ? ' (only the start is used)' : '' ]]</span>
+            <span class="as-fmeta" v-else>[[ size(f.size) ]]</span>
+            <button class="icon-btn" title="Remove" :disabled="busy" @click="removeFile(i)"><i class="ti ti-x"></i></button>
+          </li>
+        </ul>
+      </div>
+      <div class="as-actions">
+        <button class="btn-primary" :disabled="!canGenerate || busy" @click="generate">
+          <i class="ti" :class="a.drafted ? 'ti-refresh' : 'ti-sparkles'"></i><span>[[ a.drafted ? 'Draft again' : 'Draft explanation and summary' ]]</span></button>
+        <span class="as-progress" v-if="progress && a.stage !== 'create'"><i class="ti ti-loader-2 as-spin"></i>[[ progress ]]</span>
+        <span class="as-hint" v-else-if="!canGenerate">Write the vignette and the symptoms, and add at least one file.</span>
+      </div>
+    </section>
+
+    <section class="as-card" v-if="hasDrafts || a.drafted || a.stage === 'draft'">
+      <div class="as-card-head"><span class="as-num">2</span><b>Drafts</b>
+        <span class="as-hint">Edit freely: these texts go into the case as they are.</span></div>
+      <p class="as-note" v-if="stale"><i class="ti ti-alert-triangle"></i>The material changed after these drafts were written. Draft again to update them, or keep your edits.</p>
+      <p class="as-note" v-if="a.truncated"><i class="ti ti-info-circle"></i>The documents are long: the assistant read a fair share of each, not all of them.</p>
+      <div class="as-field">
+        <div class="as-label-row">
+          <span class="as-label">Explanation of the symptoms <span class="as-opt">the expert explanation of case 1</span></span>
+          <button class="btn-back" :disabled="busy" @click="regenerate('explanation')">
+            <i class="ti" :class="a.partBusy.explanation ? 'ti-loader-2 as-spin' : 'ti-refresh'"></i>Regenerate</button>
+        </div>
+        <textarea class="literal-text" :class="{empty: !has(a.explanation)}" v-model="a.explanation" rows="12"
+                  :disabled="a.partBusy.explanation || a.stage === 'draft'"></textarea>
+      </div>
+      <div class="as-field">
+        <div class="as-label-row">
+          <span class="as-label">Summary of the documents <span class="as-opt">the knowledge text</span></span>
+          <button class="btn-back" :disabled="busy" @click="regenerate('summary')">
+            <i class="ti" :class="a.partBusy.summary ? 'ti-loader-2 as-spin' : 'ti-refresh'"></i>Regenerate</button>
+        </div>
+        <textarea class="literal-text" :class="{empty: !has(a.summary)}" v-model="a.summary" rows="12"
+                  :disabled="a.partBusy.summary || a.stage === 'draft'"></textarea>
+        <span class="as-count" :class="{over: words(a.summary) > limit}">[[ words(a.summary) ]] / [[ limit ]] words</span>
+      </div>
+    </section>
+
+    <p class="as-error" v-if="a.error"><i class="ti ti-alert-circle"></i>[[ a.error ]]</p>
+
+    <section class="as-card as-create" v-if="hasDrafts">
+      <div class="as-create-body">
+        <b>Create the case</b>
+        <span>Uses the “[[ tpl?.name ]]” script: the vignette becomes case 1, the explanation its expert explanation,
+          and the summary the knowledge text. Every other step starts with its default texts.</span>
+      </div>
+      <button class="btn-primary" :disabled="!canCreate || busy" @click="createCase">
+        <i class="ti" :class="a.stage === 'create' ? 'ti-loader-2 as-spin' : 'ti-file-plus'"></i><span>Create case</span></button>
+    </section>
   </div>`,
 };
 
@@ -1412,7 +1670,7 @@ function ssSet(key, value) { try { sessionStorage.setItem(key, value); } catch {
 function ssDel(key) { try { sessionStorage.removeItem(key); } catch { /* blocked */ } }
 
 const App = {
-  components: { Topbar, UserMenu, GalleryView, EditorView, PlayerView },
+  components: { Topbar, UserMenu, GalleryView, AssistantView, EditorView, PlayerView },
   setup() {
     const gbtn = ref(null);
 
@@ -1474,7 +1732,7 @@ const App = {
       }
     }
     function onUnload(e) {
-      if (dirty.value) { e.preventDefault(); e.returnValue = ''; }
+      if (dirty.value || assistantStarted.value) { e.preventDefault(); e.returnValue = ''; }
     }
     function onResize() { store.vw = window.innerWidth; }
 
@@ -1523,6 +1781,7 @@ const App = {
           <h2>No case open</h2><p>Open or create a case, then try it here as a student would.</p>
           <button class="btn-ghost" @click="store.mode = 'author'"><i class="ti ti-arrow-left"></i>Back to the editor</button></div>
       </template>
+      <AssistantView v-else-if="store.view === 'assistant' && store.assistant" />
       <GalleryView v-else-if="store.view === 'gallery' || !store.doc" />
       <EditorView v-else />
     </main>

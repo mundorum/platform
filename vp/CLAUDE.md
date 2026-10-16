@@ -19,11 +19,12 @@ vp/
 │   └── vp_studio/                Django app, label "vp" → tables vp_*
 │       ├── casedoc.py            case rules — pure Python (mirrored by casemodel.js)
 │       ├── content.py            content-pack validation + new-case building — pure Python
+│       ├── sources.py            authoring assistant: PDF/TXT text extraction — pure Python (pypdf)
 │       ├── content/placeholder.json   neutral public content pack
 │       ├── runtime.py            the player's step machine — pure Python, LLM injected
 │       ├── gnoexport.py          case → readable gnō- narrative (export only) — pure Python
 │       ├── models.py             Case (one JSON document), ContentPack, PreviewSample, Session
-│       ├── services.py           assistant, preview samples, publishing, player sessions
+│       ├── services.py           assistant, authoring assistant, preview samples, publishing, player sessions
 │       ├── views.py / urls.py    /vp/ page + /vp/api/…
 │       ├── management/commands/load_vp_content.py
 │       └── tests/                pytest-django (real DB; LLM provider faked)
@@ -71,9 +72,16 @@ vp/
    unsaved) document. "play" sessions: any signed-in user, published copy
    only, via `/vp/play/<case id>/`; resumed per published revision.
 8. LLM calls go through `llm.services.chat()` with a `purpose` tag
-   (`vp.assist.<mode>`, `vp.preview.<kind>`, `vp.play.<generate|agent|exit|evaluate|feedback>`). Never call a provider SDK from
+   (`vp.assist.<mode>`, `vp.author.<explanation|summary>`, `vp.preview.<kind>`, `vp.play.<generate|agent|exit|evaluate|feedback>`). Never call a provider SDK from
    vp code; never send a key or a key path to the browser.
-9. **gnō- export is one-way and for reading.** `gnoexport.py` writes a case
+9. **Authoring assistant** (New case → *Authoring Assistant*): the author's
+   vignette, symptoms and PDF/TXT documents → two LLM drafts (explanation of
+   the symptoms → `case1.expert`; summary of the documents → `knowledge`),
+   edited, then a case on the pack's `authoring.template`. The section is
+   optional in a pack (fallback: placeholder instructions + the pack's
+   know/explain/transfer template). Uploaded files and extracted text are
+   never stored; the browser keeps them until the case is created.
+10. **gnō- export is one-way and for reading.** `gnoexport.py` writes a case
    as a `.gno` narrative (`docs/gno-export.md`); nothing imports or runs it.
    Its extensions (`>>` bindings, `>` prompts, the `===== Data =====` layer)
    are vp conventions: they live here and never change `gno/`. Export only

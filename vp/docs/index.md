@@ -36,8 +36,19 @@ per turn or at end.
 
 ## Simple mode at a glance
 
-- **New case** opens a gallery: start from scratch (Welcome + Final feedback)
-  or from a script template. *Your cases* lists your existing cases.
+- **New case** opens a gallery: start from scratch (Welcome + Final feedback),
+  use the **Authoring Assistant**, or start from a script template. *Your
+  cases* lists your existing cases.
+- **Authoring Assistant.** Give a vignette, the symptoms the student should
+  explain and one or more reference documents (PDF or TXT). The assistant
+  extracts the documents' text, then asks the LLM for two drafts: an
+  explanation of why the patient has those symptoms, and a summary of the
+  documents (400 words by default). Edit both, then **Create case**: a new
+  draft on the content pack's authoring script (a knowledge → explain →
+  transfer script unless the pack names another), with the vignette as case 1, the explanation as its
+  expert explanation and the summary as the knowledge text. Nothing is
+  stored until the case is created. Scanned PDFs without a text layer can't
+  be read.
 - **Steps** can be added, moved, renamed and removed. The script rules are
   enforced: Welcome first, Final feedback last, transfers and assessments
   after "Explain case 1", single steps at most once. An option that would
@@ -142,8 +153,9 @@ A deployment loads its own with `manage.py load_vp_content`; see
 |------|------|
 | `vp/server/vp_studio/casedoc.py` | Case rules (sequencing, fields, readiness, structure). Pure Python. |
 | `vp/server/vp_studio/content.py` | Content-pack validation, new-case building. Pure Python. |
+| `vp/server/vp_studio/sources.py` | Text of PDF/TXT files for the authoring assistant. Pure Python (`pypdf`). |
 | `vp/server/vp_studio/runtime.py` | The player's step machine. Pure Python; the LLM is injected. |
-| `vp/server/vp_studio/services.py` | Assistant calls, preview samples, publishing, player sessions |
+| `vp/server/vp_studio/services.py` | Assistant calls, authoring assistant, preview samples, publishing, player sessions |
 | `vp/server/vp_studio/views.py` | API under `/vp/api/` |
 | `vp/web/static/js/casemodel.js` | The same rules as `casedoc.py`, in the browser |
 | `vp/web/static/js/studio.js` | Editor and player (Vue 3 from a CDN, no build step) |
@@ -160,6 +172,9 @@ API (all require the sign-in token):
 | `GET` | `/vp/api/cases/{id}/export-gno/` | The case as a gnō- narrative (`text/plain`, `<slug>.gno`); export-only |
 | `POST` | `/vp/api/cases/import/` | A case file (or a bare document) → a new draft case, or `400` with the reason |
 | `POST` | `/vp/api/assist/` | `{mode, document, step, element, side?, instruction?}` → `{text}` |
+| `POST` | `/vp/api/authoring/sources/` | Multipart `files` (PDF/TXT, up to 10, 20 MB each) → `{documents: [{name, text, words, truncated?, error?}]}`; nothing is stored |
+| `POST` | `/vp/api/authoring/draft/` | `{part: "explanation" \| "summary", vignette, symptoms, documents}` → `{text, truncated}` |
+| `POST` | `/vp/api/authoring/case/` | `{title, vignette, explanation, summary}` → a new draft case on the authoring template |
 | `POST` | `/vp/api/preview-sample/` | `{document, step, element, refresh?}` → `{kind, text \| turns, cached}` |
 | `GET` | `/vp/api/play/{case}/` | Title and published state, for a student link |
 | `POST` | `/vp/api/sessions/` | `{case, mode: "try" \| "play", document?, restart?}` → session (resumes the latest unless `restart`) |
