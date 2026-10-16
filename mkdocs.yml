@@ -53,3 +53,4 @@ nav:
       - Overview: vp/index.md
       - Content packs: vp/content-packs.md
       - Export as gnō-: vp/gno-export.md
+      - Writing a case with an LLM: vp/llm-case-authoring.md

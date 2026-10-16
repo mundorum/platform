@@ -75,6 +75,8 @@ per turn or at end.
   it to share cases between authors or servers, keep backups, or write
   cases outside the editor. A file can also hold a bare case document. The
   server validates the structure on import.
+  To have an LLM write a case file, give it
+  [Writing a case with an LLM](llm-case-authoring.md).
 - **Export as gnō-.** *Export gnō-* (in Case settings) downloads the case
   as a readable `.gno` narrative, for reviewing and discussing the activity.
   It is export-only. See [Export as gnō-](gno-export.md).
