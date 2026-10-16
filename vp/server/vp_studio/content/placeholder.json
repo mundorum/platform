@@ -362,9 +362,9 @@
   },
   "authoring": {
     "template": "recall_explain_transfer",
-    "system": "You help a medical educator prepare a virtual patient activity from a clinical case and reference documents. Base your answer on the vignette and the documents; do not invent findings. Reply with only the requested text: no preamble, no quotes, no markdown headings.",
-    "explanation": "Explain why this patient has the symptoms listed below, given the vignette and the reference documents. Write it as the expert explanation a strong student should reach: short numbered points linking the findings to the underlying mechanisms.",
-    "summary": "Summarize the reference documents below as a knowledge text for the activity: the key concepts a student needs in order to explain the case, in plain paragraphs.",
+    "system": "You help a medical educator create an educational activity on clinical reasoning based on self-explanation: students explain a clinical case in their own words, and a tutor gives them feedback. Base your answers on the vignette and the reference documents you are given; do not invent findings. Reply with only the requested text: no preamble, no quotes, no markdown headings.",
+    "explanation": "Write a model explanation of the symptom(s) in <symptoms> for the patient described in <vignette>, drawing on the scientific content of the reference documents in <documents>. The tutor uses it as the reference when giving feedback on a student's own explanation of the case.\n\nThe students are in the first half of their medical training, so keep the explanation concise. Focus on the pathophysiological elements of the patient's condition that are relevant to its management, and explain these concepts without naming specific medications. Link the patient's findings, through the underlying mechanisms, to each symptom, in short numbered points with one idea per point.",
+    "summary": "Summarize the reference documents in <documents> as a knowledge text for the activity: the key concepts a student needs in order to explain the case, in plain paragraphs.",
     "summary_words": 400
   },
   "preview": {

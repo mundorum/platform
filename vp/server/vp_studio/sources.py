@@ -73,10 +73,10 @@ def word_count(text: str) -> int:
 
 
 def source_block(documents: list[dict], limit: int = MAX_SOURCE_CHARS) -> tuple[str, bool]:
-    """The documents as one text for a prompt, at most `limit` characters of
-    document text; returns (text, truncated). A document shorter than its
-    fair share leaves the rest to the longer ones."""
-    docs = [(str(d.get('name') or f'Document {i + 1}'), str(d.get('text') or ''))
+    """The documents as one <documents> block for a prompt, at most `limit`
+    characters of document text; returns (text, truncated). A document
+    shorter than its fair share leaves the rest to the longer ones."""
+    docs = [(str(d.get('name') or f'Document {i + 1}').replace('"', "'"), str(d.get('text') or ''))
             for i, d in enumerate(documents)]
     docs = [(name, text) for name, text in docs if text.strip()]
     budget, shares = limit, {}
@@ -88,5 +88,5 @@ def source_block(documents: list[dict], limit: int = MAX_SOURCE_CHARS) -> tuple[
     for i, (name, text) in enumerate(docs):
         if len(text) > shares[i]:
             text, truncated = text[:shares[i]].rstrip() + '\n[…]', True
-        parts.append(f'=== {name} ===\n{text}')
-    return '\n\n'.join(parts), truncated
+        parts.append(f'<document name="{name}">\n{text}\n</document>')
+    return '<documents>\n' + '\n'.join(parts) + '\n</documents>', truncated

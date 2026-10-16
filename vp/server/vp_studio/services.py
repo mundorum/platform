@@ -219,7 +219,11 @@ def _clean_documents(documents) -> list[dict]:
 def authoring_draft(user, *, part: str, vignette: str, symptoms: str, documents) -> dict:
     """Draft one text of a new case from the author's material:
     'explanation' (why the patient has the symptoms) or 'summary' (of the
-    documents). Returns {text, truncated}."""
+    documents). Returns {text, truncated}.
+
+    The material comes first, each part in its own tag (<documents>,
+    <vignette>, <symptoms>), and the pack's instruction last, so it isn't
+    buried under long documents."""
     if part not in AUTHORING_PARTS:
         raise StudioError(f'Unknown part {part!r}.')
     section = authoring_section(active_pack())
@@ -231,13 +235,13 @@ def authoring_draft(user, *, part: str, vignette: str, symptoms: str, documents)
     if part == 'explanation':
         if not vignette or not symptoms:
             raise StudioError('Write the vignette and the symptoms to explain first.')
-        lines = [f'Vignette:\n{vignette}', f'Symptoms to explain:\n{symptoms}']
+        parts = [block, f'<vignette>\n{vignette}\n</vignette>', f'<symptoms>\n{symptoms}\n</symptoms>',
+                 section[part]]
     else:
-        lines = [f"Length: at most {section['summary_words']} words."]
-    lines.append(f'Reference documents:\n{block}')
+        parts = [block, section[part], f"Length: at most {section['summary_words']} words."]
     messages = [
         {'role': 'system', 'content': section['system']},
-        {'role': 'user', 'content': f'{section[part]}\n\n' + '\n\n'.join(lines)},
+        {'role': 'user', 'content': '\n\n'.join(parts)},
     ]
     result = llm.chat(user, messages, purpose=f'vp.author.{part}', temperature=0.4)
     return {'text': _clean(result.text), 'truncated': truncated}

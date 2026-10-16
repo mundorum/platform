@@ -56,11 +56,14 @@ def test_source_block_shares_the_budget_fairly():
             {'name': 'empty', 'text': '  '}]
     text, truncated = sources.source_block(docs, limit=110)
     assert truncated
-    assert '=== short ===\n' + 'a' * 10 in text
-    assert '=== long ===\n' + 'b' * 100 + '\n[…]' in text
+    assert '<document name="short">\n' + 'a' * 10 + '\n</document>' in text
+    assert '<document name="long">\n' + 'b' * 100 + '\n[…]\n</document>' in text
     assert 'empty' not in text
     assert sources.source_block(docs, limit=1000) == (
-        '=== short ===\n' + 'a' * 10 + '\n\n=== long ===\n' + 'b' * 500, False)
+        '<documents>\n<document name="short">\n' + 'a' * 10 + '\n</document>\n'
+        '<document name="long">\n' + 'b' * 500 + '\n</document>\n</documents>', False)
+    assert sources.source_block([{'name': 'a "b".txt', 'text': 'x'}])[0].startswith(
+        '<documents>\n<document name="a \'b\'.txt">')
 
 
 # ── the pack's authoring section (pure) ───────────────────────────────────────
@@ -146,9 +149,12 @@ def test_draft_explanation_uses_vignette_symptoms_and_documents(api, fake_llm):
     pack = content.placeholder_pack()['authoring']
     system, user = fake_llm.calls[0]['messages']
     assert system['content'] == pack['system']
-    assert user['content'].startswith(pack['explanation'])
-    for part in ('tired for months', 'Fatigue; pale skin.', '=== guide.pdf ===', 'reduces haemoglobin'):
-        assert part in user['content']
+    # The material first, each part tagged; the instruction last.
+    assert user['content'] == (
+        '<documents>\n<document name="guide.pdf">\nIron deficiency reduces haemoglobin.\n</document>\n</documents>'
+        '\n\n<vignette>\nA 30-year-old woman, tired for months.\n</vignette>'
+        '\n\n<symptoms>\nFatigue; pale skin.\n</symptoms>'
+        f"\n\n{pack['explanation']}")
     assert LLMUsage.objects.get().purpose == 'vp.author.explanation'
 
 
@@ -156,7 +162,8 @@ def test_draft_summary_states_the_word_limit(api, fake_llm):
     r = api.post('/vp/api/authoring/draft/', {**DRAFT, 'part': 'summary', 'vignette': ''}, format='json')
     assert r.status_code == 200, r.content
     user = fake_llm.calls[0]['messages'][1]['content']
-    assert 'at most 400 words' in user and 'Vignette' not in user
+    assert user.endswith(f"{content.placeholder_pack()['authoring']['summary']}\n\nLength: at most 400 words.")
+    assert user.startswith('<documents>') and '<vignette>' not in user
     assert LLMUsage.objects.get().purpose == 'vp.author.summary'
 
 

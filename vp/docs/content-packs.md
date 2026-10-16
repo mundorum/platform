@@ -187,9 +187,27 @@ from the author's vignette, the symptoms to explain and reference documents:
 |-----|----------|
 | `template` | the script template the new case uses. Its steps must contain the `case1.vignette`, `case1.expert` and `knowledge` elements |
 | `system` | system prompt for both calls |
-| `explanation` | task for the explanation of the symptoms. The server appends the vignette, the symptoms and the documents |
-| `summary` | task for the summary of the documents. The server appends `Length: at most <summary_words> words.` and the documents |
+| `explanation` | task for the explanation of the symptoms |
+| `summary` | task for the summary of the documents |
 | `summary_words` | the summary's word limit (the editor shows a word count against it) |
+
+Each request puts the material first and the instruction last, so the
+instruction isn't buried under long documents:
+
+```
+<documents>
+<document name="file.pdf">…extracted text…</document>
+</documents>
+
+<vignette>…</vignette>          (explanation only)
+
+<symptoms>…</symptoms>          (explanation only)
+
+<explanation or summary instruction>
+Length: at most <summary_words> words.   (summary only)
+```
+
+Instructions can refer to the material by these tag names.
 
 The new case gets the vignette as case 1, the explanation as case 1's expert
 explanation and the summary as the knowledge text.
