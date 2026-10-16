@@ -8,6 +8,19 @@
 
 export const SCHEMA_VERSION = 1;
 export const MOMENTS = ['on start', 'per turn', 'at end'];
+export const MIN_TURNS = 1;
+export const MAX_TURNS = 50;
+export const DEFAULT_MAX_TURNS = 8;
+
+// Agent prompts every case carries (edited in the Strategies panel).
+export const AGENT_PROMPTS = [
+  { key: 'tutor_persona', name: 'Tutor persona', icon: 'ti-school',
+    desc: 'Who the tutor is and how it teaches. Part of every tutor turn.' },
+  { key: 'patient_persona', name: 'Patient persona', icon: 'ti-user',
+    desc: 'How the patient speaks in interviews and patient interactions.' },
+  { key: 'guardrails', name: 'Guardrails', icon: 'ti-shield-check',
+    desc: 'Rules every agent follows, in every turn.' },
+];
 
 // Colour pairs: names of --c-tag-* tokens (accent/muted have their own).
 export const STEP_TYPES = {
@@ -265,7 +278,7 @@ export function fieldIssues(doc, systemKeys) {
   doc.steps.forEach((step, i) => {
     for (const el of step.elements) {
       if (el.kind === 'literal') continue;
-      for (const key of fieldsIn(el.text)) {
+      for (const key of fieldsIn(`${el.text || ''} ${el.endsWhen || ''}`)) {
         const status = fieldStatus(key, doc, i, systemKeys);
         if (status !== 'known') issues.push({ step: step.id, element: el.id, key, problem: status });
       }
@@ -336,8 +349,13 @@ export function instantiateStep(pack, type, { caseN = null, num = null } = {}) {
       id: newId('e'), kind: proto.kind, label: fill(proto.label, caseN), text: fill(proto.text || '', caseN),
       sideInfo: [], strategies: (proto.strategies || []).map(s => ({ ...s })),
     };
-    for (const key of ['ref', 'card', 'note']) if (key in proto) el[key] = fill(proto[key], caseN);
-    for (const key of ['autoPhaseSentence', 'isFinalFeedback']) if (proto[key]) el[key] = true;
+    for (const key of ['ref', 'card', 'note', 'endsWhen']) if (key in proto) el[key] = fill(proto[key], caseN);
+    for (const key of ['autoPhaseSentence', 'isFinalFeedback', 'reviewMaterials']) if (proto[key]) el[key] = true;
+    if (proto.kind === 'interaction') {
+      el.maxTurns = proto.maxTurns || DEFAULT_MAX_TURNS;
+      el.allowStudentExit = proto.allowStudentExit ?? true;
+      el.endsWhen ??= '';
+    }
     for (const side of proto.sideInfo || []) {
       const item = { id: newId('i'), label: fill(side.label, caseN), text: fill(side.text || '', caseN), ref: fill(side.ref, caseN) };
       if (side.generateFromCase != null) item.generateFromCase = side.generateFromCase === CASE_N ? caseN : side.generateFromCase;
@@ -367,7 +385,34 @@ export function newCase(pack, templateId) {
     settings: { studentLevel: 'beginner', progressBar: true, replyInStudentLanguage: true,
                 scriptTemplate: tpl ? tpl.id : null },
     steps: buildSteps(pack, tpl ? tpl.steps : []),
+    ...defaultPrompts(pack),
   };
+}
+
+/** The agent and strategy prompts a new case starts with. */
+export function defaultPrompts(pack) {
+  return {
+    agentPrompts: Object.fromEntries(AGENT_PROMPTS.map(a => [a.key, pack.agents[a.key]])),
+    strategyPrompts: Object.fromEntries(pack.strategies.map(s => [s.key, s.instruction])),
+  };
+}
+
+/** Bring a case created before newer fields existed up to date: missing
+ * prompts come from the pack, interactions get turn settings. Mutates doc. */
+export function ensureCaseDefaults(doc, pack) {
+  const defaults = defaultPrompts(pack);
+  doc.agentPrompts = { ...defaults.agentPrompts, ...(doc.agentPrompts || {}) };
+  doc.strategyPrompts = { ...defaults.strategyPrompts, ...(doc.strategyPrompts || {}) };
+  for (const step of doc.steps) {
+    for (const el of step.elements) if (el.kind === 'interaction') ensureInteraction(el);
+  }
+  return doc;
+}
+
+function ensureInteraction(el) {
+  el.maxTurns ??= DEFAULT_MAX_TURNS;
+  el.allowStudentExit ??= true;
+  el.endsWhen ??= '';
 }
 
 /** Switch script template, keeping steps (and their elements) whose type and
@@ -449,13 +494,16 @@ export function setStepSubtitle(step, subtitle) {
 }
 
 export function newElement(kind) {
-  return { id: newId('e'), kind, label: ELEMENT_KINDS[kind].newLabel, text: '', sideInfo: [], strategies: [] };
+  const el = { id: newId('e'), kind, label: ELEMENT_KINDS[kind].newLabel, text: '', sideInfo: [], strategies: [] };
+  if (kind === 'interaction') ensureInteraction(el);
+  return el;
 }
 
 /** Change an element's kind; text is kept, strategies the new kind can't
  * use are dropped. */
 export function setElementKind(el, kind, strategyCatalog) {
   el.kind = kind;
+  if (kind === 'interaction') ensureInteraction(el);
   const allowed = STRATEGY_CATEGORIES[kind];
   el.strategies = el.strategies.filter(s => allowed.includes(strategyCatalog[s.key]?.category));
 }

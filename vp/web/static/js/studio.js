@@ -34,11 +34,14 @@ const store = reactive({
   view: 'gallery',        // 'gallery' | 'editor'
   ui: {
     openStep: null, settingsOpen: false, legendOpen: false, tplOpen: false,
-    previewOpen: false, previewWidth: Number(lsGet(LS_PREVIEW_WIDTH)) || 400,
+    previewOpen: false, previewWidth: Number(lsGet(LS_PREVIEW_WIDTH)) || 400, stratOpen: false, stratSel: null,
     stepMenu: null, addAt: null, pop: null, assist: null, sideBusy: null,
     editTitle: null, editSub: null, hoverStep: null, userMenu: false,
   },
   samples: {},            // element id → {sig, loading, data, error}
+  tryRuns: {},            // case id → draft signature a Try-it run started from
+  playInfo: null,         // share-link page: {case, title, published, is_owner}
+  playError: '',
   toast: null,            // {text, kind, action, actionLabel}
   dialog: null,           // {title, intro, items, actions:[{label, primary, run}]}
   vw: window.innerWidth,
@@ -119,7 +122,7 @@ function resetUi() {
 
 function setCurrent(data) {
   store.current = { id: data.id, revision: data.revision, status: data.status };
-  store.doc = data.document;
+  store.doc = M.ensureCaseDefaults(data.document, store.pack);
   store.saved = JSON.stringify(data.document);
   store.view = 'editor';
   store.mode = 'author';
@@ -221,7 +224,10 @@ async function publish() {
     const data = await api(`/vp/api/cases/${store.current.id}/publish/`, { method: 'POST' });
     store.current.status = data.status;
     refreshCases();
-    toast(`Published v${data.published_revision}.`, { ms: 3000 });
+    const id = store.current.id;
+    toast(`Published v${data.published_revision}.`, {
+      action: () => copyStudentLink(id), actionLabel: 'Copy student link', ms: 8000,
+    });
   } catch (e) {
     if (e.status === 400 && e.data?.problems) showProblems(e.data.problems);
     else toast(`Could not publish: ${e.message}`, { kind: 'error' });
@@ -241,7 +247,27 @@ const PopItem = {
     </button>`,
 };
 
+const UserMenu = {
+  setup() {
+    function out() { signOut(); window.location.href = '/'; }
+    return { store, out };
+  },
+  template: `
+  <div class="user-menu-wrap" data-pop>
+    <button class="user-btn" :title="store.user?.email" @click="store.ui.userMenu = !store.ui.userMenu">
+      <img v-if="store.user?.picture" :src="store.user.picture" alt="" referrerpolicy="no-referrer">
+      <i v-else class="ti ti-user"></i>
+    </button>
+    <div class="popover" v-if="store.ui.userMenu" style="right:0;top:38px;min-width:200px">
+      <div class="pop-head">[[ store.user?.email ]]</div>
+      <a class="pop-item" href="/" style="text-decoration:none"><i class="ti ti-apps"></i><span class="pi-body">Mundorum home</span></a>
+      <button class="pop-item" @click="out"><i class="ti ti-logout"></i><span class="pi-body">Sign out</span></button>
+    </div>
+  </div>`,
+};
+
 const Topbar = {
+  components: { UserMenu },
   setup() {
     const fileName = computed(() => `${M.slug(store.doc?.title) || 'untitled'}.vp`);
     const version = computed(() => store.current
@@ -252,8 +278,7 @@ const Topbar = {
       closePops();
     }
     function tryIt() { store.mode = 'player'; closePops(); }
-    function out() { signOut(); location.href = '/'; }
-    return { store, fileName, version, dirty, newCase, tryIt, save, publish, out };
+    return { store, fileName, version, dirty, newCase, tryIt, save, publish };
   },
   template: `
   <header class="topbar">
@@ -281,17 +306,7 @@ const Topbar = {
     <button class="btn-ghost" :disabled="!store.doc || !dirty || store.saving" @click="save()" title="Save (Ctrl+S)">
       <i class="ti ti-device-floppy"></i><span>Save</span></button>
     <button class="btn-primary" :disabled="!store.doc" @click="publish"><i class="ti ti-rocket"></i><span>Publish</span></button>
-    <div class="user-menu-wrap" data-pop>
-      <button class="user-btn" :title="store.user?.email" @click="store.ui.userMenu = !store.ui.userMenu">
-        <img v-if="store.user?.picture" :src="store.user.picture" alt="" referrerpolicy="no-referrer">
-        <i v-else class="ti ti-user"></i>
-      </button>
-      <div class="popover" v-if="store.ui.userMenu" style="right:0;top:38px;min-width:200px">
-        <div class="pop-head">[[ store.user?.email ]]</div>
-        <a class="pop-item" href="/" style="text-decoration:none"><i class="ti ti-apps"></i><span class="pi-body">Mundorum home</span></a>
-        <button class="pop-item" @click="out"><i class="ti ti-logout"></i><span class="pi-body">Sign out</span></button>
-      </div>
-    </div>
+    <UserMenu />
   </header>`,
 };
 
@@ -303,7 +318,7 @@ const GalleryView = {
       return { ...t, icons: types.map(x => ({ icon: M.STEP_TYPES[x].icon, color: C(x) })), n: `${types.length} steps` };
     }));
     function back() { store.view = 'editor'; }
-    return { store, templates, startCase, openCase, deleteCase, back, relativeTime, STATUS_LABEL };
+    return { store, templates, startCase, openCase, deleteCase, back, relativeTime, STATUS_LABEL, copyStudentLink };
   },
   template: `
   <div class="gallery">
@@ -342,6 +357,7 @@ const GalleryView = {
             <span class="case-title" :class="{untitled: !c.title}">[[ c.title || 'Untitled case' ]]</span>
             <span class="case-meta">v[[ c.revision ]] · [[ STATUS_LABEL[c.status] ]] · [[ relativeTime(c.updated_at) ]]</span>
           </button>
+          <button v-if="c.published_revision != null" class="icon-btn" title="Copy student link" @click="copyStudentLink(c.id)"><i class="ti ti-link"></i></button>
           <button class="icon-btn" title="Delete case" @click="deleteCase(c)"><i class="ti ti-trash"></i></button>
         </div>
       </div>
@@ -353,45 +369,57 @@ const GalleryView = {
 const caretPos = new Map();
 
 const PromptEditor = {
-  props: ['el', 'stepIndex'],
+  // `field` is the element property being edited: the prompt ('text') or
+  // the interaction's end condition ('endsWhen', optional — no empty warning).
+  props: { el: Object, stepIndex: Number, field: { type: String, default: 'text' } },
   setup(props) {
     const input = ref(null);
+    const id = computed(() => `${props.el.id}:${props.field}`);
+    const value = computed(() => props.el[props.field] || '');
+    const optional = computed(() => props.field !== 'text');
     const status = key => M.fieldStatus(key, store.doc, props.stepIndex, systemKeys.value);
     const segments = computed(() => {
-      const text = props.el.text || '';
+      const text = value.value;
       const segs = M.splitFields(text).map(s => (s.key ? { ...s, cls: `f-${status(s.key)}` } : s));
       if (!text || text.endsWith('\n')) segs.push({ text: ' ' });
       return segs;
     });
     const issues = computed(() => {
       const seen = new Set();
-      return M.fieldsIn(props.el.text).filter(k => !seen.has(k) && seen.add(k))
+      return M.fieldsIn(value.value).filter(k => !seen.has(k) && seen.add(k))
         .map(k => ({ key: k, status: status(k) })).filter(f => f.status !== 'known');
     });
-    const trayOpen = computed(() => store.ui.pop?.el === props.el.id && store.ui.pop?.type === 'fields');
+    const trayOpen = computed(() => store.ui.pop?.el === id.value && store.ui.pop?.type === 'fields');
     const fields = computed(() => M.availableFields(store.doc, props.stepIndex, store.systemFields));
-    const hint = computed(() => (props.el.kind === 'generated' ? 'Written fresh in every session' : 'Runs in turns until the exit you describe'));
-    const placeholder = computed(() => (props.el.kind === 'generated'
-      ? 'Write the instructions the LLM follows to produce this text…'
-      : 'Describe how the agent should interact with the student, and when to stop…'));
-    function track(e) { caretPos.set(props.el.id, e.target.selectionStart); }
-    function onInput(e) { props.el.text = e.target.value; track(e); }
+    const hint = computed(() => {
+      if (optional.value) return 'Checked by the LLM after each student turn. Leave empty to stop only at the turn limit.';
+      return props.el.kind === 'generated' ? 'Written fresh in every session' : 'Runs in turns until it ends (see below)';
+    });
+    const placeholder = computed(() => {
+      if (optional.value) return 'e.g. The student has explained the main mechanisms in their own words.';
+      return props.el.kind === 'generated'
+        ? 'Write the instructions the LLM follows to produce this text…'
+        : 'Describe how the agent should interact with the student…';
+    });
+    function track(e) { caretPos.set(id.value, e.target.selectionStart); }
+    function onInput(e) { props.el[props.field] = e.target.value; track(e); }
     function insert(key) {
-      const [text, caret] = M.insertField(props.el.text, caretPos.get(props.el.id), key);
-      props.el.text = text;
-      caretPos.set(props.el.id, caret);
+      const [text, caret] = M.insertField(value.value, caretPos.get(id.value), key);
+      props.el[props.field] = text;
+      caretPos.set(id.value, caret);
       nextTick(() => { input.value?.focus(); input.value?.setSelectionRange(caret, caret); });
     }
-    return { store, input, segments, issues, trayOpen, fields, hint, placeholder, onInput, track, insert, openPop, tok, has };
+    return { store, input, id, value, optional, segments, issues, trayOpen, fields, hint, placeholder,
+             onInput, track, insert, openPop, tok, has };
   },
   template: `
-  <div class="prompt-box" :class="{empty: !has(el.text)}">
+  <div class="prompt-box" :class="{empty: !optional && !has(value), compact: optional}">
     <pre class="prompt-mirror" aria-hidden="true"><span v-for="(s, i) in segments" :key="i" :class="s.cls">[[ s.text ]]</span></pre>
-    <textarea ref="input" class="prompt-input" :value="el.text" :placeholder="placeholder" spellcheck="false"
+    <textarea ref="input" class="prompt-input" :value="value" :placeholder="placeholder" spellcheck="false"
               @input="onInput" @select="track" @click="track" @keyup="track"></textarea>
   </div>
   <div class="prompt-tools">
-    <button class="insert-field" :class="{on: trayOpen}" @click="openPop(el.id, 'fields')"><i class="ti ti-braces"></i>Insert field</button>
+    <button class="insert-field" :class="{on: trayOpen}" @click="openPop(id, 'fields')"><i class="ti ti-braces"></i>Insert field</button>
     <span class="prompt-hint">[[ hint ]]</span>
   </div>
   <div class="field-tray" v-if="trayOpen">
@@ -400,6 +428,36 @@ const PromptEditor = {
   <div class="field-issues" v-if="issues.length">
     <div v-for="f in issues" :key="f.key"><i class="ti ti-alert-triangle"></i>
       <span><code>[[ tok(f.key) ]]</code> [[ f.status === 'forward' ? 'refers to something that doesn’t exist yet at this step' : 'is not a known field' ]]</span>
+    </div>
+  </div>`,
+};
+
+// Interaction exit settings: "Ends when…", turn limit, "I'm done" switch.
+const EndsBlock = {
+  components: { PromptEditor },
+  props: { el: Object, stepIndex: Number },
+  setup(props) {
+    const turns = ref(props.el.maxTurns);
+    watch(() => props.el.maxTurns, v => { turns.value = v; });
+    function commitTurns() {
+      const n = Math.round(Number(turns.value));
+      props.el.maxTurns = Number.isFinite(n) && n >= M.MIN_TURNS
+        ? Math.min(n, M.MAX_TURNS) : (props.el.maxTurns || M.DEFAULT_MAX_TURNS);
+      turns.value = props.el.maxTurns;
+    }
+    return { M, turns, commitTurns };
+  },
+  template: `
+  <div class="ends-block">
+    <span class="ends-head"><i class="ti ti-flag-check"></i>Ends when…</span>
+    <PromptEditor :el="el" :step-index="stepIndex" field="endsWhen" />
+    <div class="ends-row">
+      <label class="turns">Max turns
+        <input type="number" :min="M.MIN_TURNS" :max="M.MAX_TURNS" v-model="turns" @change="commitTurns" @blur="commitTurns"
+               aria-label="Maximum number of student turns"></label>
+      <button class="switch-btn" @click="el.allowStudentExit = !el.allowStudentExit"
+              title="Shows an “I’m done” button in the player after the student’s first reply">
+        <span class="switch" :class="{on: el.allowStudentExit}"></span><span>Students can say they’re done</span></button>
     </div>
   </div>`,
 };
@@ -420,7 +478,7 @@ const ASSIST_BUTTONS = {
 };
 
 const ElementCard = {
-  components: { PromptEditor, PopItem },
+  components: { PromptEditor, EndsBlock, PopItem },
   props: ['step', 'stepIndex', 'el', 'elIndex'],
   setup(props) {
     const kind = computed(() => M.ELEMENT_KINDS[props.el.kind]);
@@ -447,6 +505,13 @@ const ElementCard = {
     }
     function attach(preset) { M.addSideInfo(store.doc, props.step, props.stepIndex, props.el, preset); store.ui.pop = null; }
     function toggleStrat(key) { M.toggleStrategy(props.el, key, strategyCatalog.value); }
+    function editPrompts() {
+      const first = props.el.strategies[0];
+      store.ui.pop = null;
+      store.ui.stratOpen = true;
+      if (first) store.ui.stratSel = `strategy:${first.key}`;
+      nextTick(() => document.querySelector('.strat-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    }
     function removeStrat(key) { props.el.strategies = props.el.strategies.filter(s => s.key !== key); }
     function removeSide(side) {
       withUndo('Side information removed.', () => { props.el.sideInfo = props.el.sideInfo.filter(x => x.id !== side.id); });
@@ -488,7 +553,7 @@ const ElementCard = {
     }
     return {
       store, M, kind, pop, assist, assistMode, rows, strategyGroups, chips, activeKeys, elements, sentence,
-      ASSIST_BUTTONS, has, tok, openPop, setKind, move, remove, attach, toggleStrat, removeStrat, removeSide,
+      ASSIST_BUTTONS, has, tok, openPop, setKind, move, remove, attach, toggleStrat, editPrompts, removeStrat, removeSide,
       toggleAssist, runAssist, generateExpert, cycle: M.cycleMoment,
     };
   },
@@ -535,7 +600,7 @@ const ElementCard = {
           <PopItem v-for="s in g.items" :key="s.key" :icon="s.icon" :label="s.name" :desc="s.description + ' · ' + s.moment"
                    :checked="activeKeys.has(s.key)" icon-color="var(--c-tag-state)" @pick="toggleStrat(s.key)" />
         </template>
-        <PopItem icon="ti-external-link" label="Browse all strategies in Advanced" desc="Coming soon" disabled />
+        <PopItem icon="ti-edit" label="Edit strategy prompts" desc="Opens the Strategies panel" @pick="editPrompts" />
       </template>
     </div>
 
@@ -551,10 +616,13 @@ const ElementCard = {
       <textarea v-if="el.kind === 'literal'" class="literal-text" :class="{empty: !has(el.text)}" v-model="el.text" :rows="rows"
                 placeholder="Write the text the student will read…"></textarea>
       <PromptEditor v-else :el="el" :step-index="stepIndex" />
+      <EndsBlock v-if="el.kind === 'interaction'" :el="el" :step-index="stepIndex" />
       <div class="info-line" v-if="el.autoPhaseSentence && sentence">
         <i class="ti ti-link link-ic"></i><span>Added automatically from the steps: <q>[[ sentence ]]</q></span>
       </div>
       <div class="info-line" v-if="el.note"><i class="ti ti-info-circle"></i><span>[[ el.note ]]</span></div>
+      <div class="info-line" v-if="el.reviewMaterials"><i class="ti ti-books"></i>
+        <span>Followed by the case vignettes, expert explanations and knowledge text, for review.</span></div>
       <div class="strat-chips" v-if="chips.length">
         <span class="strat-chip" v-for="c in chips" :key="c.s.key">
           <i class="ti" :class="c.spec.icon"></i><b>[[ c.spec.name ]]</b>
@@ -845,7 +913,7 @@ const PreviewPanel = {
             out.push({ type: 'tutor', tag: 'interaction', el, sample, canSample, pending: true,
                        text: canSample ? 'The agent converses with the student following your prompt.' : 'Prompt not written yet.' });
           }
-          out.push({ type: 'loop', text: 'Continues in turns until the exit in the prompt' });
+          out.push({ type: 'loop', text: `Continues in turns until it ends · at most ${el.maxTurns || M.DEFAULT_MAX_TURNS} student turns` });
         }
       }
       if (s.type === 'final') progress(m + 1, 'All phases completed! Excellent work.');
@@ -928,8 +996,79 @@ const PreviewPanel = {
   </aside>`,
 };
 
+// Strategies panel (§ third toggle): one editable prompt per agent and per
+// strategy, stored with the case (doc.agentPrompts / doc.strategyPrompts).
+const CATEGORY_ORDER = ['Feedback', 'Final feedback', 'Patient', 'Gamification'];
+
+const StrategiesPanel = {
+  setup() {
+    const groups = computed(() => [
+      { name: 'Agents', items: M.AGENT_PROMPTS.map(a => ({ ...a, id: `agent:${a.key}`, kind: 'agent', color: 'accent' })) },
+      ...CATEGORY_ORDER.map(cat => ({
+        name: cat,
+        items: store.pack.strategies.filter(x => x.category === cat).map(x => ({
+          id: `strategy:${x.key}`, kind: 'strategy', key: x.key, name: x.name, icon: x.icon,
+          desc: `${x.description} · default: ${x.moment}`, color: 'state',
+        })),
+      })).filter(g => g.items.length),
+    ]);
+    const items = computed(() => groups.value.flatMap(g => g.items));
+    const selected = computed(() => items.value.find(i => i.id === store.ui.stratSel) || items.value[0]);
+    const prompts = item => (item.kind === 'agent' ? store.doc.agentPrompts : store.doc.strategyPrompts);
+    const defaultOf = item => (item.kind === 'agent' ? store.pack.agents[item.key] : strategyCatalog.value[item.key]?.instruction) || '';
+    const textOf = item => prompts(item)[item.key] ?? defaultOf(item);
+    const customized = item => textOf(item) !== defaultOf(item);
+    const usage = computed(() => {
+      const item = selected.value;
+      if (!item) return '';
+      if (item.kind === 'agent') {
+        if (item.key === 'patient_persona') return 'Used by interviews and by interactions with a Patient strategy.';
+        return item.key === 'guardrails' ? 'Used by every agent, in every turn.' : 'Used by every tutor turn and generated text.';
+      }
+      const where = [];
+      for (const step of store.doc.steps) {
+        for (const el of step.elements) {
+          const s = el.strategies.find(x => x.key === item.key);
+          if (s) where.push(`${M.stepName(step)} › ${el.label} (${s.moment})`);
+        }
+      }
+      return where.length ? `Used in: ${where.join(' · ')}` : 'Not used by any element yet — attach it with the puzzle button of an element.';
+    });
+    function select(item) { store.ui.stratSel = item.id; }
+    function setText(value) { prompts(selected.value)[selected.value.key] = value; }
+    function reset() { prompts(selected.value)[selected.value.key] = defaultOf(selected.value); }
+    return { store, groups, selected, textOf, customized, usage, select, setText, reset };
+  },
+  template: `
+  <div class="panel strat-panel">
+    <span class="strat-intro">Each agent and strategy has one prompt, stored with this case. Edits apply wherever it is used.</span>
+    <div class="strat-groups">
+      <div class="strat-group" v-for="g in groups" :key="g.name">
+        <span class="eyebrow">[[ g.name ]]</span>
+        <div class="strat-buttons">
+          <button v-for="it in g.items" :key="it.id" :class="{on: selected?.id === it.id}" :title="it.desc" @click="select(it)">
+            <span class="tile" :class="'c-' + it.color"><i class="ti" :class="it.icon"></i></span>
+            <span>[[ it.name ]]</span>
+            <span v-if="customized(it)" class="custom-dot" title="Edited for this case"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="strat-editor" v-if="selected">
+      <div class="strat-editor-head">
+        <span class="tile" :class="'c-' + selected.color"><i class="ti" :class="selected.icon"></i></span>
+        <span class="strat-editor-title"><b>[[ selected.name ]]</b><span>[[ selected.desc ]]</span></span>
+        <button v-if="customized(selected)" class="btn-link" @click="reset"><i class="ti ti-arrow-back-up"></i>Reset to default</button>
+      </div>
+      <textarea class="strat-text" rows="5" :value="textOf(selected)" @input="setText($event.target.value)"
+                :aria-label="selected.name + ' prompt'"></textarea>
+      <span class="strat-usage">[[ usage ]]</span>
+    </div>
+  </div>`,
+};
+
 const EditorView = {
-  components: { StepCard, PreviewPanel },
+  components: { StepCard, PreviewPanel, StrategiesPanel },
   setup() {
     const reqs = computed(() => M.requirements(store.doc));
     const met = computed(() => reqs.value.filter(Boolean).length);
@@ -973,6 +1112,9 @@ const EditorView = {
         <button class="panel-toggle" :class="{on: store.ui.legendOpen}" @click="store.ui.legendOpen = !store.ui.legendOpen">
           <i class="ti ti-category"></i><span>Element types</span>
           <i class="ti" :class="store.ui.legendOpen ? 'ti-chevron-up' : 'ti-chevron-down'"></i></button>
+        <button class="panel-toggle" :class="{on: store.ui.stratOpen}" @click="store.ui.stratOpen = !store.ui.stratOpen">
+          <i class="ti ti-puzzle"></i><span>Strategies</span>
+          <i class="ti" :class="store.ui.stratOpen ? 'ti-chevron-up' : 'ti-chevron-down'"></i></button>
       </div>
       <div class="panel settings-panel" v-if="store.ui.settingsOpen">
         <div class="settings-row">
@@ -1000,6 +1142,7 @@ const EditorView = {
         <span v-for="[icon, text, color] in legend" :key="text">
           <span class="tile" :class="'c-' + color"><i class="ti" :class="icon"></i></span>[[ text ]]</span>
       </div>
+      <StrategiesPanel v-if="store.ui.stratOpen" />
     </div>
 
     <div class="main-grid" :style="{gridTemplateColumns: columns}">
@@ -1013,20 +1156,194 @@ const EditorView = {
   </div>`,
 };
 
-const PlayerStub = {
-  setup() { return { store }; },
+// ── player ───────────────────────────────────────────────────────────────────
+
+const PLAY_PATH = /^\/vp\/play\/([0-9a-f-]{36})\/?$/i;
+const playCaseId = (window.location.pathname.match(PLAY_PATH) || [])[1] || null;
+const LS_AFTER_LOGIN = 'vp.afterLogin';
+
+function studentLink(caseId) { return `${window.location.origin}/vp/play/${caseId}/`; }
+
+async function copyStudentLink(caseId) {
+  try {
+    await navigator.clipboard.writeText(studentLink(caseId));
+    toast('Student link copied. Any signed-in user with the link can play the published version.', { ms: 4000 });
+  } catch {
+    window.prompt('Copy the student link:', studentLink(caseId));
+  }
+}
+
+const PLACEHOLDERS = { answer: 'Write your answer…', pre: 'Write your answer…', interaction: 'Write your reply…' };
+
+const PlayerView = {
+  props: { mode: String, caseId: String },
+  setup(props) {
+    const session = ref(null);
+    const error = ref('');
+    const sending = ref(false);
+    const draft = ref('');
+    const pending = ref('');
+    const scroller = ref(null);
+    const input = ref(null);
+    const isTry = props.mode === 'try';
+    const currentSig = () => (store.doc ? JSON.stringify(store.doc) : '');
+    // Try mode: the draft signature each run started from, so a changed
+    // draft offers a restart. Unknown for a run resumed after a reload.
+    const startedSig = computed(() => store.tryRuns[props.caseId] || null);
+    const stale = computed(() => isTry && startedSig.value && startedSig.value !== currentSig());
+    const published = computed(() => store.cases.find(c => c.id === props.caseId)?.published_revision != null);
+    const placeholder = computed(() => PLACEHOLDERS[session.value?.waiting] || 'Please wait…');
+
+    function scrollDown() {
+      nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; });
+    }
+    function focusInput() { nextTick(() => input.value?.focus()); }
+
+    async function start(restart = false) {
+      if (restart && !isTry && !window.confirm('Start this activity again from the beginning?')) return;
+      error.value = '';
+      sending.value = true;
+      try {
+        const body = { case: props.caseId, mode: props.mode, restart };
+        if (isTry) body.document = store.doc;
+        session.value = await api('/vp/api/sessions/', { method: 'POST', body });
+        if (isTry && restart) store.tryRuns[props.caseId] = currentSig();
+      } catch (e) {
+        error.value = e.message;
+      } finally {
+        sending.value = false;
+        scrollDown();
+        focusInput();
+      }
+    }
+
+    async function act(action, text) {
+      if (!session.value || sending.value) return;
+      error.value = '';
+      sending.value = true;
+      if (text) pending.value = text;
+      scrollDown();
+      try {
+        session.value = await api(`/vp/api/sessions/${session.value.id}/${action}/`, {
+          method: 'POST', body: text ? { text } : {},
+        });
+      } catch (e) {
+        error.value = e.message;
+        if (text) draft.value = text;       // nothing was saved: give the text back
+      } finally {
+        pending.value = '';
+        sending.value = false;
+        scrollDown();
+        focusInput();
+      }
+    }
+
+    function send() {
+      const text = draft.value.trim();
+      if (!text || !session.value?.waiting || sending.value) return;
+      draft.value = '';
+      act('reply', text);
+    }
+
+    onMounted(() => start(false));
+    return { store, isTry, session, error, sending, draft, pending, scroller, input, stale, published, placeholder,
+             start, send, act, copyStudentLink };
+  },
   template: `
-  <div class="stub">
-    <span class="tile c-accent"><i class="ti ti-player-play"></i></span>
-    <h2>The player is coming soon</h2>
-    <p>Here you’ll be able to try the case as a student: phases, the tutor and patient agents, and the final feedback.
-       Until then, the preview in the editor shows what each step looks like.</p>
-    <button class="btn-ghost" @click="store.mode = 'author'"><i class="ti ti-arrow-left"></i>Back to the editor</button>
+  <div class="player">
+    <section class="chat">
+      <div class="chat-scroll" ref="scroller">
+        <div class="chat-inner">
+          <div class="chat-title" v-if="session">
+            <h1>[[ session.title ]]</h1>
+            <span>[[ isTry ? 'Trying the current draft — notes in grey are visible to you only' : session.level + ' level' ]]</span>
+          </div>
+          <div class="stale-note" v-if="stale"><i class="ti ti-alert-circle"></i>
+            <span>The case changed since this run started.</span>
+            <button class="btn-link" @click="start(true)">Restart with the changes</button></div>
+          <template v-for="m in session?.messages || []" :key="m.id">
+            <div v-if="m.type === 'phase'" class="pv-phase"><span>[[ m.label ]]</span><b>[[ m.text ]]</b></div>
+            <div v-else-if="m.type === 'progress'" class="pv-progress">
+              <span class="segs"><span v-for="n in m.total" :key="n" :class="{on: n <= m.filled}"></span></span>
+              <span class="pct">[[ m.pct ]]</span><span>[[ m.text ]]</span>
+            </div>
+            <div v-else-if="m.type === 'case'" class="pv-case">
+              <div class="pv-case-head"><i class="ti ti-stethoscope"></i><span>[[ m.label ]]</span></div>
+              <p>[[ m.text ]]</p>
+            </div>
+            <div v-else-if="m.role === 'student'" class="pv-student">[[ m.text ]]</div>
+            <div v-else-if="m.type === 'feedback'" class="pv-feedback">
+              <span>[[ m.label ]]</span><p>[[ m.text ]]</p>
+            </div>
+            <div v-else-if="m.type === 'review'" class="pv-review">
+              <span class="eyebrow">Review materials</span>
+              <details v-for="(it, i) in m.items" :key="i"><summary>[[ it.label ]]</summary><p>[[ it.text ]]</p></details>
+            </div>
+            <div v-else-if="m.type === 'notice'" class="trace-note"><i class="ti ti-info-circle"></i>[[ m.text ]]</div>
+            <div v-else class="pv-msg">
+              <span class="pv-who" :class="{patient: m.role === 'patient'}">
+                <span>[[ m.role === 'patient' ? 'Patient' : 'Tutor' ]]</span>
+                <span v-if="isTry && m.tag === 'generated'" class="pv-tag c-char"><i class="ti ti-sparkles"></i>generated</span>
+                <span v-if="isTry && m.tag === 'interaction'" class="pv-tag c-trans"><i class="ti ti-repeat"></i>interaction</span>
+              </span>
+              <p class="pv-text">[[ m.text ]]</p>
+              <span class="trace-note" v-if="m.trace">[[ m.trace ]]</span>
+            </div>
+          </template>
+          <div v-if="pending" class="pv-student sending">[[ pending ]]</div>
+          <div v-if="sending" class="typing" aria-label="Waiting for the reply"><span></span><span></span><span></span></div>
+          <div class="pv-error" v-if="error" role="alert"><i class="ti ti-alert-triangle"></i> [[ error ]]</div>
+        </div>
+      </div>
+      <div class="composer" v-if="session">
+        <div class="composer-inner" v-if="!session.finished">
+          <textarea ref="input" v-model="draft" rows="2" :placeholder="placeholder" :disabled="!session.waiting || sending"
+                    @keydown.enter.exact.prevent="send" aria-label="Your message"></textarea>
+          <div class="composer-actions">
+            <button v-if="store.vw < 900" class="btn-ghost" :disabled="sending" title="Request feedback on your progress"
+                    @click="act('feedback')"><i class="ti ti-message-check"></i></button>
+            <button v-if="session.can_finish" class="btn-ghost" :disabled="sending" @click="act('done')"
+                    title="End this part of the conversation and continue"><i class="ti ti-player-skip-forward"></i><span>I’m done with this part</span></button>
+            <span class="spacer"></span>
+            <button class="btn-primary" :disabled="!draft.trim() || !session.waiting || sending" @click="send">
+              <i class="ti ti-send"></i><span>Send</span></button>
+          </div>
+        </div>
+        <div class="composer-inner finished" v-else>
+          <span><i class="ti ti-circle-check"></i>Activity complete.</span>
+          <button class="btn-ghost" @click="start(true)"><i class="ti ti-refresh"></i><span>[[ isTry ? 'Restart' : 'Play again' ]]</span></button>
+        </div>
+      </div>
+    </section>
+    <aside class="player-side" v-if="store.vw >= 900 && session">
+      <span class="eyebrow">Phases</span>
+      <ol class="phase-list">
+        <li v-for="(p, i) in session.phases" :key="i" :class="p.state">
+          <i class="ti" :class="p.state === 'done' ? 'ti-circle-check' : p.state === 'now' ? 'ti-point-filled' : 'ti-circle'"></i>
+          <span>[[ p.name ]]</span>
+        </li>
+        <li v-if="!session.phases.length" class="next"><span>No phases in this case.</span></li>
+      </ol>
+      <button class="side-btn" :disabled="sending || session.finished" @click="act('feedback')">
+        <i class="ti ti-message-check"></i>Request feedback</button>
+      <button class="side-btn" :disabled="sending" @click="start(true)">
+        <i class="ti ti-refresh"></i>[[ isTry ? 'Restart run' : 'Start over' ]]</button>
+      <template v-if="isTry">
+        <span class="eyebrow" style="margin-top:14px">Students</span>
+        <button v-if="published" class="side-btn" @click="copyStudentLink(caseId)"><i class="ti ti-link"></i>Copy student link</button>
+        <span v-else class="side-note">Publish the case to get a link students can open. They play the published version.</span>
+      </template>
+    </aside>
   </div>`,
 };
 
+
+function ssGet(key) { try { return sessionStorage.getItem(key); } catch { return null; } }
+function ssSet(key, value) { try { sessionStorage.setItem(key, value); } catch { /* blocked */ } }
+function ssDel(key) { try { sessionStorage.removeItem(key); } catch { /* blocked */ } }
+
 const App = {
-  components: { Topbar, GalleryView, EditorView, PlayerStub },
+  components: { Topbar, UserMenu, GalleryView, EditorView, PlayerView },
   setup() {
     const gbtn = ref(null);
 
@@ -1034,13 +1351,28 @@ const App = {
       try {
         let { user, error } = await initAuth({ app: 'vp' });
         if (!user) {
+          // Google's callback returns to /vp/; come back to the share link after.
+          if (playCaseId) ssSet(LS_AFTER_LOGIN, window.location.pathname);
           store.booting = false;
           await nextTick();
           ({ user, error } = await initAuth({ app: 'vp', buttonEl: gbtn.value }));
           store.authError = error;
           return;
         }
+        const after = ssGet(LS_AFTER_LOGIN);
+        if (after) {
+          ssDel(LS_AFTER_LOGIN);
+          if (!playCaseId && PLAY_PATH.test(after)) { window.location.replace(after); return; }
+        }
         store.user = user;
+        if (playCaseId) {
+          try {
+            store.playInfo = await api(`/vp/api/play/${playCaseId}/`);
+          } catch (e) {
+            store.playError = e.status === 404 ? 'This activity doesn’t exist or isn’t published yet.' : e.message;
+          }
+          return;
+        }
         const content = await api('/vp/api/content/');
         store.pack = content;
         store.levels = content.levels;
@@ -1093,13 +1425,35 @@ const App = {
     // A newly opened step closes any popovers left over from another one.
     watch(() => store.ui.openStep, () => { store.ui.pop = null; store.ui.assist = null; });
 
-    return { store, gbtn };
+    return { store, gbtn, playCaseId };
   },
   template: `
-  <div v-if="store.user && store.pack" class="shell">
+  <div v-if="store.user && playCaseId" class="shell">
+    <header class="topbar">
+      <a class="logo" href="/vp/"><span class="logo-tile">vp</span><span class="logo-text">vp-studio</span></a>
+      <span class="file-name">[[ store.playInfo?.title ]]</span>
+      <div class="spacer"></div>
+      <a v-if="store.playInfo?.is_owner" class="btn-ghost" href="/vp/" style="text-decoration:none"><i class="ti ti-pencil"></i><span>Edit</span></a>
+      <UserMenu />
+    </header>
+    <main class="main">
+      <PlayerView v-if="store.playInfo?.published" mode="play" :case-id="playCaseId" />
+      <div v-else-if="store.playInfo || store.playError" class="stub">
+        <span class="tile c-state"><i class="ti ti-lock"></i></span>
+        <h2>Not available</h2>
+        <p>[[ store.playError || 'This activity isn’t published yet. Publish it in the editor first.' ]]</p>
+      </div>
+    </main>
+  </div>
+  <div v-else-if="store.user && store.pack" class="shell">
     <Topbar />
     <main class="main">
-      <PlayerStub v-if="store.mode === 'player'" />
+      <template v-if="store.mode === 'player'">
+        <PlayerView v-if="store.doc" :key="store.current.id" mode="try" :case-id="store.current.id" />
+        <div v-else class="stub"><span class="tile c-accent"><i class="ti ti-player-play"></i></span>
+          <h2>No case open</h2><p>Open or create a case, then try it here as a student would.</p>
+          <button class="btn-ghost" @click="store.mode = 'author'"><i class="ti ti-arrow-left"></i>Back to the editor</button></div>
+      </template>
       <GalleryView v-else-if="store.view === 'gallery' || !store.doc" />
       <EditorView v-else />
     </main>

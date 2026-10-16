@@ -23,6 +23,11 @@ def test_placeholder_is_valid_and_marked():
     (lambda p: p['step_defaults']['final'][0]['strategies'][0].update(key='forthcoming'), 'can’t use'),
     (lambda p: p['assist']['modes'].pop('expert'), 'assist.modes.expert'),
     (lambda p: p['preview'].pop('interaction'), 'preview.interaction'),
+    (lambda p: p.pop('agents'), 'agents'),
+    (lambda p: p['runtime'].pop('exit_check'), 'runtime.exit_check'),
+    (lambda p: p['runtime']['levels'].pop('advanced'), 'runtime.levels.advanced'),
+    (lambda p: p['step_defaults']['explain'][2].pop('maxTurns'), 'maxTurns'),
+    (lambda p: p['step_defaults']['explain'][2].update(allowStudentExit='yes'), 'allowStudentExit'),
 ])
 def test_invalid_packs_are_rejected(mutate, message):
     pack = copy.deepcopy(content.placeholder_pack())

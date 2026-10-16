@@ -5,7 +5,8 @@ A content pack holds VP Studio's pedagogical content:
 - the **script templates** offered when a case is created;
 - the **default elements** each step type starts with (labels, prompts, side information, strategies);
 - the **strategy catalogue**;
-- the instructions the **assistant** and the **preview** use when they call the LLM.
+- the **agent prompts** (tutor persona, patient persona, guardrails) new cases start with;
+- the instructions the **assistant**, the **preview** and the **player** use when they call the LLM.
 
 Code and content are kept apart on purpose. The public repository ships only
 neutral placeholder content (`vp/server/vp_studio/content/placeholder.json`).
@@ -33,7 +34,9 @@ A pack is one JSON file:
   "default_template": "explain_only",
   "templates": [ ... ],
   "strategies": [ ... ],
+  "agents": { ... },
   "step_defaults": { ... },
+  "runtime": { ... },
   "assist": { ... },
   "preview": { ... }
 }
@@ -72,7 +75,18 @@ Available step types: `know`, `explain`, `assess`, `transfer`, `interview`,
 | `category` | One of `Feedback`, `Final feedback`, `Patient`, `Gamification`. Each element kind accepts only some categories: literal → Gamification; generated → Final feedback, Gamification; interaction → Feedback, Patient, Gamification. Within Feedback, Final feedback and Patient an element holds one strategy at most; Gamification allows several. |
 | `moment` | Default timing: `on start`, `per turn` or `at end`. Authors can change it per element. |
 | `icon` | A [Tabler icon](https://tabler.io/icons) class. |
-| `instruction` | Sent to the LLM. It stays on the server and is never sent to the editor. |
+| `instruction` | Sent to the LLM. New cases copy it into the case, where authors can edit it (Strategies panel). |
+
+### agents
+
+```json
+{"tutor_persona": "…", "patient_persona": "…", "guardrails": "…"}
+```
+
+These are copied into every new case, where authors can edit them in the
+Strategies panel. The tutor persona and guardrails shape every tutor turn
+and generated text. The patient persona shapes interviews and interactions
+with a Patient strategy. They may use `{{fields}}`.
 
 ### step_defaults
 
@@ -90,8 +104,20 @@ be empty. Each entry is an element:
  "isFinalFeedback": true,
  "sideInfo": [{"label": "Expert explanation of case {N}", "ref": "case{N}.expert", "text": "",
                "generateFromCase": "{N}"}],
- "strategies": [{"key": "hints", "moment": "per turn"}]}
+ "strategies": [{"key": "hints", "moment": "per turn"}],
+ "endsWhen": "interaction only: the end condition the LLM checks after each student turn",
+ "maxTurns": 8,
+ "allowStudentExit": true,
+ "reviewMaterials": true}
 ```
+
+- `maxTurns` (1–50) is **required** on interactions; `endsWhen` may be empty
+  (turn limit only); `allowStudentExit` defaults to `true`.
+- `reviewMaterials` on a literal makes the player append the case vignettes,
+  expert explanations and knowledge text after it (typically in the final
+  step).
+- Side information with `generateFromCase` is an **expert explanation**:
+  the player's hidden evaluator compares the student's answers with it.
 
 - `kind` is `literal`, `generated` or `interaction`.
 - In `transfer` defaults, `{N}` is replaced by the step's case number (2, 3, …) in every text, label, card and ref. `generateFromCase: "{N}"` becomes that number.
@@ -118,6 +144,23 @@ Each mode is the task description for one assistant button:
 The server appends the case context to every call: title, level, step,
 element, existing text, available fields, strategies, and (for `expert`) the
 knowledge text and vignette. It also appends the author's request.
+
+### runtime
+
+Server-only instructions used by the player:
+
+```json
+{"generated": "…", "exit_check": "…", "evaluator": "…", "progress_feedback": "…",
+ "levels": {"beginner": "…", "intermediate": "…", "advanced": "…"}}
+```
+
+| Key | Used for |
+|-----|----------|
+| `generated` | wraps a generated element's prompt when the player writes it |
+| `exit_check` | decides whether an interaction's **Ends when…** condition is met. Must ask for JSON `{"end": true\|false, "reason": "…"}` |
+| `evaluator` | the hidden evaluator. Must ask for JSON `{"covered": [], "missing": [], "misconceptions": []}` |
+| `progress_feedback` | the student's **Request feedback** button |
+| `levels` | one sentence per student level, added to the tutor's instructions |
 
 ### preview
 

@@ -14,7 +14,8 @@ from llm.gateway import LLMError, ModelNotConfigured, ProviderNotConfigured
 from llm.services import RateLimited, provider_status
 
 from . import casedoc, services
-from .models import Case
+from .models import Case, Session
+from .runtime import PlayerError
 from .serializers import CaseListSerializer, CaseSerializer
 
 # vp/web/ — the frontend lives next to vp/server/, not inside the app.
@@ -23,7 +24,7 @@ log = logging.getLogger('vp')
 WEB_DIR = Path(__file__).resolve().parent.parent.parent / 'web'
 
 
-def studio_html(_request):
+def studio_html(_request, **_route):
     return FileResponse(open(WEB_DIR / 'studio.html', 'rb'),
                         content_type='text/html; charset=utf-8')
 
@@ -159,3 +160,69 @@ class PreviewSampleView(APIView):
         except (LLMError, APIError, services.StudioError) as exc:
             return _llm_error_response(exc)
         return Response(sample)
+
+
+# ── player ────────────────────────────────────────────────────────────────────
+
+def _player_error_response(exc: Exception) -> Response:
+    if isinstance(exc, services.NotAllowed):
+        return Response({'detail': str(exc)}, status=status.HTTP_404_NOT_FOUND)
+    if isinstance(exc, PlayerError):
+        return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    return _llm_error_response(exc)
+
+
+class PlayInfoView(APIView):
+    """GET /vp/api/play/<case>/ — what a share link needs before starting."""
+
+    def get(self, request, case_id):
+        try:
+            case = services.playable_case(request.user, case_id)
+        except services.NotAllowed as exc:
+            return _player_error_response(exc)
+        doc = case.published_document or case.document
+        return Response({
+            'case': str(case.id), 'title': doc.get('title') or 'Untitled case',
+            'published': case.published_revision is not None,
+            'is_owner': case.owner_id == request.user.id,
+        })
+
+
+class SessionsView(APIView):
+    """POST {case, mode: 'try'|'play', document?, restart?} → session.
+
+    Resumes the latest matching session unless `restart` is true."""
+
+    def post(self, request):
+        try:
+            case = services.playable_case(request.user, request.data.get('case'))
+            session = services.start_session(
+                request.user, case, request.data.get('mode', 'play'),
+                document=request.data.get('document'), restart=bool(request.data.get('restart')),
+            )
+        except (LLMError, APIError, services.StudioError, PlayerError) as exc:
+            return _player_error_response(exc)
+        return Response(services.session_view(session))
+
+
+class SessionView(APIView):
+    """GET a session; POST /reply/ {text}, /done/, /feedback/ to act on it."""
+
+    def _session(self, request, session_id):
+        return Session.objects.filter(pk=session_id, user=request.user).first()
+
+    def get(self, request, session_id):
+        session = self._session(request, session_id)
+        if session is None:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(services.session_view(session))
+
+    def post(self, request, session_id, action):
+        session = self._session(request, session_id)
+        if session is None:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            session = services.act(session, request.user, action, str(request.data.get('text', ''))[:4000])
+        except (LLMError, APIError, services.StudioError, PlayerError) as exc:
+            return _player_error_response(exc)
+        return Response(services.session_view(session))

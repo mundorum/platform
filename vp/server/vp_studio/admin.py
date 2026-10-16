@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Case, ContentPack, PreviewSample
+from .models import Case, ContentPack, PreviewSample, Session
 
 
 @admin.register(Case)
@@ -26,3 +26,11 @@ class ContentPackAdmin(admin.ModelAdmin):
 class PreviewSampleAdmin(admin.ModelAdmin):
     list_display = ('key', 'kind', 'created_at')
     list_filter = ('kind',)
+
+
+@admin.register(Session)
+class SessionAdmin(admin.ModelAdmin):
+    list_display = ('case', 'user', 'mode', 'revision', 'finished', 'updated_at')
+    list_filter = ('mode', 'finished')
+    search_fields = ('case__title', 'user__email')
+    readonly_fields = ('id', 'case', 'user', 'mode', 'revision', 'document', 'state', 'created_at', 'updated_at')

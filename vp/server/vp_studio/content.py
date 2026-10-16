@@ -18,6 +18,10 @@ PACK_FORMAT = 1
 PLACEHOLDER_PATH = Path(__file__).resolve().parent / 'content' / 'placeholder.json'
 
 ASSIST_MODES = ('text', 'vignette', 'prompt', 'vprompt', 'expert')
+# Agent prompts every case starts with (editable per case in Strategies).
+AGENT_PROMPTS = ('tutor_persona', 'patient_persona', 'guardrails')
+# Server-only instructions the player uses (see runtime.py).
+RUNTIME_PROMPTS = ('generated', 'exit_check', 'evaluator', 'progress_feedback')
 PREVIEW_KINDS = ('generated', 'interaction', 'final_feedback')
 STRATEGY_CATEGORY_NAMES = ('Feedback', 'Final feedback', 'Patient', 'Gamification')
 
@@ -44,9 +48,17 @@ def _validate_element(el, where: str, categories: dict[str, str]) -> None:
     _require(el.get('kind') in casedoc.ELEMENT_KINDS, f'{where}: unknown kind {el.get("kind")!r}.')
     _text(el.get('label'), f'{where}.label')
     _text(el.get('text', ''), f'{where}.text')
-    for key in ('ref', 'card', 'note'):
+    for key in ('ref', 'card', 'note', 'endsWhen'):
         if key in el:
             _text(el[key], f'{where}.{key}')
+    for key in ('allowStudentExit', 'reviewMaterials', 'autoPhaseSentence', 'isFinalFeedback'):
+        if key in el:
+            _require(isinstance(el[key], bool), f'{where}.{key} must be true or false.')
+    if el['kind'] == 'interaction':
+        turns = el.get('maxTurns')
+        _require(isinstance(turns, int) and not isinstance(turns, bool)
+                 and casedoc.MIN_TURNS <= turns <= casedoc.MAX_TURNS,
+                 f'{where}.maxTurns must be a whole number from {casedoc.MIN_TURNS} to {casedoc.MAX_TURNS}.')
     for i, side in enumerate(el.get('sideInfo', [])):
         _require(isinstance(side, dict), f'{where}.sideInfo[{i}] must be an object.')
         _text(side.get('label'), f'{where}.sideInfo[{i}].label')
@@ -116,6 +128,20 @@ def validate_pack(pack) -> None:
         for i, el in enumerate(elements):
             _validate_element(el, f'step_defaults.{step_type}[{i}]', categories)
 
+    agents = pack.get('agents')
+    _require(isinstance(agents, dict), 'agents must be an object.')
+    for key in AGENT_PROMPTS:
+        _text(agents.get(key), f'agents.{key}')
+
+    runtime = pack.get('runtime')
+    _require(isinstance(runtime, dict), 'runtime must be an object.')
+    for key in RUNTIME_PROMPTS:
+        _text(runtime.get(key), f'runtime.{key}')
+    levels = runtime.get('levels')
+    _require(isinstance(levels, dict), 'runtime.levels must be an object.')
+    for level in casedoc.LEVELS:
+        _text(levels.get(level), f'runtime.levels.{level}')
+
     assist = pack.get('assist')
     _require(isinstance(assist, dict), 'assist must be an object.')
     _text(assist.get('system'), 'assist.system')
@@ -171,12 +197,15 @@ def instantiate_step(pack: dict, step_type: str, new_id, case_n: int | None = No
         el = {'id': new_id('e'), 'kind': proto['kind'],
               'label': _fill(proto['label'], case_n), 'text': _fill(proto.get('text', ''), case_n),
               'sideInfo': [], 'strategies': [dict(s) for s in proto.get('strategies', [])]}
-        for key in ('ref', 'card', 'note'):
+        for key in ('ref', 'card', 'note', 'endsWhen'):
             if key in proto:
                 el[key] = _fill(proto[key], case_n)
-        for key in ('autoPhaseSentence', 'isFinalFeedback'):
+        for key in ('autoPhaseSentence', 'isFinalFeedback', 'reviewMaterials'):
             if proto.get(key):
                 el[key] = True
+        if proto['kind'] == 'interaction':
+            el['maxTurns'] = proto['maxTurns']
+            el['allowStudentExit'] = proto.get('allowStudentExit', True)
         for side in proto.get('sideInfo', []):
             item = {'id': new_id('i'), 'label': _fill(side['label'], case_n),
                     'text': _fill(side.get('text', ''), case_n), 'ref': _fill(side['ref'], case_n)}
@@ -208,4 +237,13 @@ def new_case_document(pack: dict, template_id: str | None, new_id) -> dict:
         'settings': {'studentLevel': 'beginner', 'progressBar': True,
                      'replyInStudentLanguage': True, 'scriptTemplate': template_id},
         'steps': steps,
+        **default_prompts(pack),
+    }
+
+
+# The agent and strategy prompts a new case stores (editable per case).
+def default_prompts(pack: dict) -> dict:
+    return {
+        'agentPrompts': {k: pack['agents'][k] for k in AGENT_PROMPTS},
+        'strategyPrompts': {s['key']: s['instruction'] for s in pack['strategies']},
     }

@@ -1,55 +1,15 @@
 """VP Studio HTTP API (real database; the LLM provider is faked)."""
 import json
-from types import SimpleNamespace
-
 import pytest
-from django.contrib.auth.models import User
 from django.core.management import call_command
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from llm import services as llm_services
-from llm.gateway import PROVIDERS, LLMGateway
 from llm.models import LLMUsage
 from vp_studio import content
 from vp_studio.models import Case, ContentPack, PreviewSample
+from vp_studio.tests.conftest import client_for
 from vp_studio.tests.helpers import fill_all, make_doc, step_of
-
-
-def client_for(email):
-    user = User.objects.create_user(username=email, email=email)
-    c = APIClient()
-    c.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=user).key}')
-    return c
-
-
-@pytest.fixture
-def api(db):
-    return client_for('author@example.org')
-
-
-@pytest.fixture
-def fake_llm(monkeypatch):
-    """Replace the provider with a canned reply; returns the list of calls."""
-    state = SimpleNamespace(reply='Generated text.', calls=[])
-
-    class Completions:
-        def create(self, **kwargs):
-            state.calls.append(kwargs)
-            return SimpleNamespace(
-                model='fake-model',
-                choices=[SimpleNamespace(message=SimpleNamespace(content=state.reply),
-                                         finish_reason='stop')],
-                usage=SimpleNamespace(prompt_tokens=10, completion_tokens=5),
-            )
-
-    class Client:
-        def __init__(self, **kwargs):
-            self.chat = SimpleNamespace(completions=Completions())
-
-    gateway = LLMGateway(PROVIDERS['groq'], 'k', default_model='fake-model', client_factory=Client)
-    monkeypatch.setattr(llm_services, 'get_gateway', lambda provider=None: gateway)
-    return state
 
 
 def create_case(api, doc=None):
@@ -120,12 +80,15 @@ def test_publish_blocks_until_ready_then_freezes_a_copy(api):
 
 # ── content ───────────────────────────────────────────────────────────────────
 
-def test_content_endpoint_serves_placeholder_without_instructions(api):
+def test_content_endpoint_serves_placeholder(api):
     data = api.get('/vp/api/content/').json()
     assert data['placeholder'] is True
     assert data['levels']['beginner']['hints'] == 4
-    assert all('instruction' not in s for s in data['strategies'])
-    assert 'assist' not in data and 'preview' not in data
+    # authors edit strategy and agent prompts per case, so the editor gets them
+    assert all(s['instruction'] for s in data['strategies'])
+    assert set(data['agents']) == {'tutor_persona', 'patient_persona', 'guardrails'}
+    # the assistant's, preview's and player's own instructions stay on the server
+    assert 'assist' not in data and 'preview' not in data and 'runtime' not in data
 
 
 def test_load_vp_content_activates_a_pack(api, tmp_path):

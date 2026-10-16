@@ -68,3 +68,34 @@ class PreviewSample(models.Model):
 
     def __str__(self):
         return f'{self.kind} {self.key[:10]}'
+
+
+class Session(models.Model):
+    """One run of a case in the player.
+
+    `document` is a snapshot of what is being played: the editor's current
+    document for an author's "Try it", the published copy for students.
+    `state` is runtime.py's state dict (position, transcript, answers, …).
+    """
+    class Mode(models.TextChoices):
+        TRY = 'try', 'Try it (author, current draft)'
+        PLAY = 'play', 'Play (published version)'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='sessions')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name='vp_sessions')
+    mode = models.CharField(max_length=4, choices=Mode.choices)
+    revision = models.PositiveIntegerField()
+    document = models.JSONField()
+    state = models.JSONField()
+    finished = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [models.Index(fields=['user', 'case', 'mode'])]
+
+    def __str__(self):
+        return f'{self.get_mode_display()} · {self.case} · {self.user}'

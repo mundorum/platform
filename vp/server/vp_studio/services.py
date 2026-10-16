@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
+import uuid
 
+from django.db import transaction
 from django.utils import timezone
 
 from llm import services as llm
 
-from . import casedoc
+from . import casedoc, runtime
 from .content import ContentError, placeholder_pack, strategy_map, validate_pack
-from .models import ContentPack, PreviewSample
+from .models import Case, ContentPack, PreviewSample, Session
+
+log = logging.getLogger('vp')
 
 
 class StudioError(Exception):
@@ -21,9 +26,23 @@ class StudioError(Exception):
 
 # ── content ───────────────────────────────────────────────────────────────────
 
+# Sections added to the pack format after packs were already loaded; an
+# older stored pack gets them from the placeholder instead of failing.
+_LATER_SECTIONS = ('agents', 'runtime')
+
+
 def active_pack() -> dict:
-    pack = ContentPack.objects.filter(is_active=True).first()
-    return pack.data if pack else placeholder_pack()
+    record = ContentPack.objects.filter(is_active=True).first()
+    if record is None:
+        return placeholder_pack()
+    pack = record.data
+    missing = [k for k in _LATER_SECTIONS if k not in pack]
+    if missing:
+        log.warning('Content pack “%s” lacks %s; using the placeholder’s. Reload it with '
+                    'load_vp_content after adding them.', record.name, ', '.join(missing))
+        fallback = placeholder_pack()
+        pack = {**pack, **{k: fallback[k] for k in missing}}
+    return pack
 
 
 def load_pack(data: dict, source: str = '') -> ContentPack:
@@ -34,14 +53,17 @@ def load_pack(data: dict, source: str = '') -> ContentPack:
 
 
 def public_pack(pack: dict) -> dict:
-    """What the editor needs. Strategies' runtime instructions and the
-    assistant's own instructions stay on the server."""
+    """What the editor needs: templates, defaults, strategies with their
+    default prompts and the agent prompts (authors edit both per case).
+    The assistant's, preview's and player's own instructions stay on the
+    server."""
     return {
         'name': pack['name'],
         'placeholder': bool(pack.get('placeholder')),
         'default_template': pack['default_template'],
         'templates': pack['templates'],
-        'strategies': [{k: v for k, v in s.items() if k != 'instruction'} for s in pack['strategies']],
+        'strategies': pack['strategies'],
+        'agents': pack['agents'],
         'step_defaults': pack['step_defaults'],
     }
 
@@ -231,5 +253,97 @@ def publish(case) -> list[str]:
     return []
 
 
+# ── player sessions ───────────────────────────────────────────────────────────
+
+class NotAllowed(StudioError):
+    pass
+
+
+def playable_case(user, case_id) -> Case:
+    """The case if `user` may play it: their own, or any published case."""
+    try:
+        case_id = uuid.UUID(str(case_id))
+    except ValueError:
+        raise NotAllowed('This case doesn’t exist or isn’t published.')
+    case = Case.objects.filter(pk=case_id).first()
+    if case is None or (case.owner_id != user.id and case.published_revision is None):
+        raise NotAllowed('This case doesn’t exist or isn’t published.')
+    return case
+
+
+def _llm_for(user):
+    return lambda messages, purpose: llm.chat(user, messages, purpose=purpose, temperature=0.7).text
+
+
+def start_session(user, case: Case, mode: str, document: dict | None = None,
+                  restart: bool = False) -> Session:
+    """Resume the user's latest session for this case and mode, or start one.
+
+    "try" (owner only) plays the given document (the editor's current,
+    possibly unsaved version) or the saved one; "play" plays the published
+    version and resumes only a session of that same published revision.
+    """
+    if mode == Session.Mode.TRY:
+        if case.owner_id != user.id:
+            raise NotAllowed('Only the author can try an unpublished version.')
+        doc, revision = (document or case.document), case.revision
+    elif mode == Session.Mode.PLAY:
+        if case.published_revision is None:
+            raise NotAllowed('This case isn’t published yet.')
+        doc, revision = case.published_document, case.published_revision
+    else:
+        raise StudioError(f'Unknown mode {mode!r}.')
+    try:
+        casedoc.validate_document(doc)
+    except casedoc.DocumentError as exc:
+        raise StudioError(f'Invalid case: {exc}')
+
+    if not restart:
+        existing = Session.objects.filter(user=user, case=case, mode=mode)
+        if mode == Session.Mode.PLAY:
+            existing = existing.filter(revision=revision)
+        if (found := existing.first()) is not None:
+            return found
+
+    player = runtime.Player(doc, active_pack(), runtime.new_state(), _llm_for(user),
+                            trace=mode == Session.Mode.TRY)
+    player.start()
+    return Session.objects.create(case=case, user=user, mode=mode, revision=revision,
+                                  document=doc, state=player.s, finished=player.view()['finished'])
+
+
+def act(session: Session, user, action: str, text: str = '') -> Session:
+    """Run one player action ('reply', 'done', 'feedback') on a copy of the
+    state; the session is saved only if every LLM call succeeded, so a
+    provider error leaves it exactly as it was."""
+    with transaction.atomic():
+        locked = Session.objects.select_for_update().get(pk=session.pk)
+        player = runtime.Player(locked.document, active_pack(), runtime.play_copy(locked.state),
+                                _llm_for(user), trace=locked.mode == Session.Mode.TRY)
+        if action == 'reply':
+            player.reply(text)
+        elif action == 'done':
+            player.finish_interaction()
+        elif action == 'feedback':
+            player.progress_feedback()
+        else:
+            raise StudioError(f'Unknown action {action!r}.')
+        locked.state = player.s
+        locked.finished = player.view()['finished']
+        locked.save(update_fields=['state', 'finished', 'updated_at'])
+    return locked
+
+
+def session_view(session: Session) -> dict:
+    view = runtime.Player(session.document, active_pack(), session.state, llm=None).view()
+    return {
+        'id': str(session.id), 'case': str(session.case_id), 'mode': session.mode,
+        'title': session.document.get('title') or 'Untitled case', 'revision': session.revision,
+        'level': casedoc.LEVELS[session.document['settings']['studentLevel']]['label'],
+        **view,
+    }
+
+
 __all__ = ['StudioError', 'ContentError', 'active_pack', 'load_pack', 'public_pack',
-           'assist', 'preview_sample', 'publish']
+           'assist', 'preview_sample', 'publish', 'NotAllowed', 'playable_case', 'start_session',
+           'act', 'session_view']

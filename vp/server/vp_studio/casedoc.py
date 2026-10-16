@@ -25,10 +25,21 @@ A case document (stored as JSON in Case.document):
           "ref"?: str, "card"?: str, "autoPhaseSentence"?: bool,
           "note"?: str, "isFinalFeedback"?: bool,
           "sideInfo": [{"id", "label", "text", "ref", "generateFromCase"?: int}],
-          "strategies": [{"key": str, "moment": "on start"|"per turn"|"at end"}]
+          "strategies": [{"key": str, "moment": "on start"|"per turn"|"at end"}],
+          # interaction only:
+          "endsWhen"?: str,          # LLM-checked end condition ('' = turn limit only)
+          "maxTurns": int,           # hard limit on student turns (required)
+          "allowStudentExit"?: bool, # student may press "I'm done" (default true)
+          # literal only:
+          "reviewMaterials"?: bool   # followed by the cases, expert explanations, knowledge
         }]
-      }]
+      }],
+      "agentPrompts": {"tutor_persona", "patient_persona", "guardrails"},  # per case
+      "strategyPrompts": {<strategy key>: str}                             # per case
     }
+
+Side information with `generateFromCase` is an *expert explanation*: the
+player's hidden evaluator compares the student's answers against it.
 """
 from __future__ import annotations
 
@@ -45,6 +56,7 @@ LEVELS = {
 }
 
 ELEMENT_KINDS = ('literal', 'generated', 'interaction')
+MIN_TURNS, MAX_TURNS, DEFAULT_MAX_TURNS = 1, 50, 8
 MOMENTS = ('on start', 'per turn', 'at end')
 
 # Strategy categories each element kind may use (structural, not content).
@@ -253,7 +265,7 @@ def prompt_texts(doc: dict):
 def field_issues(doc: dict) -> list[dict]:
     issues = []
     for i, step, el in prompt_texts(doc):
-        for key in FIELD_RE.findall(el.get('text', '')):
+        for key in FIELD_RE.findall(el.get('text', '') + ' ' + el.get('endsWhen', '')):
             status = field_status(key, doc, i)
             if status != 'known':
                 issues.append({'step': step['id'], 'element': el['id'], 'key': key,
@@ -373,12 +385,25 @@ def validate_document(doc) -> None:
                 _require(isinstance(side, dict), 'Side information must be an object.')
                 new_id(side.get('id'))
                 _require(isinstance(side.get('text', ''), str), 'Side information text must be text.')
+            if el['kind'] == 'interaction':
+                turns = el.get('maxTurns', DEFAULT_MAX_TURNS)
+                _require(isinstance(turns, int) and not isinstance(turns, bool)
+                         and MIN_TURNS <= turns <= MAX_TURNS,
+                         f'maxTurns must be a whole number from {MIN_TURNS} to {MAX_TURNS}.')
+                _require(isinstance(el.get('endsWhen', ''), str), 'endsWhen must be text.')
+            for key in ('allowStudentExit', 'reviewMaterials'):
+                _require(isinstance(el.get(key, False), bool), f'{key} must be true or false.')
             strategies = el.get('strategies', [])
             _require(isinstance(strategies, list), 'strategies must be a list.')
             for strat in strategies:
                 _require(isinstance(strat, dict) and isinstance(strat.get('key'), str),
                          'Each strategy needs a key.')
                 _require(strat.get('moment') in MOMENTS, f'Invalid strategy moment {strat.get("moment")!r}.')
+
+    for key in ('agentPrompts', 'strategyPrompts'):
+        prompts = doc.get(key, {})
+        _require(isinstance(prompts, dict) and all(isinstance(v, str) for v in prompts.values()),
+                 f'{key} must map names to text.')
 
     _require(is_valid_sequence(s['type'] for s in steps),
              'The step order breaks the script rules (welcome first, final last, '
@@ -387,10 +412,15 @@ def validate_document(doc) -> None:
 
 # ── sample rendering (preview) ────────────────────────────────────────────────
 
-def resolve_fields(text: str, doc: dict, step_index: int) -> str:
-    """Fill {{fields}} with what the preview can know at authoring time:
-    authored content and level values; answers and runtime data become
-    bracketed descriptions."""
+def resolve_fields(text: str, doc: dict, step_index: int, session: Optional[dict] = None) -> str:
+    """Fill {{fields}}.
+
+    Without `session` (the editor preview): authored content and level
+    values; answers and runtime data become bracketed descriptions.
+    With `session` (the player), these keys supply live values:
+    answers {'<key>.answer': text}, generated {ref: text}, transcript,
+    evaluator_log, last_answer.
+    """
     level = LEVELS[doc['settings']['studentLevel']]
     steps = doc.get('steps', [])
     content = {}
@@ -412,10 +442,28 @@ def resolve_fields(text: str, doc: dict, step_index: int) -> str:
         'phase.name': (phase_name(step, steps) or step_name(step)) if step else '',
     }
 
+    if session is not None:
+        content.update({k: v for k, v in session.get('generated', {}).items() if v})
+        system['transcript'] = session.get('transcript') or '(no conversation yet)'
+        system['evaluator.log'] = session.get('evaluator_log') or '(no evaluation yet)'
+        system['student.last_answer'] = session.get('last_answer') or '(no answer yet)'
+        system['student.language'] = 'the language the student writes in'
+        system['patient_data.row'] = '(no patient dataset is available)'
+        live = session.get('answers', {})
+
     def repl(match: re.Match) -> str:
         key = match.group(1)
         if key in system:
             return system[key]
+        if session is not None:
+            if key == 'prev.answer' and step_index > 0:
+                prev = f'{answer_key(steps[step_index - 1])}.answer'
+                return live.get(prev) or '(no answer)'
+            if key in answers:
+                return live.get(key) or '(no answer)'
+            if key in content:
+                return content[key] or f'[{key}]'
+            return f'[{key}]'
         if key == 'prev.answer' and step_index > 0:
             return f"[the student’s answer in “{step_name(steps[step_index - 1])}”]"
         if key in answers:

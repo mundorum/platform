@@ -19,8 +19,9 @@ vp/
 │       ├── casedoc.py            case rules — pure Python (mirrored by casemodel.js)
 │       ├── content.py            content-pack validation + new-case building — pure Python
 │       ├── content/placeholder.json   neutral public content pack
-│       ├── models.py             Case (one JSON document), ContentPack, PreviewSample
-│       ├── services.py           assistant, preview samples, publishing
+│       ├── runtime.py            the player's step machine — pure Python, LLM injected
+│       ├── models.py             Case (one JSON document), ContentPack, PreviewSample, Session
+│       ├── services.py           assistant, preview samples, publishing, player sessions
 │       ├── views.py / urls.py    /vp/ page + /vp/api/…
 │       ├── management/commands/load_vp_content.py
 │       └── tests/                pytest-django (real DB; LLM provider faked)
@@ -29,7 +30,7 @@ vp/
 │   ├── static/                   served at /static/vp/ (STATICFILES_DIRS prefix)
 │   │   ├── studio.css
 │   │   └── js/casemodel.js       case rules in the browser (mirror of casedoc.py)
-│   │       js/studio.js          Vue 3 app (CDN, runtime templates, [[ ]] delimiters)
+│   │       js/studio.js          Vue 3 app: editor + player (CDN, runtime templates, [[ ]] delimiters)
 │   └── tests/casemodel.test.mjs  node --test (no dependencies)
 └── docs/                         public docs (published with the platform site)
 ```
@@ -53,10 +54,22 @@ vp/
    the assistant/preview instructions come from the active **content pack**,
    never from code. Step types, element kinds, strategy categories, side-info
    presets, system fields and level profiles are structural and live in code.
-5. Strategy `instruction` texts and the `assist`/`preview` sections stay on
-   the server; `/vp/api/content/` strips them.
-6. LLM calls go through `llm.services.chat()` with a `purpose` tag
-   (`vp.assist.<mode>`, `vp.preview.<kind>`). Never call a provider SDK from
+5. **Prompts live in the case.** New cases copy the pack's agent prompts
+   (`agentPrompts`) and strategy instructions (`strategyPrompts`); authors
+   edit them in the Strategies panel. The pack's `assist`, `preview` and
+   `runtime` sections stay on the server (`/vp/api/content/` strips them).
+6. **Player.** `runtime.Player` runs a case from a state dict (stored in
+   `Session.state`); the rules are documented at the top of `runtime.py`.
+   Interactions end by turn limit (`maxTurns`, required), the author's
+   `endsWhen` (LLM check, optional) or the student's "I'm done"
+   (`allowStudentExit`). The hidden evaluator uses only expert explanations
+   (side info with `generateFromCase`). Every session action works on a
+   copy of the state and is saved only if all LLM calls succeed.
+7. **Access.** "try" sessions: the case owner, playing a given (possibly
+   unsaved) document. "play" sessions: any signed-in user, published copy
+   only, via `/vp/play/<case id>/`; resumed per published revision.
+8. LLM calls go through `llm.services.chat()` with a `purpose` tag
+   (`vp.assist.<mode>`, `vp.preview.<kind>`, `vp.play.<generate|agent|exit|evaluate|feedback>`). Never call a provider SDK from
    vp code; never send a key or a key path to the browser.
 
 ## Conventions

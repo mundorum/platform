@@ -145,3 +145,40 @@ def test_resolve_fields_for_preview():
         'after {{welcome.answer}}. {{transcript}}', doc, 2)
     assert text == ('Discuss A 60-year-old patient. at beginner level with 4 hints, '
                     'after [the student’s answer in “Welcome & case 1”]. [transcript]')
+
+
+@pytest.mark.parametrize('turns, ok', [(1, True), (50, True), (0, False), (51, False), ('8', False), (True, False)])
+def test_interaction_turn_limit_is_validated(turns, ok):
+    doc = make_doc()
+    step_of(doc, 'explain')['elements'][2]['maxTurns'] = turns
+    if ok:
+        casedoc.validate_document(doc)
+    else:
+        with pytest.raises(casedoc.DocumentError, match='maxTurns'):
+            casedoc.validate_document(doc)
+
+
+def test_new_cases_store_agent_and_strategy_prompts():
+    doc = make_doc()
+    assert set(doc['agentPrompts']) == {'tutor_persona', 'patient_persona', 'guardrails'}
+    assert doc['strategyPrompts']['hints']
+    explain = step_of(doc, 'explain')['elements'][2]
+    assert (explain['maxTurns'], explain['allowStudentExit']) == (8, True)
+    assert explain['endsWhen']
+    doc['strategyPrompts']['hints'] = 42
+    with pytest.raises(casedoc.DocumentError, match='strategyPrompts'):
+        casedoc.validate_document(doc)
+
+
+def test_fields_in_ends_when_are_checked():
+    doc = fill_all(make_doc())
+    step_of(doc, 'know')['elements'][2]['endsWhen'] = 'When {{mystery}} is done.'
+    assert any('{{mystery}} is not a known field' in p for p in casedoc.publish_problems(doc))
+
+
+def test_resolve_fields_with_a_live_session():
+    doc = make_doc()
+    text = casedoc.resolve_fields('{{welcome.answer}} / {{prev.answer}} / {{transcript}} / {{case2.answer}}',
+                                  doc, 1, session={'answers': {'welcome.answer': 'HELLO'},
+                                                   'transcript': 'T'})
+    assert text == 'HELLO / HELLO / T / (no answer)'

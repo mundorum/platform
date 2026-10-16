@@ -174,3 +174,34 @@ test('collapsed summary', () => {
   assert.equal(M.collapsedSummary(stepOf(doc, 'welcome')), 'First line');
   assert.equal(M.collapsedSummary({ elements: [] }), 'No elements yet');
 });
+
+test('new cases carry agent and strategy prompts; interactions carry turn settings', () => {
+  const doc = M.newCase(pack, 'recall_explain');
+  assert.deepEqual(Object.keys(doc.agentPrompts), ['tutor_persona', 'patient_persona', 'guardrails']);
+  assert.equal(doc.strategyPrompts.hints, catalog.hints.instruction);
+  const discussion = stepOf(doc, 'explain').elements[2];
+  assert.equal(discussion.maxTurns, 8);
+  assert.equal(discussion.allowStudentExit, true);
+  assert.ok(discussion.endsWhen);
+  const fresh = M.newElement('interaction');
+  assert.deepEqual([fresh.maxTurns, fresh.allowStudentExit, fresh.endsWhen], [8, true, '']);
+});
+
+test('older cases are brought up to date without losing their edits', () => {
+  const doc = M.newCase(pack, 'recall_explain');
+  delete doc.agentPrompts;
+  doc.strategyPrompts = { hints: 'MINE' };
+  const discussion = stepOf(doc, 'explain').elements[2];
+  delete discussion.maxTurns;
+  M.ensureCaseDefaults(doc, pack);
+  assert.equal(doc.strategyPrompts.hints, 'MINE');
+  assert.equal(doc.strategyPrompts.direct, catalog.direct.instruction);
+  assert.equal(doc.agentPrompts.guardrails, pack.agents.guardrails);
+  assert.equal(discussion.maxTurns, 8);
+});
+
+test('fields in "Ends when…" are checked too', () => {
+  const doc = M.newCase(pack, 'recall_explain');
+  stepOf(doc, 'know').elements[2].endsWhen = 'When {{nothing.here}} happened';
+  assert.ok(M.publishProblems(doc, SYS).some(p => p.includes('{{nothing.here}} is not a known field')));
+});
