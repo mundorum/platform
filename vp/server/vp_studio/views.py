@@ -3,7 +3,7 @@ from pathlib import Path
 
 from django.db import transaction
 from django.db.models import F
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from openai import APIError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -96,6 +96,15 @@ class CaseViewSet(viewsets.ModelViewSet):
         name = casedoc.slug(case.title) or 'case'
         response = Response(services.export_case(case))
         response['Content-Disposition'] = f'attachment; filename="{name}.vp.json"'
+        return response
+
+    @action(detail=True, methods=['get'], url_path='export-gno')
+    def export_gno(self, request, pk=None):
+        """The case as a gnō- narrative (.gno), for reading — never imported back."""
+        case = self.get_object()
+        name = casedoc.slug(case.title) or 'case'
+        response = HttpResponse(services.export_gno(case), content_type='text/plain; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{name}.gno"'
         return response
 
     @action(detail=False, methods=['post'], url_path='import')

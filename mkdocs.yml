@@ -52,3 +52,4 @@ nav:
   - VP Studio:
       - Overview: vp/index.md
       - Content packs: vp/content-packs.md
+      - Export as gnō-: vp/gno-export.md

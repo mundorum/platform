@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from llm import services as llm
 
-from . import casedoc, runtime
+from . import casedoc, gnoexport, runtime
 from .content import ContentError, placeholder_pack, strategy_map, validate_pack
 from .models import Case, ContentPack, PreviewSample, Session
 
@@ -260,6 +260,11 @@ def export_case(case) -> dict:
                                   exported_at=timezone.now().isoformat(timespec='seconds'))
 
 
+def export_gno(case) -> str:
+    """The case as a gnō- narrative, for reading (see gnoexport.py)."""
+    return gnoexport.to_gno(case.document, active_pack())
+
+
 def import_case(user, data) -> Case:
     """A new draft case for `user` from an exported file (or a bare document)."""
     try:
@@ -362,4 +367,4 @@ def session_view(session: Session) -> dict:
 
 __all__ = ['StudioError', 'ContentError', 'active_pack', 'load_pack', 'public_pack',
            'assist', 'preview_sample', 'publish', 'NotAllowed', 'playable_case', 'start_session',
-           'act', 'session_view', 'export_case', 'import_case']
+           'act', 'session_view', 'export_case', 'export_gno', 'import_case']

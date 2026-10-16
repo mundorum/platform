@@ -238,3 +238,15 @@ def test_import_accepts_a_bare_document_and_rejects_junk(api):
 def test_export_is_owner_only(api):
     case = create_case(api)
     assert client_for('other@example.org').get(f"/vp/api/cases/{case['id']}/export/").status_code == 404
+
+
+def test_export_gno_is_a_readable_text_file(api):
+    case = create_case(api, make_doc(title='Original'))
+    r = api.get(f"/vp/api/cases/{case['id']}/export-gno/")
+    assert r.status_code == 200
+    assert r['Content-Type'] == 'text/plain; charset=utf-8'
+    assert r['Content-Disposition'] == 'attachment; filename="original.gno"'
+    text = r.content.decode()
+    assert text.startswith('# Welcome & case 1: Original (Start)')
+    assert '===== Data =====' in text
+    assert client_for('other@example.org').get(f"/vp/api/cases/{case['id']}/export-gno/").status_code == 404

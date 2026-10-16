@@ -75,6 +75,9 @@ per turn or at end.
   it to share cases between authors or servers, keep backups, or write
   cases outside the editor. A file can also hold a bare case document. The
   server validates the structure on import.
+- **Export as gnō-.** *Export gnō-* (in Case settings) downloads the case
+  as a readable `.gno` narrative, for reviewing and discussing the activity.
+  It is export-only. See [Export as gnō-](gno-export.md).
 - **Save** (Ctrl+S) stores the case. **Publish** checks the readiness
   requirements, then freezes a published copy. Students always play the
   published copy; later edits reach them only when you publish again.
@@ -152,6 +155,7 @@ API (all require the sign-in token):
 | `GET/PUT/DELETE` | `/vp/api/cases/{id}/` | Read / save (send `base_revision` to detect concurrent edits → 409) / delete |
 | `POST` | `/vp/api/cases/{id}/publish/` | Publish, or `400` with `problems` |
 | `GET` | `/vp/api/cases/{id}/export/` | The case file: `{format: "mundorum-vp-case", version: 1, title, exported_at, revision, document}` |
+| `GET` | `/vp/api/cases/{id}/export-gno/` | The case as a gnō- narrative (`text/plain`, `<slug>.gno`); export-only |
 | `POST` | `/vp/api/cases/import/` | A case file (or a bare document) → a new draft case, or `400` with the reason |
 | `POST` | `/vp/api/assist/` | `{mode, document, step, element, side?, instruction?}` → `{text}` |
 | `POST` | `/vp/api/preview-sample/` | `{document, step, element, refresh?}` → `{kind, text \| turns, cached}` |

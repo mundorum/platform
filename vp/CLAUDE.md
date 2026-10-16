@@ -2,7 +2,8 @@
 
 VP Studio: authoring and playing **virtual patient** activities, in which LLM
 agents (tutor, evaluator, optional patient) guide a student through clinical
-cases. Human-readable docs: `docs/index.md`, `docs/content-packs.md`.
+cases. Human-readable docs: `docs/index.md`, `docs/content-packs.md`,
+`docs/gno-export.md`.
 
 vp has no server of its own. Its Django app runs on the platform's shared
 server (`../server/`), mounted at `/vp/`, with the shared database, Google
@@ -20,6 +21,7 @@ vp/
 │       ├── content.py            content-pack validation + new-case building — pure Python
 │       ├── content/placeholder.json   neutral public content pack
 │       ├── runtime.py            the player's step machine — pure Python, LLM injected
+│       ├── gnoexport.py          case → readable gnō- narrative (export only) — pure Python
 │       ├── models.py             Case (one JSON document), ContentPack, PreviewSample, Session
 │       ├── services.py           assistant, preview samples, publishing, player sessions
 │       ├── views.py / urls.py    /vp/ page + /vp/api/…
@@ -71,6 +73,11 @@ vp/
 8. LLM calls go through `llm.services.chat()` with a `purpose` tag
    (`vp.assist.<mode>`, `vp.preview.<kind>`, `vp.play.<generate|agent|exit|evaluate|feedback>`). Never call a provider SDK from
    vp code; never send a key or a key path to the browser.
+9. **gnō- export is one-way and for reading.** `gnoexport.py` writes a case
+   as a `.gno` narrative (`docs/gno-export.md`); nothing imports or runs it.
+   Its extensions (`>>` bindings, `>` prompts, the `===== Data =====` layer)
+   are vp conventions: they live here and never change `gno/`. Export only
+   what the case holds; prompt fallbacks follow `runtime.Player`.
 
 ## Conventions
 

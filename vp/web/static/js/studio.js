@@ -236,19 +236,35 @@ async function publish() {
 
 // ── export / import ──────────────────────────────────────────────────────────
 
+function download(name, content, type) {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([content], { type }));
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
 async function exportCase(id) {
   // Export what the author sees: save pending edits of the open case first.
   if (store.current?.id === id && dirty.value && !(await save({ quiet: true }))) return;
   try {
     const data = await api(`/vp/api/cases/${id}/export/`);
-    const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${M.slug(data.title) || 'case'}.vp.json`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    download(`${M.slug(data.title) || 'case'}.vp.json`, `${JSON.stringify(data, null, 2)}\n`, 'application/json');
+  } catch (e) {
+    toast(`Could not export: ${e.message}`, { kind: 'error' });
+  }
+}
+
+/** The case as a gnō- narrative (.gno), for reading only. */
+async function exportGno(id) {
+  if (store.current?.id === id && dirty.value && !(await save({ quiet: true }))) return;
+  try {
+    const r = await apiFetch(`/vp/api/cases/${id}/export-gno/`);
+    if (!r.ok) throw new Error(`Request failed (${r.status})`);
+    const name = /filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '')?.[1] || 'case.gno';
+    download(name, await r.text(), 'text/plain;charset=utf-8');
   } catch (e) {
     toast(`Could not export: ${e.message}`, { kind: 'error' });
   }
@@ -1136,7 +1152,7 @@ const EditorView = {
       withUndo('Script switched.', () => M.applyTemplate(store.doc, store.pack, id));
       store.ui.openStep = store.doc.steps[0].id;
     }
-    return { store, reqs, met, pw, sideBySide, maxWidth, columns, templateName, legend, applyTemplate, exportCase };
+    return { store, reqs, met, pw, sideBySide, maxWidth, columns, templateName, legend, applyTemplate, exportCase, exportGno };
   },
   template: `
   <div class="editor" :style="{maxWidth}">
@@ -1180,6 +1196,8 @@ const EditorView = {
             <i class="ti ti-layout-list"></i>Script: [[ templateName ]]<i class="ti ti-chevron-down"></i></button>
           <button class="script-btn" title="Download this case as a .vp.json file (saves pending changes first)"
                   @click="exportCase(store.current.id)"><i class="ti ti-download"></i>Export JSON</button>
+          <button class="script-btn" title="Download this case as a readable gnō- narrative (.gno). Export only: it can't be imported back."
+                  @click="exportGno(store.current.id)"><i class="ti ti-script"></i>Export gnō-</button>
         </div>
         <div class="tpl-switch" v-if="store.ui.tplOpen">
           <span>Switching keeps the texts of steps that stay in the script.</span>
