@@ -234,6 +234,45 @@ async function publish() {
   }
 }
 
+// ── export / import ──────────────────────────────────────────────────────────
+
+async function exportCase(id) {
+  // Export what the author sees: save pending edits of the open case first.
+  if (store.current?.id === id && dirty.value && !(await save({ quiet: true }))) return;
+  try {
+    const data = await api(`/vp/api/cases/${id}/export/`);
+    const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${M.slug(data.title) || 'case'}.vp.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  } catch (e) {
+    toast(`Could not export: ${e.message}`, { kind: 'error' });
+  }
+}
+
+async function importCaseFile(file) {
+  if (!file || !confirmDiscard()) return;
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    toast(`“${file.name}” is not a JSON file.`, { kind: 'error' });
+    return;
+  }
+  try {
+    const created = await api('/vp/api/cases/import/', { method: 'POST', body: data });
+    setCurrent(created);
+    refreshCases();
+    toast(`Imported “${created.title || 'Untitled case'}” as a new draft.`, { ms: 3000 });
+  } catch (e) {
+    toast(e.message, { kind: 'error', ms: 8000 });
+  }
+}
+
 // ── components ───────────────────────────────────────────────────────────────
 
 const PopItem = {
@@ -318,7 +357,11 @@ const GalleryView = {
       return { ...t, icons: types.map(x => ({ icon: M.STEP_TYPES[x].icon, color: C(x) })), n: `${types.length} steps` };
     }));
     function back() { store.view = 'editor'; }
-    return { store, templates, startCase, openCase, deleteCase, back, relativeTime, STATUS_LABEL, copyStudentLink };
+    const fileInput = ref(null);
+    function pickFile() { fileInput.value.value = ''; fileInput.value.click(); }
+    function onFile(e) { importCaseFile(e.target.files[0]); }
+    return { store, templates, startCase, openCase, deleteCase, back, relativeTime, STATUS_LABEL, copyStudentLink,
+             exportCase, fileInput, pickFile, onFile };
   },
   template: `
   <div class="gallery">
@@ -327,7 +370,12 @@ const GalleryView = {
         <h1>Start a new virtual patient</h1>
         <span class="gallery-sub">Pick a script to begin with, or build the steps yourself. You can change everything later.</span>
       </div>
-      <button v-if="store.doc" class="btn-back" @click="back"><i class="ti ti-arrow-left"></i>Back to current case</button>
+      <div class="gallery-actions">
+        <button class="btn-back" @click="pickFile" title="Create a case from a .vp.json file exported from VP Studio">
+          <i class="ti ti-file-import"></i>Import a case</button>
+        <button v-if="store.doc" class="btn-back" @click="back"><i class="ti ti-arrow-left"></i>Back to current case</button>
+      </div>
+      <input ref="fileInput" type="file" accept=".json,application/json" hidden @change="onFile">
     </div>
     <div v-if="store.pack.placeholder" class="placeholder-note">
       <i class="ti ti-info-circle"></i>
@@ -357,6 +405,7 @@ const GalleryView = {
             <span class="case-title" :class="{untitled: !c.title}">[[ c.title || 'Untitled case' ]]</span>
             <span class="case-meta">v[[ c.revision ]] · [[ STATUS_LABEL[c.status] ]] · [[ relativeTime(c.updated_at) ]]</span>
           </button>
+          <button class="icon-btn" title="Export as JSON" @click="exportCase(c.id)"><i class="ti ti-download"></i></button>
           <button v-if="c.published_revision != null" class="icon-btn" title="Copy student link" @click="copyStudentLink(c.id)"><i class="ti ti-link"></i></button>
           <button class="icon-btn" title="Delete case" @click="deleteCase(c)"><i class="ti ti-trash"></i></button>
         </div>
@@ -1087,7 +1136,7 @@ const EditorView = {
       withUndo('Script switched.', () => M.applyTemplate(store.doc, store.pack, id));
       store.ui.openStep = store.doc.steps[0].id;
     }
-    return { store, reqs, met, pw, sideBySide, maxWidth, columns, templateName, legend, applyTemplate };
+    return { store, reqs, met, pw, sideBySide, maxWidth, columns, templateName, legend, applyTemplate, exportCase };
   },
   template: `
   <div class="editor" :style="{maxWidth}">
@@ -1129,6 +1178,8 @@ const EditorView = {
           <span><i class="ti ti-language"></i>Replies in the student’s language</span>
           <button class="script-btn" :class="{on: store.ui.tplOpen}" @click="store.ui.tplOpen = !store.ui.tplOpen">
             <i class="ti ti-layout-list"></i>Script: [[ templateName ]]<i class="ti ti-chevron-down"></i></button>
+          <button class="script-btn" title="Download this case as a .vp.json file (saves pending changes first)"
+                  @click="exportCase(store.current.id)"><i class="ti ti-download"></i>Export JSON</button>
         </div>
         <div class="tpl-switch" v-if="store.ui.tplOpen">
           <span>Switching keeps the texts of steps that stay in the script.</span>

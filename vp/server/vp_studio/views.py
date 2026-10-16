@@ -89,6 +89,24 @@ class CaseViewSet(viewsets.ModelViewSet):
             case.refresh_from_db()
         return Response(CaseSerializer(case).data)
 
+    @action(detail=True, methods=['get'])
+    def export(self, request, pk=None):
+        """The case as a JSON file (envelope + document)."""
+        case = self.get_object()
+        name = casedoc.slug(case.title) or 'case'
+        response = Response(services.export_case(case))
+        response['Content-Disposition'] = f'attachment; filename="{name}.vp.json"'
+        return response
+
+    @action(detail=False, methods=['post'], url_path='import')
+    def import_case(self, request):
+        """POST an exported file's JSON (or a bare document) → a new draft case."""
+        try:
+            case = services.import_case(request.user, request.data)
+        except services.StudioError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(CaseSerializer(case).data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=['post'])
     def publish(self, request, pk=None):
         case = self.get_object()

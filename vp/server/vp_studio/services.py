@@ -253,6 +253,22 @@ def publish(case) -> list[str]:
     return []
 
 
+# ── export / import ───────────────────────────────────────────────────────────
+
+def export_case(case) -> dict:
+    return casedoc.wrap_case_file(case.document, revision=case.revision,
+                                  exported_at=timezone.now().isoformat(timespec='seconds'))
+
+
+def import_case(user, data) -> Case:
+    """A new draft case for `user` from an exported file (or a bare document)."""
+    try:
+        doc = casedoc.unwrap_case_file(data)
+    except casedoc.DocumentError as exc:
+        raise StudioError(f'Cannot import: {exc}')
+    return Case.objects.create(owner=user, title=doc.get('title', '')[:300], document=doc)
+
+
 # ── player sessions ───────────────────────────────────────────────────────────
 
 class NotAllowed(StudioError):
@@ -346,4 +362,4 @@ def session_view(session: Session) -> dict:
 
 __all__ = ['StudioError', 'ContentError', 'active_pack', 'load_pack', 'public_pack',
            'assist', 'preview_sample', 'publish', 'NotAllowed', 'playable_case', 'start_session',
-           'act', 'session_view']
+           'act', 'session_view', 'export_case', 'import_case']

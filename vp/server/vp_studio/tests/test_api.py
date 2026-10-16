@@ -204,3 +204,37 @@ def test_final_feedback_sample_and_literal_rejection(api, fake_llm):
     r = api.post('/vp/api/preview-sample/', {'document': doc, 'step': final['id'],
                                              'element': final['elements'][1]['id']}, format='json')
     assert r.status_code == 400
+
+
+# ── export / import ───────────────────────────────────────────────────────────
+
+def test_export_then_import_creates_an_independent_copy(api):
+    case = create_case(api, fill_all(make_doc(title='Original')))
+    r = api.get(f"/vp/api/cases/{case['id']}/export/")
+    assert r.status_code == 200
+    assert r['Content-Disposition'] == 'attachment; filename="original.vp.json"'
+    exported = r.json()
+    assert (exported['format'], exported['revision'], exported['title']) == ('mundorum-vp-case', 1, 'Original')
+
+    other = client_for('colleague@example.org')
+    r = other.post('/vp/api/cases/import/', exported, format='json')
+    assert r.status_code == 201, r.content
+    imported = r.json()
+    assert imported['id'] != case['id']
+    assert (imported['title'], imported['revision'], imported['status']) == ('Original', 1, 'draft')
+    assert imported['document'] == exported['document']
+    assert [c['title'] for c in other.get('/vp/api/cases/').json()] == ['Original']
+
+
+def test_import_accepts_a_bare_document_and_rejects_junk(api):
+    r = api.post('/vp/api/cases/import/', make_doc(title='Bare'), format='json')
+    assert r.status_code == 201 and r.json()['title'] == 'Bare'
+    r = api.post('/vp/api/cases/import/', {'format': 'mundorum-vp-case', 'version': 1, 'document': {'schema': 1}},
+                 format='json')
+    assert r.status_code == 400 and r.json()['detail'].startswith('Cannot import:')
+    assert api.post('/vp/api/cases/import/', {'hello': 'world'}, format='json').status_code == 400
+
+
+def test_export_is_owner_only(api):
+    case = create_case(api)
+    assert client_for('other@example.org').get(f"/vp/api/cases/{case['id']}/export/").status_code == 404

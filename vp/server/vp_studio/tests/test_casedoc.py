@@ -182,3 +182,29 @@ def test_resolve_fields_with_a_live_session():
                                   doc, 1, session={'answers': {'welcome.answer': 'HELLO'},
                                                    'transcript': 'T'})
     assert text == 'HELLO / HELLO / T / (no answer)'
+
+
+def test_case_file_round_trip_and_bare_documents():
+    doc = make_doc()
+    wrapped = casedoc.wrap_case_file(doc, exported_at='2026-10-16T10:00:00', revision=3)
+    assert (wrapped['format'], wrapped['version'], wrapped['revision']) == ('mundorum-vp-case', 1, 3)
+    assert casedoc.unwrap_case_file(wrapped) == doc
+    assert casedoc.unwrap_case_file(doc) == doc          # bare document
+
+
+@pytest.mark.parametrize('data, message', [
+    ({'format': 'something-else', 'document': {}}, 'not a VP Studio case file'),
+    ({'format': 'mundorum-vp-case', 'version': 9, 'document': {}}, 'Unsupported case file version'),
+    ([1, 2], 'not a VP Studio case file'),
+    ({'title': 'no steps'}, 'not a VP Studio case file'),
+])
+def test_case_file_rejects_other_files(data, message):
+    with pytest.raises(casedoc.DocumentError, match=message):
+        casedoc.unwrap_case_file(data)
+
+
+def test_case_file_validates_the_document():
+    doc = make_doc()
+    doc['steps'].reverse()
+    with pytest.raises(casedoc.DocumentError, match='step order'):
+        casedoc.unwrap_case_file(casedoc.wrap_case_file(doc))

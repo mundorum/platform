@@ -69,6 +69,12 @@ per turn or at end.
   The result replaces the text; the toast offers **Undo**.
 - **Preview** shows what the student sees in the open step. **Generate
   sample** asks the LLM for an example.
+- **Export / import.** *Export JSON* (in Case settings, or the download
+  button in *Your cases*) saves the case as a `.vp.json` file. *Import a
+  case* (in the New case gallery) creates a new draft from such a file. Use
+  it to share cases between authors or servers, keep backups, or write
+  cases outside the editor. A file can also hold a bare case document. The
+  server validates the structure on import.
 - **Save** (Ctrl+S) stores the case. **Publish** checks the readiness
   requirements, then freezes a published copy. Students always play the
   published copy; later edits reach them only when you publish again.
@@ -145,6 +151,8 @@ API (all require the sign-in token):
 | `GET/POST` | `/vp/api/cases/` | List / create your cases |
 | `GET/PUT/DELETE` | `/vp/api/cases/{id}/` | Read / save (send `base_revision` to detect concurrent edits → 409) / delete |
 | `POST` | `/vp/api/cases/{id}/publish/` | Publish, or `400` with `problems` |
+| `GET` | `/vp/api/cases/{id}/export/` | The case file: `{format: "mundorum-vp-case", version: 1, title, exported_at, revision, document}` |
+| `POST` | `/vp/api/cases/import/` | A case file (or a bare document) → a new draft case, or `400` with the reason |
 | `POST` | `/vp/api/assist/` | `{mode, document, step, element, side?, instruction?}` → `{text}` |
 | `POST` | `/vp/api/preview-sample/` | `{document, step, element, refresh?}` → `{kind, text \| turns, cached}` |
 | `GET` | `/vp/api/play/{case}/` | Title and published state, for a student link |

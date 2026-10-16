@@ -473,3 +473,37 @@ def resolve_fields(text: str, doc: dict, step_index: int, session: Optional[dict
         return f'[{key}]'
 
     return FIELD_RE.sub(repl, text or '')
+
+
+# ── case files (export / import) ──────────────────────────────────────────────
+
+CASE_FILE_FORMAT = 'mundorum-vp-case'
+CASE_FILE_VERSION = 1
+
+
+def wrap_case_file(doc: dict, *, exported_at: str = '', revision: Optional[int] = None) -> dict:
+    """An exported case: the document plus an envelope that identifies it."""
+    envelope = {'format': CASE_FILE_FORMAT, 'version': CASE_FILE_VERSION,
+                'title': doc.get('title', ''), 'exported_at': exported_at}
+    if revision is not None:
+        envelope['revision'] = revision
+    return {**envelope, 'document': doc}
+
+
+def unwrap_case_file(data) -> dict:
+    """The case document inside an exported file, validated.
+
+    Accepts the envelope written by wrap_case_file() or a bare document
+    (handy for hand-written or generated cases). Raises DocumentError.
+    """
+    if isinstance(data, dict) and 'format' in data:
+        _require(data['format'] == CASE_FILE_FORMAT, 'This is not a VP Studio case file.')
+        _require(data.get('version') == CASE_FILE_VERSION,
+                 f'Unsupported case file version {data.get("version")!r} (expected {CASE_FILE_VERSION}).')
+        doc = data.get('document')
+    elif isinstance(data, dict) and 'steps' in data:
+        doc = data
+    else:
+        raise DocumentError('This is not a VP Studio case file.')
+    validate_document(doc)
+    return doc

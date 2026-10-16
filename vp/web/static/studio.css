@@ -589,3 +589,4 @@ button:disabled { cursor: not-allowed; }
 .side-btn:disabled { opacity: 0.5; }
 .side-btn i { color: var(--c-accent); }
 .side-note { font-size: 11.5px; color: var(--c-muted); line-height: 1.5; }
+.gallery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
