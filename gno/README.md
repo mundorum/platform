@@ -238,11 +238,18 @@ When dialogs share a `speech` area (and, always, for a group) they are prefixed 
 
 **Stacks.** Items can be put into *stacks*, which place them the way a CSS flexbox does: a vertical stack lines its items up top to bottom, a horizontal one left to right, and stacks can contain other stacks. Each item keeps its own size, and the stack decides its position from three settings: where the run sits along the direction (start, center, end or spread out), how each item is aligned across it, and the gap between items. Items hidden at the current pause take no room, so the rest close up. A stack with nothing visible is hidden as well. Hidden items are an empty speech area, a choice not on offer, an inactive control, or an anchor with no one on it. For example, a vertical stack aligned to the bottom, holding `speech` and then the `action_N_label` areas, shows the speech right at the bottom while there are no choices, and moves it up above them when the choices appear.
 
-**Item groups.** Items can also be put into *groups*, which keep them together exactly where they were placed: a speech area over a speech-bubble image behind it, for instance. A group moves as one, and a stack places it like any other item, its items following along. A group is hidden while every item in it that can be hidden is (an empty speech area, a choice not on offer, …), and its plain images go with it; so the bubble shows only while there is speech. A group holding plain images only is always shown. Inside a group, items are drawn back to front in the group's order.
+**Item groups.** Items can also be put into *groups*, which keep them together exactly where they were placed: a speech area over a speech-bubble image behind it, for instance. A group has no area of its own (it is just the items in it); it moves as one, and a stack places it like any other item, its items following along. A group is hidden while every item in it that can be hidden is (an empty speech area, a choice not on offer, …), and its plain images go with it; so the bubble shows only while there is speech. A group holding plain images only is always shown. Inside a group, items are drawn back to front in the group's order.
 
-The sidebar of **Presentation → Scenarios** shows the *hierarchy* of the design: stacks and groups with the items they hold, nested as they are. Clicking a row selects that item (or, while inserting into a stack or group, inserts it).
+Items go into a stack or group in either of two ways in **Presentation → Scenarios**:
+
+1. Select the stack or group (or create one with **New group**), press **Insert items**, and click the items, on the canvas or in the hierarchy.
+2. In the sidebar's *hierarchy* (the design's stacks and groups with the items they hold, nested as they are), Shift- or Ctrl-click several items and group or stack them with the buttons at its top, or drag items onto a group or stack. Dragging them onto empty space in the hierarchy takes them out again.
 
 Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without `action_N` / `action_N_label`), so a scene can never get stuck; `Space` always continues.
+
+## Side panels
+
+Every side panel can be resized by dragging its inner edge: the left navigation, the Editor's preview, the Graph's scene panel, the Scenarios sidebar and the Player's entity panel. Double-clicking an edge restores the default width. The widths are remembered in this browser.
 
 ## Browser Storage (Save / Load)
 

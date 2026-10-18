@@ -52,6 +52,18 @@ lines), when making changes prefer `grep -n` for the section comments (each
 major function is preceded by a comment explaining its *why*) over reading
 the file top to bottom.
 
+## Resizable side panels
+
+Each side panel has a `.panel-splitter` on its inner edge (the left
+navigation's sits absolutely at the left of `#main-area`). `startPanelResize`
+tracks the pointer on `window` and writes `panelWidths` (`nav`, `preview` —
+`null` means half and half with the source —, `scenarioSide`,
+`playerEntities`), clamped by `PANEL_LIMITS`; double-click resets one. While
+dragging, `#app.resizing` turns off the grid transition and pointer events
+elsewhere. Widths are a per-browser convenience in their own `localStorage`
+key (`gno-panel-widths`), not part of the narrative bundle. The Graph's scene
+panel keeps its own older handle (`onPanelResizeDown`, `nodePanelWidth`).
+
 ## The four views
 
 The editor is one Vue app with a `view` ref switching between four panels;
@@ -103,7 +115,9 @@ all persisted together as `_presentation.yaml`:
   was written (`entityWrittenRef`): `extraEntities` keeps the typed form
   (re-typing a declared group in another order replaces it), occurrences carry
   `written`, and the app's `entityLabel(key)` picks the typed form first, then
-  the narrative's first one.
+  the narrative's first one. The Editor preview and the text Player show
+  each occurrence as written (`entityBlockHtml` uses `occ.written`; the
+  roster lists a group's members in written order).
 - **Scenarios** — a small SVG design canvas per scenario
   (`buildScenarioSvg`/`parseScenarioSvg`), downloaded as one `.svg` file per
   scenario inside the export zip.
@@ -114,7 +128,7 @@ all persisted together as `_presentation.yaml`:
     selects, moves and resizes them; it is the only mode in which items take
     the pointer (`.scenario-svg.editing`) and the inspector shows a
     selection. **Place: Text** / **Place: Vertical stack** / **Place:
-    Horizontal stack** / **Place: Group** draw a new text area, stack or group, and then switch to Edit
+    Horizontal stack** draw a new text area or stack, and then switch to Edit
     with it selected. Entities are added by dragging a tile from the palette,
     in any mode.
   - *Items:* entities, text areas and stacks are placed on it; anchors are
@@ -157,8 +171,12 @@ all persisted together as `_presentation.yaml`:
     empty `<g data-gno-layout="column|row">` whose settings and child ids
     are in `data-gno-*` attributes. The children stay flat in the SVG's
     z-order.
-  - *Groups* (`kind: 'group'`, `cleanGroup`) are the other container: a box
-    and `children`, with no placement rule of their own. Children keep their
+  - *Groups* (`kind: 'group'`, `cleanGroup`) are the other container:
+    `children`, with no area and no placement rule of their own. Their box is
+    always the union of their children's (`fitGroups`, run after each
+    relayout, inner groups first), which is what a stack sizes them by; it is
+    only drawn, as a frame around the items. "New group" makes an empty one
+    and starts inserting into it. Children keep their
     absolute x/y; moving the group (drag or X/Y) moves them along
     (`translateItem`), and when a stack places the group, `layoutBoxes`
     shifts them by the group's displacement. Stacks and groups nest freely
@@ -166,7 +184,7 @@ all persisted together as `_presentation.yaml`:
     `children` are back to front and mirror the design's z-order: inserting
     files the item by its z-index, and reordering permutes the children's
     slots in `items` (`moveLayoutChild`). Inserting also grows the box to
-    take the item in; "Fit to items" shrinks it to them. Visibility in play:
+    Visibility in play:
     a group is shown while any child that can hide (anything but a plain,
     non-action entity image, `isDecorItem`) is, else everything inside it is
     hidden (`layoutBoxes` returns that set as `hidden`). Exported as an empty
@@ -174,7 +192,15 @@ all persisted together as `_presentation.yaml`:
   - *Hierarchy:* the sidebar lists the design as a tree (`designTree`):
     top-level items in z-order, containers with their children indented.
     A row selects its item (switching to Edit), or inserts it while a
-    container is collecting items.
+    container is collecting items. Shift/Ctrl/Cmd-click builds a multiple
+    selection (`treeSelection`; the last one picked is the inspector's
+    `selectedItemId`, and a canvas selection resets it). `wrapTreeSelection`
+    puts it into a new group (children in z-order) or stack (children in
+    their order along its direction, box = their union), which takes their
+    place in their container when they all shared one. Rows are draggable
+    (HTML5 DnD, `treeDrag`): dropped on a container they go in through
+    `insertIntoLayout` (no cycles), dropped on empty space in the panel they
+    go to the top level.
   - *Wide editor:* a toolbar button lifts the whole workspace (toolbar,
     canvas, sidebar) into a fixed full-window layer (`.scenario-workspace.wide`),
     hiding the app's top bar, navigation and the 900px page column. Esc (or
