@@ -2293,7 +2293,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                           <foreignObject class="scenario-text-fo" :x="item.x" :y="item.y" :width="item.w" :height="item.h">
                             <div class="scenario-text-body" :style="{fontFamily: item.fontFamily, fontSize: item.fontSize + 'px', color: item.color}">{{ item.text }}</div>
                           </foreignObject>
-                          <text :x="item.x" :y="item.y - 3" font-size="9" fill="var(--c-muted)" style="pointer-events:none;">{{ item.svgId }}</text>
+                          <text :x="item.x" :y="item.y - 3" font-size="9" fill="var(--c-muted)" style="pointer-events:none;">{{ itemRoleId(item) }}</text>
                           <text v-if="placeMode === 'edit'" :x="item.x + item.w - 2" :y="item.y - 3" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
                           <rect
                             v-if="selectedItemId === item.svgId"
@@ -2400,7 +2400,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                         <label class="inspector-label">Items, back to front</label>
                         <div class="inspector-children" v-if="selectedItem.children.length">
                           <div class="inspector-child" v-for="(cid, ci) in selectedItem.children" :key="cid">
-                            <span :title="cid">{{ cid }}</span>
+                            <span :title="roleIdOf(cid)">{{ roleIdOf(cid) }}</span>
                             <button title="Further back" :disabled="ci === 0" @click="moveLayoutChild(selectedItem, ci, -1)"><i class="ti ti-arrow-up"></i></button>
                             <button title="Further front" :disabled="ci === selectedItem.children.length - 1" @click="moveLayoutChild(selectedItem, ci, 1)"><i class="ti ti-arrow-down"></i></button>
                             <button title="Take out of the group" @click="selectedItem.children.splice(ci, 1)"><i class="ti ti-x"></i></button>
@@ -2446,7 +2446,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                         <label class="inspector-label">Items, in order</label>
                         <div class="inspector-children" v-if="selectedItem.children.length">
                           <div class="inspector-child" v-for="(cid, ci) in selectedItem.children" :key="cid">
-                            <span :title="cid">{{ cid }}</span>
+                            <span :title="roleIdOf(cid)">{{ roleIdOf(cid) }}</span>
                             <button title="Earlier" :disabled="ci === 0" @click="moveLayoutChild(selectedItem, ci, -1)"><i class="ti ti-arrow-up"></i></button>
                             <button title="Later" :disabled="ci === selectedItem.children.length - 1" @click="moveLayoutChild(selectedItem, ci, 1)"><i class="ti ti-arrow-down"></i></button>
                             <button title="Take out of the stack" @click="selectedItem.children.splice(ci, 1)"><i class="ti ti-x"></i></button>
@@ -2511,7 +2511,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                          @dragover.stop="onTreeDragOver($event, row.item)" @drop.stop="onTreeDrop($event, row.item)"
                          @click="selectTreeItem(row.item, $event)">
                       <i class="ti" :class="itemIcon(row.item)"></i>
-                      <span class="scenario-tree-id">{{ row.item.svgId }}</span>
+                      <span class="scenario-tree-id">{{ itemRoleId(row.item) }}</span>
                       <span class="scenario-tree-kind" v-if="row.item.kind === 'layout' || row.item.kind === 'group'">{{ row.item.children.length }}</span>
                     </div>
                     <div class="inspector-empty" v-if="!designTree.length">Nothing placed yet.</div>
@@ -3297,20 +3297,56 @@ function foldStageFrames(eventsByBeat, associations, anchorKeys) {
   });
 }
 
-// Which special role, if any, a scenario item plays. Entities named
-// `action_proceed` / `action_regress` / `action_N` are buttons; text areas named
-// `action_N_label` (or `_text`) carry the label of choice N.
+// Text areas and the other items have separate IDs: while authoring, a text
+// area and an entity can both be called `action_1` or `speech` — a pair that
+// plays one role together. Behind the scenes (in the design data and the SVG)
+// a text area's id always carries the `_text` suffix, so every svgId stays
+// unique: `action_1` + `action_1_text`, `speech` + `speech_text`.
+const TEXT_ID_SUFFIX = '_text';
+
+// The ID an item is authored by: a text area's svgId without its suffix.
+function itemRoleId(item) {
+  return item.kind === 'text' && item.svgId.endsWith(TEXT_ID_SUFFIX)
+    ? item.svgId.slice(0, -TEXT_ID_SUFFIX.length)
+    : item.svgId;
+}
+
+// The svgId a typed ID stands for. For a text area, a suffix typed out
+// (`action_1_text`, or the former `action_1_label`) is dropped first, since
+// the suffix is the system's to add.
+function roleSvgId(kind, id) {
+  return kind === 'text' ? id.replace(/_(?:text|label)$/, '') + TEXT_ID_SUFFIX : id;
+}
+
+// Designs made before the suffix existed: their text areas were named
+// `speech`, `text_1` or `action_N_label` (`action_N_text` already fits). Gives
+// each its suffix and follows the rename through the containers' lists.
+function migrateTextIds(design) {
+  const used = new Set(design.items.map(it => it.svgId));
+  design.items.forEach(it => {
+    if (it.kind !== 'text' || it.svgId.endsWith(TEXT_ID_SUFFIX)) return;
+    const base = it.svgId.replace(/_label$/, '');
+    let id = base + TEXT_ID_SUFFIX, n = 1;
+    while (used.has(id)) id = `${base}_${n++}${TEXT_ID_SUFFIX}`;
+    design.items.forEach(c => {
+      if (isContainer(c)) c.children = c.children.map(cid => (cid === it.svgId ? id : cid));
+    });
+    used.add(id);
+    it.svgId = id;
+  });
+  return design;
+}
+
+// Which special role, if any, a scenario item plays — the same for both items
+// of a pair. `action_proceed` / `action_regress` / `action_N` are buttons; the
+// text area of `action_N` carries the label of choice N.
 function actionRole(item) {
-  const key = idKey(item.svgId);
-  if (item.kind === 'entity') {
-    if (key === 'action_proceed') return { kind: 'proceed' };
-    if (key === 'action_regress') return { kind: 'regress' };
-    const m = /^action_(\d+)$/.exec(key);
-    if (m) return { kind: 'choice', n: parseInt(m[1], 10) };
-  } else if (item.kind === 'text') {
-    const m = /^action_(\d+)_(?:label|text)$/.exec(key);
-    if (m) return { kind: 'choice', n: parseInt(m[1], 10) };
-  }
+  if (item.kind !== 'entity' && item.kind !== 'text') return null;
+  const key = idKey(itemRoleId(item));
+  if (key === 'action_proceed') return { kind: 'proceed' };
+  if (key === 'action_regress') return { kind: 'regress' };
+  const m = /^action_(\d+)$/.exec(key);
+  if (m) return { kind: 'choice', n: parseInt(m[1], 10) };
   return null;
 }
 
@@ -3328,7 +3364,10 @@ function scenarioActionSlots(design) {
   return slots;
 }
 
-const isSpeechArea = item => item.kind === 'text' && /(^|\.)speech$/.test(idKey(item.svgId));
+// `speech`, `_.speech`, `king.speech`: the text area shows the speech; an
+// entity of the same ID (a speech bubble) shows only while it has some.
+const isSpeechRole = item => (item.kind === 'text' || item.kind === 'entity') && /(^|\.)speech$/.test(idKey(itemRoleId(item)));
+const isSpeechArea = item => item.kind === 'text' && isSpeechRole(item);
 
 // Sends each piece of a beat's speech to a text area: prose to `_.speech`,
 // a character's dialog to `<entity>.speech`, either falling back to `speech`.
@@ -3337,7 +3376,7 @@ const isSpeechArea = item => item.kind === 'text' && /(^|\.)speech$/.test(idKey(
 // that isn't the speaker's own names the speaker.
 // Speech with no area to go to isn't shown. Returns Map(svgId -> html).
 function routeSpeech(items, design) {
-  const areas = new Map(design.items.filter(isSpeechArea).map(it => [idKey(it.svgId), it.svgId]));
+  const areas = new Map(design.items.filter(isSpeechArea).map(it => [idKey(itemRoleId(it)), it.svgId]));
   const out = new Map();
   items.forEach(it => {
     let key, html;
@@ -3394,9 +3433,10 @@ function itemBox(item) {
     : { x: item.x, y: item.y, w: item.w, h: item.h };
 }
 
-// An entity image that never hides on its own (not a control or a choice).
+// An entity image that never hides on its own (not a control, a choice or
+// a speech bubble).
 function isDecorItem(item) {
-  return item.kind === 'entity' && !actionRole(item);
+  return item.kind === 'entity' && !actionRole(item) && !isSpeechRole(item);
 }
 
 function layoutBoxes(design, isVisible, keepEmpty = false) {
@@ -3504,11 +3544,18 @@ function buildPlayerStage(design, ctx) {
       }
     }
     if (item.kind === 'entity') {
+      if (isSpeechRole(item)) {
+        // a speech bubble goes with its text area's speech
+        const key = idKey(item.svgId);
+        const area = design.items.find(it => isSpeechArea(it) && idKey(itemRoleId(it)) === key);
+        if (!area || !ctx.speech.get(area.svgId)) return;
+      }
       shown.set(item.svgId, [{ key: item.svgId, type: 'image', url: item.url, click }]);
     } else {
       const style = `font-family:${item.fontFamily};font-size:${item.fontSize}px;color:${item.color};`;
       let html, pre = false, live = false;
       if (choice) html = escH(choice.label);
+      else if (role) { html = escH(item.text); pre = true; } // a Continue / Back label
       else if (isSpeechArea(item)) {
         // Like a choice with nothing to offer, a speech area with nothing to
         // say is hidden rather than drawn as an empty box.
@@ -4076,7 +4123,7 @@ function parseScenarioSvg(svgText) {
       });
     }
   });
-  return { background, width, height, items };
+  return migrateTextIds({ background, width, height, items });
 }
 
 /* ── PERSISTED-SHAPE SANITIZERS ──
@@ -4201,12 +4248,12 @@ function sanitizeScenarioDesigns(raw) {
       const items = Array.isArray(design.items)
         ? design.items.map(sanitizeScenarioItem).filter(Boolean)
         : [];
-      out[name] = {
+      out[name] = migrateTextIds({
         background: design.background && typeof design.background === 'object' ? design.background : null,
         width: typeof design.width === 'number' ? design.width : 960,
         height: typeof design.height === 'number' ? design.height : 540,
         items,
-      };
+      });
     });
   }
   return out;
@@ -5099,6 +5146,14 @@ createApp({
       return rows;
     });
 
+    // The authored ID of the item `svgId` names in the open design (a
+    // container's list holds svgIds).
+    function roleIdOf(svgId) {
+      const design = scenarioDesigns[openScenario.value];
+      const item = design && design.items.find(it => it.svgId === svgId);
+      return item ? itemRoleId(item) : svgId;
+    }
+
     function itemIcon(item) {
       if (item.kind === 'layout') return item.direction === 'row' ? 'ti-layout-columns' : 'ti-layout-rows';
       return { entity: 'ti-user', anchor: 'ti-map-pin', text: 'ti-typography', group: 'ti-stack-2' }[item.kind] || 'ti-square';
@@ -5238,16 +5293,30 @@ createApp({
 
     // Re-seed the ID field whenever the selection (or the selected item's own
     // ID) changes, discarding any half-typed draft and its error.
-    watch(() => selectedItem.value && selectedItem.value.svgId, id => {
-      idDraft.value = id || '';
+    watch(() => selectedItem.value && selectedItem.value.svgId, () => {
+      idDraft.value = selectedItem.value ? itemRoleId(selectedItem.value) : '';
       idError.value = '';
     });
 
+    // `id` is the authored ID; a text area and an entity may share one (see
+    // TEXT_ID_SUFFIX), two items of the same sort may not.
     function scenarioItemIdError(design, item, id) {
       if (!id) return 'The ID cannot be empty.';
       if (!/^[\p{L}_][\p{L}\p{N}_.\-]*$/u.test(id)) return 'Use letters, digits, "_", "." or "-", and don\'t start with a digit.';
-      if (id !== item.svgId && usedItemIds(design).has(id)) return 'That ID is already used in this scenario.';
+      if (item.kind === 'text' && !id.replace(/_(?:text|label)$/, '')) return 'The ID cannot be only a suffix.';
+      const svgId = roleSvgId(item.kind, id);
+      if (svgId !== item.svgId && usedItemIds(design).has(svgId)) {
+        return item.kind === 'text' ? 'Another text area has that ID.' : 'That ID is already used in this scenario.';
+      }
       return '';
+    }
+
+    // The authored IDs taken for items of `kind`: for a text area, those whose
+    // suffixed svgId is taken.
+    function usedRoleIds(design, kind) {
+      const used = usedItemIds(design);
+      if (kind !== 'text') return used;
+      return new Set([...used].filter(id => id.endsWith(TEXT_ID_SUFFIX)).map(id => id.slice(0, -TEXT_ID_SUFFIX.length)));
     }
 
     function onIdDraftInput() {
@@ -5264,30 +5333,36 @@ createApp({
       const err = scenarioItemIdError(design, item, id);
       idError.value = err;
       if (err) return;
-      idDraft.value = id;
-      renameLayoutRefs(design, item.svgId, id);
-      if (layoutPick.value === item.svgId) layoutPick.value = id;
-      item.svgId = id;
-      selectedItemId.value = id;
+      const svgId = roleSvgId(item.kind, id);
+      renameLayoutRefs(design, item.svgId, svgId);
+      if (layoutPick.value === item.svgId) layoutPick.value = svgId;
+      item.svgId = svgId;
+      selectedItemId.value = svgId;
+      idDraft.value = itemRoleId(item);
     }
 
-    // Suggested IDs, offered for every kind of item; text areas get a few
-    // more, since they're where dialog lines end up being shown. Only IDs
-    // still free in the scenario are offered.
+    // Suggested IDs for entities and text areas, still free for the item's
+    // sort. First come the action and speech IDs the other sort already uses
+    // without a partner — naming the text of an `action_1` entity `action_1`
+    // too makes it that choice's label.
     const idSuggestions = computed(() => {
       const item = selectedItem.value;
       const design = scenarioDesigns[openScenario.value];
-      if (!item || !design) return [];
-      const used = usedItemIds(design);
+      if (!item || !design || (item.kind !== 'entity' && item.kind !== 'text')) return [];
+      const used = usedRoleIds(design, item.kind);
+      const other = item.kind === 'text' ? 'entity' : 'text';
+      const partners = design.items
+        .filter(it => it.kind === other && (actionRole(it) || isSpeechRole(it)))
+        .map(itemRoleId)
+        .filter(id => !used.has(id));
       const list = [
+        ...partners,
         nextSeqId(used, 'action_'),
-        nextSeqId(used, 'action_', '_label'),
         'action_proceed',
         'action_regress',
+        'speech', '_.speech', 'entity.speech',
       ];
-      if (isContainer(item)) return [];
-      if (item.kind === 'text') list.push('speech', '_.speech', 'entity.speech');
-      return list.filter(id => !used.has(id));
+      return [...new Set(list)].filter(id => !used.has(id) && id !== itemRoleId(item));
     });
 
     // Numeric fields of the selected item (position/size/font size): blank or
@@ -5390,7 +5465,7 @@ createApp({
       const box = { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h) };
       let svgId;
       if (d.kind === 'text') {
-        svgId = nextSeqId(usedItemIds(design), 'text_');
+        svgId = roleSvgId('text', nextSeqId(usedRoleIds(design, 'text'), 'text_'));
         design.items.push({ kind: 'text', svgId, ...TEXT_DEFAULTS, ...box });
       } else {
         svgId = nextSeqId(usedItemIds(design), 'layout_');
@@ -6240,7 +6315,7 @@ Write your scene description here.
       setItemNumber, isKnownFont, TEXT_FONTS,
       layoutPick, isDrawMode, togglePlaceMode, placeModeHint, itemCorner, setItemCorner, selectedParentLayout,
       toggleLayoutPick, moveLayoutChild, takeOutOfLayout, selectedPlacedByStack,
-      designTree, itemIcon, itemKindLabel, selectTreeItem, treeSelection, newGroup, wrapTreeSelection,
+      designTree, itemIcon, itemKindLabel, itemRoleId, roleIdOf, selectTreeItem, treeSelection, newGroup, wrapTreeSelection,
       treeDropTarget, onTreeDragStart, onTreeDragEnd, onTreeDragOver, onTreeDragLeave, onTreeDrop,
     };
   }

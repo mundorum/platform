@@ -217,6 +217,8 @@ Later mentions update what they say something about: `@king sad` changes the ima
 
 **Groups.** Entities joined in **Presentation → Entity**, by typing them with `+` in *Add entity* (for example `@king + @queen`, or `@king + @queen + @jester` for more), can have images of their own, which are used only where the narrative writes the members joined, in any order (`@king + @queen right` or `@queen + @king right`). The Presentation tab shows a group with its members in the order they were typed. Their labels work as for a single entity. While the group is on stage, it is drawn as one image and the members' own images are hidden. Mentioning a member alone (`-- @king: …`) leaves the group as it is. The group stands at the anchor it names; if it names none, it stands where its first placed member already is. `@king + @queen ->` removes the group together with its members. A member leaving on its own (`@king ->`) breaks the group up, and any remaining member shows its own image again. A group with no images of its own is the same as mentioning each member with the same labels.
 
+**IDs: entity and text pairs.** In **Presentation → Scenarios**, a text area and an entity can have the same ID: together they play the same role, the text area showing the text and the entity being its picture (a button, a speech bubble). In the exported SVG, the text area's id gets the suffix `_text` (`action_1` and `action_1_text`, `speech` and `speech_text`); typing the suffix yourself, or the former `_label`, makes no difference. Designs made before this are converted when they are opened: their text areas get the suffix (`action_1_label` becomes `action_1_text`, `speech` becomes `speech_text`).
+
 **Speech.** Text is shown in the SVG's text areas, replaced at every pause like the text view:
 
 | What | Goes to text area | Otherwise |
@@ -225,18 +227,17 @@ Later mentions update what they say something about: `@king sad` changes the ima
 | A dialog of `@king` | `king.speech` | `speech` |
 | A dialog of `@king + @queen` | `speech` | the first member's own area (`king.speech`) |
 
-When dialogs share a `speech` area (and, always, for a group) they are prefixed with the speaker's name. Text with no area to go to isn't shown, and a speech area with nothing to show at the current pause is hidden, like an unused choice.
+When dialogs share a `speech` area (and, always, for a group) they are prefixed with the speaker's name. Text with no area to go to isn't shown, and a speech area with nothing to show at the current pause is hidden, like an unused choice. An entity with the same ID as a speech area (`speech`, `_.speech`, `king.speech`), such as a speech bubble, is shown only while its text area has something to show.
 
-**Actions.** Items with these IDs are the controls:
+**Actions.** Items with these IDs are the controls. Each can be an entity, a text area, or both (a pair), and both behave the same:
 
-| ID | Kind | Behavior |
-|---|---|---|
-| `action_proceed` | entity | Visible and clickable while the scene is paused; continues. |
-| `action_regress` | entity | Visible and clickable once past the first beat; steps back to the previous beat. |
-| `action_N` | entity | Choice N (the Nth `* Label -> Target` of the scene); clickable while the choices are on offer, goes to its target. |
-| `action_N_label` | text area | Filled with choice N's label; clickable like `action_N`. (`action_N_text` is accepted as well.) |
+| ID | Behavior |
+|---|---|
+| `action_proceed` | Visible and clickable while the scene is paused; continues. A text area shows its own text ("Continue"). |
+| `action_regress` | Visible and clickable once past the first beat; steps back to the previous beat. A text area shows its own text. |
+| `action_N` | Choice N (the Nth `* Label -> Target` of the scene); clickable while the choices are on offer, goes to its target. A text area is filled with the choice's label. |
 
-**Stacks.** Items can be put into *stacks*, which place them the way a CSS flexbox does: a vertical stack lines its items up top to bottom, a horizontal one left to right, and stacks can contain other stacks. Each item keeps its own size, and the stack decides its position from three settings: where the run sits along the direction (start, center, end or spread out), how each item is aligned across it, and the gap between items. Items hidden at the current pause take no room, so the rest close up. A stack with nothing visible is hidden as well. Hidden items are an empty speech area, a choice not on offer, an inactive control, or an anchor with no one on it. For example, a vertical stack aligned to the bottom, holding `speech` and then the `action_N_label` areas, shows the speech right at the bottom while there are no choices, and moves it up above them when the choices appear.
+**Stacks.** Items can be put into *stacks*, which place them the way a CSS flexbox does: a vertical stack lines its items up top to bottom, a horizontal one left to right, and stacks can contain other stacks. Each item keeps its own size, and the stack decides its position from three settings: where the run sits along the direction (start, center, end or spread out), how each item is aligned across it, and the gap between items. Items hidden at the current pause take no room, so the rest close up. A stack with nothing visible is hidden as well. Hidden items are an empty speech area, a choice not on offer, an inactive control, or an anchor with no one on it. For example, a vertical stack aligned to the bottom, holding the `speech` text area and then the `action_N` text areas, shows the speech right at the bottom while there are no choices, and moves it up above them when the choices appear.
 
 **Item groups.** Items can also be put into *groups*, which keep them together exactly where they were placed: a speech area over a speech-bubble image behind it, for instance. A group has no area of its own (it is just the items in it); it moves as one, and a stack places it like any other item, its items following along. A group is hidden while every item in it that can be hidden is (an empty speech area, a choice not on offer, …), and its plain images go with it; so the bubble shows only while there is speech. A group holding plain images only is always shown. Inside a group, items are drawn back to front in the group's order.
 
@@ -245,7 +246,7 @@ Items go into a stack or group in either of two ways in **Presentation → Scena
 1. Select the stack or group (or create one with **New group**), press **Insert items**, and click the items, on the canvas or in the hierarchy.
 2. In the sidebar's *hierarchy* (the design's stacks and groups with the items they hold, nested as they are), Shift- or Ctrl-click several items and group or stack them with the buttons at its top, or drag items onto a group or stack. Dragging them onto empty space in the hierarchy takes them out again.
 
-Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without `action_N` / `action_N_label`), so a scene can never get stuck; `Space` always continues.
+Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without an `action_N` entity or text area), so a scene can never get stuck; `Space` always continues.
 
 ## Side panels
 

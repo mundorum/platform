@@ -133,12 +133,21 @@ all persisted together as `_presentation.yaml`:
     in any mode.
   - *Items:* entities, text areas and stacks are placed on it; anchors are
     made from entities (see below). Every item
-    has an ID, unique within the scenario, edited in the sidebar inspector
-    after placement. New anchors, text areas and stacks start as `anchor_n` /
+    has an ID, edited in the sidebar inspector after placement. Text areas
+    and the other items have separate IDs, so a text area and an entity can
+    share one and play a role as a pair (`action_1`, `speech`). Internally
+    `svgId` stays unique: a text area's always carries `TEXT_ID_SUFFIX`
+    (`_text`); `itemRoleId` gives the authored ID, `roleSvgId(kind, id)` the
+    svgId for a typed one (dropping a typed `_text`/`_label`), and
+    `migrateTextIds` (run by `sanitizeScenarioDesigns` and
+    `parseScenarioSvg`) suffixes text areas of older designs, renaming
+    `action_N_label` to `action_N_text`. The UI always shows `itemRoleId`.
+    New anchors, text areas and stacks start as `anchor_n` /
     `text_n` / `layout_n` (lowest free `n` from 1); entities start as their entity id. The
-    inspector offers suggested IDs for all kinds (`action_n`,
-    `action_n_label`, `action_proceed`, `action_regress`), plus `speech`,
-    `_.speech` and `entity.speech` for text areas.
+    inspector suggests IDs for entities and text areas: first the action and
+    speech IDs the other sort uses without a partner, then `action_n`,
+    `action_proceed`, `action_regress`, `speech`, `_.speech`,
+    `entity.speech`.
   - *Moving and resizing:* every item can be moved by dragging it or by typing
     its X/Y in the inspector. The X/Y fields always show the top-left corner,
     including for anchors, whose stored x/y is their center. The canvas
@@ -227,7 +236,9 @@ round-trip. The pipeline is a chain of pure functions:
 `buildScenePlayback` additionally returns per-beat `events` (entity mentions)
 and `speeches` (prose and dialogs, in order) → `foldStageFrames` replays the
 events into who is on stage and where, using `pickEntityImage` (best label
-match, first on ties) → `routeSpeech` assigns speech to text areas →
+match, first on ties) → `routeSpeech` assigns speech to text areas (by their authored ID; an
+entity sharing a speech area's ID, `isSpeechRole`, is shown only while that
+area has speech, and both items of an `action_*` pair follow `actionRole`) →
 `buildPlayerStage` first settles what each item shows at this moment (and so
 which items are hidden), then runs `layoutBoxes` so stacks close up around
 the hidden items, and finally emits drawable layers in the design's z-order,
