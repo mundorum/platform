@@ -2185,7 +2185,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                           <text :x="item.x + item.w - 2" :y="item.y + 10" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
                         </g>
                         <g v-else-if="item.kind === 'anchor'" :id="item.svgId" :transform="'translate(' + item.x + ',' + item.y + ')'">
-                          <ellipse :rx="item.w / 2" :ry="item.h / 2" fill="none" stroke="var(--c-accent)" :stroke-width="selectedItemId === item.svgId ? 3.5 : 2" stroke-dasharray="4,3" style="cursor: move;" @mousedown="onItemMouseDown(name, idx, item, $event)" />
+                          <rect :x="-item.w / 2" :y="-item.h / 2" :width="item.w" :height="item.h" fill="none" stroke="var(--c-accent)" :stroke-width="selectedItemId === item.svgId ? 3.5 : 2" stroke-dasharray="4,3" style="cursor: move;" @mousedown="onItemMouseDown(name, idx, item, $event)" />
                           <rect v-if="selectedItemId === item.svgId" class="scenario-selection" :x="-item.w / 2" :y="-item.h / 2" :width="item.w" :height="item.h" />
                           <text :y="item.h / 2 + 12" text-anchor="middle" font-size="9" fill="var(--c-accent)" style="pointer-events: none;">{{ item.svgId }}</text>
                           <text :x="item.w / 2" :y="-item.h / 2 + 6" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
@@ -2263,6 +2263,13 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                         </button>
                       </div>
 
+                      <label class="inspector-label">{{ selectedItem.kind === 'anchor' ? 'Center X, Y (px)' : 'Top-left X, Y (px)' }}</label>
+                      <div class="inspector-row compact">
+                        <input class="inspector-input num" type="number" title="X" :value="selectedItem.x" @change="setItemNumber(selectedItem, 'x', $event, -10000, 10000)">
+                        <span class="scenario-size-x">,</span>
+                        <input class="inspector-input num" type="number" title="Y" :value="selectedItem.y" @change="setItemNumber(selectedItem, 'y', $event, -10000, 10000)">
+                      </div>
+
                       <template v-if="selectedItem.kind === 'entity'">
                         <button class="tb-btn ghost inspector-convert" @click="convertSelectedToAnchor">
                           <i class="ti ti-map-pin"></i> Convert to anchor
@@ -2292,12 +2299,6 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                           </div>
                         </div>
 
-                        <label class="inspector-label">Position (px)</label>
-                        <div class="inspector-row compact">
-                          <input class="inspector-input num" type="number" title="X" :value="selectedItem.x" @change="setItemNumber(selectedItem, 'x', $event, -10000, 10000)">
-                          <span class="scenario-size-x">,</span>
-                          <input class="inspector-input num" type="number" title="Y" :value="selectedItem.y" @change="setItemNumber(selectedItem, 'y', $event, -10000, 10000)">
-                        </div>
                       </template>
                     </template>
                   </div>
@@ -2960,9 +2961,11 @@ function findPhrase(tokens, phrase) {
 
 // Chooses which of an entity's images fits the labels written after it: the
 // association sharing the most labels wins (a label may be several words, and
-// must then appear as such), and on a tie the first one defined. `used` holds
-// the indices of the entity's labels the winner accounted for as state, so
-// whatever is left can be read as an anchor name. Returns null without images.
+// must then appear as such), and on a tie the first one defined. When no label
+// matches (or none was written) the entity's unlabeled image stands in as its
+// default, else the first one defined. `used` holds the indices of the
+// entity's labels the winner accounted for as state, so whatever is left can
+// be read as an anchor name. Returns null without images.
 function pickEntityImage(assocs, labels) {
   const tokens = labels.map(idKey);
   let best = null;
@@ -2978,6 +2981,10 @@ function pickEntityImage(assocs, labels) {
     });
     if (!best || score > best.score) best = { assoc, score, used };
   });
+  if (best && best.score === 0) {
+    const plain = assocs.find(a => !a.labels.some(l => l.trim()));
+    if (plain) best.assoc = plain;
+  }
   return best;
 }
 
@@ -3102,7 +3109,13 @@ function buildPlayerStage(design, ctx) {
       const style = `font-family:${item.fontFamily};font-size:${item.fontSize}px;color:${item.color};`;
       let html, pre = false, live = false;
       if (choice) html = escH(choice.label);
-      else if (isSpeechArea(item)) { html = ctx.speech.get(item.svgId) || ''; live = true; }
+      else if (isSpeechArea(item)) {
+        // Like a choice with nothing to offer, a speech area with nothing to
+        // say is hidden rather than drawn as an empty box.
+        html = ctx.speech.get(item.svgId) || '';
+        if (!html) return;
+        live = true;
+      }
       else { html = escH(item.text); pre = true; }
       layers.push({ key: item.svgId, type: 'text', style, html, pre, live, click, ...box });
     }

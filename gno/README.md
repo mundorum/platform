@@ -198,7 +198,7 @@ When the current scene's scenario has a design in **Presentation → Scenarios**
 
 **Entities.** When an entity enters, its image is placed on the SVG. Its labels (the words after `@id`) are read in two steps:
 
-1. *State → image.* The label sets defined for the entity in **Presentation → Entity** are compared with the labels written after it, and the image sharing the most labels is used. On a tie, the first one defined wins. Given `@king happy left` and images labeled `happy` and `sad`, the `happy` image is used, since `left` isn't one of its labels. A label made of several words (`very happy`) must appear as such. If the entity has no matching label at all it gets its first image.
+1. *State → image.* The label sets defined for the entity in **Presentation → Entity** are compared with the labels written after it, and the image sharing the most labels is used. On a tie, the first one defined wins. Given `@king happy left` and images labeled `happy` and `sad`, the `happy` image is used, since `left` isn't one of its labels. A label made of several words (`very happy`) must appear as such. If no label matches (or none is written), the entity's image with no labels is used; if every image has labels, the first one defined is used.
 2. *Label → anchor.* Of the labels that weren't used as a state, the first one that names an anchor ID in the SVG says where the entity stands; its image is fitted into that anchor's box. An entity with no anchor label (and none from before) isn't drawn.
 
 Later mentions update what they say something about: `@king sad` changes the image and keeps the position, `@king right` moves the king and keeps the image. `@king ->` removes the entity. Labels, anchor IDs and text-area IDs are compared ignoring case and accents.
@@ -210,7 +210,7 @@ Later mentions update what they say something about: `@king sad` changes the ima
 | Free text (outside any dialog) | `_.speech` | `speech` |
 | A dialog of `@king` | `king.speech` | `speech` |
 
-When dialogs share a `speech` area they are prefixed with the speaker's name. Text with no area to go to isn't shown.
+When dialogs share a `speech` area they are prefixed with the speaker's name. Text with no area to go to isn't shown, and a speech area with nothing to show at the current pause is hidden, like an unused choice.
 
 **Actions.** Items with these IDs are the controls:
 

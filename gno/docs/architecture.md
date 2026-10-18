@@ -108,15 +108,17 @@ all persisted together as `_presentation.yaml`:
     inspector offers suggested IDs for all kinds (`action_n`,
     `action_n_label`, `action_proceed`, `action_regress`), plus `speech`,
     `_.speech` and `entity.speech` for text areas.
-  - *Resizing:* the canvas and every item can be resized by dragging a corner
-    handle or typing width/height. Holding Shift while dragging, or the lock
+  - *Moving and resizing:* every item can be moved by dragging it or by typing
+    its X/Y in the inspector (top-left corner; an anchor's center). The canvas
+    and every item can be resized by dragging a corner handle or typing
+    width/height. Holding Shift while dragging, or the lock
     toggle beside the inputs (one for the canvas, one for items), keeps the
     current proportion.
   - *Anchors* are made by placing an entity, sizing it while its image is
     still visible, then using the inspector's "Convert to anchor" button: the
     image is dropped and the footprint (size, and position as its center) is
     kept. The ID becomes the next `anchor_n` unless the user had already
-    renamed it. Anchors are drawn as an ellipse and exported as a `<g>` with
+    renamed it. Anchors are drawn as a dashed rectangle of the image's footprint and exported as a `<g>` with
     `data-gno-width`/`data-gno-height` (36×36 if absent, e.g. in older
     files). Their x/y is their center, so they grow around it when resized.
     The conversion is one-way.
