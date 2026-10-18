@@ -3,6 +3,9 @@
 This document describes the `.gno` narrative format and the editor's Player
 behavior. For how the editor application itself is built (stack, views,
 persistence, parsing pipeline), see [`docs/architecture.md`](docs/architecture.md).
+For a step-by-step tutorial on designing a scenario's graphic presentation,
+see [`docs/scenario-tutorial.md`](docs/scenario-tutorial.md) (in Portuguese:
+[`docs/scenario-tutorial.pt-BR.md`](docs/scenario-tutorial.pt-BR.md)).
 
 ## Narrative
 
