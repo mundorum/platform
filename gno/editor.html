@@ -1372,7 +1372,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   width: 40px; height: 40px; object-fit: cover;
   border-radius: 5px; border: 0.5px solid var(--c-border-strong);
 }
-.scenario-mode-toggle { display: flex; gap: 4px; padding: 10px 14px 0; }
+.scenario-mode-toggle { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 14px 0; }
 .scenario-mode-btn {
   padding: 5px 12px;
   border: 0.5px solid var(--c-border-strong);
@@ -1382,6 +1382,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
 }
 .scenario-mode-btn.active { background: var(--c-accent-light); color: var(--c-accent); border-color: var(--c-accent); }
@@ -1426,6 +1427,15 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 
 .scenario-svg { display: block; }
 .scenario-svg.text-mode { cursor: crosshair; }
+/* Items are only grabbed in Edit mode; otherwise clicks go through them to
+   the canvas (to draw a text area or stack over them). */
+.scenario-svg:not(.editing) .scenario-item { pointer-events: none; }
+.scenario-svg.editing .scenario-item { cursor: move; }
+.scenario-svg.picking .scenario-item { cursor: copy; }
+.scenario-layout-frame { fill: none; stroke: var(--c-tag-place); stroke-width: 1.5; stroke-dasharray: 8 3 2 3; pointer-events: visibleStroke; }
+.scenario-layout-frame.selected { stroke-width: 3; }
+.scenario-layout-frame.picking { stroke: var(--c-accent); stroke-width: 3; }
+.scenario-layout-label { font-family: var(--font-mono); font-size: 10px; fill: var(--c-tag-place); }
 .scenario-side { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; }
 .scenario-mode-hint { align-self: center; margin-left: 6px; font-family: var(--font-ui); font-size: 11.5px; color: var(--c-muted); font-style: italic; }
 
@@ -1453,7 +1463,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 .scenario-canvas-handle { cursor: nwse-resize; }
 .scenario-canvas-handle rect { fill: var(--c-surface); stroke: var(--c-accent); stroke-width: 1; opacity: 0.85; }
 .scenario-canvas-handle path { fill: none; stroke: var(--c-accent); stroke-width: 1.5; stroke-linecap: round; pointer-events: none; }
-.scenario-text-frame { fill: var(--c-accent-light); fill-opacity: 0.25; stroke: var(--c-accent); stroke-width: 1; stroke-dasharray: 4 3; cursor: move; }
+.scenario-text-frame { fill: var(--c-accent-light); fill-opacity: 0.25; stroke: var(--c-accent); stroke-width: 1; stroke-dasharray: 4 3; }
 .scenario-text-frame.selected { stroke-width: 2; fill-opacity: 0.4; }
 .scenario-selection { fill: none; stroke: var(--c-accent); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
 .scenario-resize-handle { fill: var(--c-accent); stroke: var(--c-surface); stroke-width: 1.5; cursor: nwse-resize; }
@@ -1499,12 +1509,22 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
   cursor: pointer;
 }
 .inspector-chip:hover { border-color: var(--c-accent); }
+.ent-join-row { flex-wrap: wrap; gap: 6px; }
+.ent-join-label { font-family: var(--font-ui); font-size: 12px; font-weight: 500; color: var(--c-muted); }
+.ent-join-chip { background: var(--c-surface); color: var(--c-muted); }
+.ent-join-chip.active { background: var(--c-accent-light); color: var(--c-accent); border-color: var(--c-accent); }
 .inspector-row { display: flex; gap: 10px; align-items: flex-end; }
 .inspector-row.compact { gap: 4px; align-items: center; }
 .inspector-row.compact .inspector-input.num { width: 100%; min-width: 0; padding: 4px 4px; -moz-appearance: textfield; }
 .inspector-row.compact .inspector-input.num::-webkit-inner-spin-button { display: none; }
 .inspector-color { width: 44px; height: 26px; padding: 0; border: 0.5px solid var(--c-border-strong); border-radius: 5px; background: var(--c-surface); cursor: pointer; }
 .inspector-hint { margin-top: 2px; font-size: 10px; color: var(--c-muted); }
+.inspector-children { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.inspector-child { display: flex; align-items: center; gap: 2px; font-family: var(--font-mono); font-size: 11px; }
+.inspector-child span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-child button { border: none; background: none; color: var(--c-muted); cursor: pointer; padding: 1px 3px; font-size: 13px; }
+.inspector-child button:hover { color: var(--c-accent); }
+.inspector-child button:disabled { opacity: 0.3; cursor: default; }
 
 .scenario-palette {
   width: auto;
@@ -2005,11 +2025,22 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
             Entities written as <code>@name</code> in the narrative are listed automatically. Add one here for scenery or props (a throne, a tree) that only appear in the scenario designs.
           </div>
 
+          <div class="lib-add-row ent-join-row" v-if="singleEntityIds.length >= 2">
+            <span class="ent-join-label">Join</span>
+            <button class="inspector-chip ent-join-chip" v-for="id in singleEntityIds" :key="id"
+                    :class="{active: joinPick.includes(id)}" @click="toggleJoinPick(id)">{{ id }}</button>
+            <button class="tb-btn" :disabled="joinPick.length < 2" @click="joinEntities"><i class="ti ti-link"></i> Join entities</button>
+          </div>
+          <div class="lib-add-hint" v-if="singleEntityIds.length >= 2">
+            Join two or more entities to give them images shown when they are together. They are used only where the narrative writes them joined, as <code>@king + @queen</code>.
+          </div>
+
           <div class="lib-list" v-if="entityIdsForPresentation.length">
             <div class="lib-card" v-for="entId in entityIdsForPresentation" :key="entId">
               <div class="lib-card-header" style="cursor: pointer;" @click="toggleEntityImages(entId)">
                 <i class="ti" :class="openEntityImages.has(entId) ? 'ti-chevron-down' : 'ti-chevron-right'"></i>
                 <span class="lib-id-input" style="border-color: transparent; cursor: pointer;">{{ entId }}</span>
+                <span class="lib-url" v-if="entId.includes(' + ')">group</span>
                 <span class="lib-url" v-if="isDeclaredEntity(entId)">not in the narrative</span>
                 <span class="lib-status">{{ (entityAssociations[entId] || []).length }} image(s)</span>
                 <div class="lib-actions" v-if="isDeclaredEntity(entId)">
@@ -2132,13 +2163,22 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                 </div>
 
                 <div class="scenario-mode-toggle">
-                  <button class="scenario-mode-btn" :class="{active: placeMode === 'entity'}" @click="placeMode = 'entity'">
-                    <i class="ti ti-user"></i> Place: Entity
+                  <button class="scenario-mode-btn" :class="{active: placeMode === 'edit'}" @click="togglePlaceMode('edit')"
+                          title="Move, resize and edit the items on the canvas">
+                    <i class="ti ti-pointer"></i> Edit
                   </button>
-                  <button class="scenario-mode-btn" :class="{active: placeMode === 'text'}" @click="placeMode = 'text'">
+                  <button class="scenario-mode-btn" :class="{active: placeMode === 'text'}" @click="togglePlaceMode('text')">
                     <i class="ti ti-typography"></i> Place: Text
                   </button>
-                  <span class="scenario-mode-hint" v-if="placeMode === 'text'">Drag over the canvas to draw the text area.</span>
+                  <button class="scenario-mode-btn" :class="{active: placeMode === 'column'}" @click="togglePlaceMode('column')"
+                          title="A layout that stacks its items top to bottom">
+                    <i class="ti ti-layout-rows"></i> Place: Vertical stack
+                  </button>
+                  <button class="scenario-mode-btn" :class="{active: placeMode === 'row'}" @click="togglePlaceMode('row')"
+                          title="A layout that lines its items up left to right">
+                    <i class="ti ti-layout-columns"></i> Place: Horizontal stack
+                  </button>
+                  <span class="scenario-mode-hint">{{ placeModeHint }}</span>
                   <button class="scenario-mode-btn scenario-wide-btn" @click="wideScenario = !wideScenario"
                           :title="wideScenario ? 'Back to the normal layout (Esc)' : 'Widen the editor: hide everything around it'">
                     <i class="ti" :class="wideScenario ? 'ti-arrows-minimize' : 'ti-arrows-maximize'"></i> {{ wideScenario ? 'Exit wide (Esc)' : 'Wide editor' }}
@@ -2150,7 +2190,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                   <div class="scenario-canvas-wrap">
                     <svg
                       class="scenario-svg"
-                      :class="{'text-mode': placeMode === 'text'}"
+                      :class="{'text-mode': isDrawMode, editing: placeMode === 'edit', picking: !!layoutPick}"
                       :width="scenarioDesigns[name].width"
                       :height="scenarioDesigns[name].height"
                       :viewBox="'0 0 ' + scenarioDesigns[name].width + ' ' + scenarioDesigns[name].height"
@@ -2171,7 +2211,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                           <image
                             :id="item.svgId"
                             :x="item.x" :y="item.y" :width="item.w" :height="item.h"
-                            :href="item.url" style="cursor: move;"
+                            :href="item.url" class="scenario-item"
                             @mousedown="onItemMouseDown(name, idx, item, $event)"
                           />
                           <rect v-if="selectedItemId === item.svgId" class="scenario-selection" :x="item.x" :y="item.y" :width="item.w" :height="item.h" />
@@ -2182,13 +2222,13 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                             @mousedown="onItemResizeMouseDown(name, idx, item, $event)"
                           />
                           <text :x="item.x + item.w/2" :y="item.y + item.h + 11" text-anchor="middle" font-size="9" fill="var(--c-muted)" style="pointer-events:none;">{{ item.svgId }}</text>
-                          <text :x="item.x + item.w - 2" :y="item.y + 10" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
+                          <text v-if="placeMode === 'edit'" :x="item.x + item.w - 2" :y="item.y + 10" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
                         </g>
                         <g v-else-if="item.kind === 'anchor'" :id="item.svgId" :transform="'translate(' + item.x + ',' + item.y + ')'">
-                          <rect :x="-item.w / 2" :y="-item.h / 2" :width="item.w" :height="item.h" fill="none" stroke="var(--c-accent)" :stroke-width="selectedItemId === item.svgId ? 3.5 : 2" stroke-dasharray="4,3" style="cursor: move;" @mousedown="onItemMouseDown(name, idx, item, $event)" />
+                          <rect :x="-item.w / 2" :y="-item.h / 2" :width="item.w" :height="item.h" fill="none" stroke="var(--c-accent)" :stroke-width="selectedItemId === item.svgId ? 3.5 : 2" stroke-dasharray="4,3" class="scenario-item" @mousedown="onItemMouseDown(name, idx, item, $event)" />
                           <rect v-if="selectedItemId === item.svgId" class="scenario-selection" :x="-item.w / 2" :y="-item.h / 2" :width="item.w" :height="item.h" />
                           <text :y="item.h / 2 + 12" text-anchor="middle" font-size="9" fill="var(--c-accent)" style="pointer-events: none;">{{ item.svgId }}</text>
-                          <text :x="item.w / 2" :y="-item.h / 2 + 6" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
+                          <text v-if="placeMode === 'edit'" :x="item.w / 2" :y="-item.h / 2 + 6" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
                           <rect
                             v-if="selectedItemId === item.svgId"
                             class="scenario-resize-handle"
@@ -2196,9 +2236,9 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                             @mousedown="onItemResizeMouseDown(name, idx, item, $event)"
                           />
                         </g>
-                        <g v-else>
+                        <g v-else-if="item.kind === 'text'">
                           <rect
-                            class="scenario-text-frame" :class="{selected: selectedItemId === item.svgId}"
+                            class="scenario-text-frame scenario-item" :class="{selected: selectedItemId === item.svgId}"
                             :x="item.x" :y="item.y" :width="item.w" :height="item.h"
                             @mousedown="onItemMouseDown(name, idx, item, $event)"
                           />
@@ -2206,7 +2246,24 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                             <div class="scenario-text-body" :style="{fontFamily: item.fontFamily, fontSize: item.fontSize + 'px', color: item.color}">{{ item.text }}</div>
                           </foreignObject>
                           <text :x="item.x" :y="item.y - 3" font-size="9" fill="var(--c-muted)" style="pointer-events:none;">{{ item.svgId }}</text>
-                          <text :x="item.x + item.w - 2" :y="item.y - 3" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
+                          <text v-if="placeMode === 'edit'" :x="item.x + item.w - 2" :y="item.y - 3" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
+                          <rect
+                            v-if="selectedItemId === item.svgId"
+                            class="scenario-resize-handle"
+                            :x="item.x + item.w - 6" :y="item.y + item.h - 6" width="12" height="12"
+                            @mousedown="onItemResizeMouseDown(name, idx, item, $event)"
+                          />
+                        </g>
+                      </template>
+                      <!-- layouts: drawn last so their frames stay visible over their items; only the frame line and the label take clicks -->
+                      <template v-for="(item, idx) in scenarioDesigns[name].items" :key="'layout:' + item.svgId">
+                        <g v-if="item.kind === 'layout'">
+                          <rect class="scenario-layout-frame scenario-item" :class="{selected: selectedItemId === item.svgId, picking: layoutPick === item.svgId}"
+                                :x="item.x" :y="item.y" :width="item.w" :height="item.h"
+                                @mousedown="onItemMouseDown(name, idx, item, $event)" />
+                          <text class="scenario-layout-label scenario-item" :x="item.x + 4" :y="item.y + 12"
+                                @mousedown="onItemMouseDown(name, idx, item, $event)">{{ item.direction === 'row' ? '⇆' : '⇅' }} {{ item.svgId }}</text>
+                          <text v-if="placeMode === 'edit'" :x="item.x + item.w - 4" :y="item.y + 12" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
                           <rect
                             v-if="selectedItemId === item.svgId"
                             class="scenario-resize-handle"
@@ -2217,7 +2274,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                       </template>
                       <rect
                         v-if="textDraw && textDraw.name === name"
-                        class="scenario-text-frame selected" style="pointer-events: none;"
+                        :class="textDraw.kind === 'text' ? 'scenario-text-frame selected' : 'scenario-layout-frame selected'" style="pointer-events: none;"
                         :x="textDrawRect().x" :y="textDrawRect().y" :width="textDrawRect().w" :height="textDrawRect().h"
                       />
                       <!-- canvas (background) resize handle: design-time only, never exported -->
@@ -2234,12 +2291,13 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                   <div class="scenario-inspector">
                     <div class="scenario-palette-title">Selected item</div>
                     <div class="inspector-empty" v-if="!selectedItem">
-                      Click an entity, anchor or text area on the canvas to edit its ID and properties.
+                      <template v-if="placeMode === 'edit'">Click an entity, anchor, text area or stack on the canvas to edit its ID and properties.</template>
+                      <template v-else>Turn on <strong>Edit</strong> to select, move and change the items on the canvas.</template>
                     </div>
                     <template v-else>
                       <div class="inspector-kind">
-                        <i class="ti" :class="{'ti-user': selectedItem.kind === 'entity', 'ti-map-pin': selectedItem.kind === 'anchor', 'ti-typography': selectedItem.kind === 'text'}"></i>
-                        {{ selectedItem.kind }}<template v-if="selectedItem.kind === 'entity'"> · {{ selectedItem.entityId }}</template>
+                        <i class="ti" :class="{'ti-user': selectedItem.kind === 'entity', 'ti-map-pin': selectedItem.kind === 'anchor', 'ti-typography': selectedItem.kind === 'text', 'ti-layout-rows': selectedItem.kind === 'layout' && selectedItem.direction === 'column', 'ti-layout-columns': selectedItem.kind === 'layout' && selectedItem.direction === 'row'}"></i>
+                        {{ selectedItem.kind === 'layout' ? (selectedItem.direction === 'row' ? 'horizontal stack' : 'vertical stack') : selectedItem.kind }}<template v-if="selectedItem.kind === 'entity'"> · {{ selectedItem.entityId }}</template>
                       </div>
 
                       <label class="inspector-label">ID</label>
@@ -2263,12 +2321,64 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                         </button>
                       </div>
 
-                      <label class="inspector-label">{{ selectedItem.kind === 'anchor' ? 'Center X, Y (px)' : 'Top-left X, Y (px)' }}</label>
+                      <label class="inspector-label">Top-left X, Y (px)</label>
                       <div class="inspector-row compact">
-                        <input class="inspector-input num" type="number" title="X" :value="selectedItem.x" @change="setItemNumber(selectedItem, 'x', $event, -10000, 10000)">
+                        <input class="inspector-input num" type="number" title="X" :value="itemCorner(selectedItem, 'x')" :disabled="!!selectedParentLayout" @change="setItemCorner(selectedItem, 'x', $event)">
                         <span class="scenario-size-x">,</span>
-                        <input class="inspector-input num" type="number" title="Y" :value="selectedItem.y" @change="setItemNumber(selectedItem, 'y', $event, -10000, 10000)">
+                        <input class="inspector-input num" type="number" title="Y" :value="itemCorner(selectedItem, 'y')" :disabled="!!selectedParentLayout" @change="setItemCorner(selectedItem, 'y', $event)">
                       </div>
+                      <template v-if="selectedParentLayout">
+                        <div class="inspector-hint">Placed by the stack <span class="mono">{{ selectedParentLayout.svgId }}</span>.</div>
+                        <button class="tb-btn ghost inspector-convert" @click="takeOutOfLayout(selectedItem)">
+                          <i class="ti ti-arrow-bar-to-right"></i> Take out of the stack
+                        </button>
+                      </template>
+
+                      <template v-if="selectedItem.kind === 'layout'">
+                        <label class="inspector-label">Direction</label>
+                        <select class="inspector-input" v-model="selectedItem.direction">
+                          <option value="column">Vertical (top to bottom)</option>
+                          <option value="row">Horizontal (left to right)</option>
+                        </select>
+                        <div class="inspector-row">
+                          <div>
+                            <label class="inspector-label">Along</label>
+                            <select class="inspector-input" v-model="selectedItem.justify">
+                              <option value="start">{{ selectedItem.direction === 'row' ? 'Left' : 'Top' }}</option>
+                              <option value="center">Center</option>
+                              <option value="end">{{ selectedItem.direction === 'row' ? 'Right' : 'Bottom' }}</option>
+                              <option value="space-between">Spread out</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label class="inspector-label">Across</label>
+                            <select class="inspector-input" v-model="selectedItem.align">
+                              <option value="start">{{ selectedItem.direction === 'row' ? 'Top' : 'Left' }}</option>
+                              <option value="center">Center</option>
+                              <option value="end">{{ selectedItem.direction === 'row' ? 'Bottom' : 'Right' }}</option>
+                            </select>
+                          </div>
+                        </div>
+                        <label class="inspector-label">Gap (px)</label>
+                        <input class="inspector-input num" type="number" min="0" max="1000" step="1"
+                               :value="selectedItem.gap" @change="setItemNumber(selectedItem, 'gap', $event, 0, 1000)">
+
+                        <label class="inspector-label">Items, in order</label>
+                        <div class="inspector-children" v-if="selectedItem.children.length">
+                          <div class="inspector-child" v-for="(cid, ci) in selectedItem.children" :key="cid">
+                            <span :title="cid">{{ cid }}</span>
+                            <button title="Earlier" :disabled="ci === 0" @click="moveLayoutChild(selectedItem, ci, -1)"><i class="ti ti-arrow-up"></i></button>
+                            <button title="Later" :disabled="ci === selectedItem.children.length - 1" @click="moveLayoutChild(selectedItem, ci, 1)"><i class="ti ti-arrow-down"></i></button>
+                            <button title="Take out of the stack" @click="selectedItem.children.splice(ci, 1)"><i class="ti ti-x"></i></button>
+                          </div>
+                        </div>
+                        <div class="inspector-hint" v-else>No items yet.</div>
+                        <button class="tb-btn ghost inspector-convert" :class="{active: layoutPick === selectedItem.svgId}" @click="toggleLayoutPick(selectedItem)">
+                          <i class="ti" :class="layoutPick === selectedItem.svgId ? 'ti-check' : 'ti-plus'"></i>
+                          {{ layoutPick === selectedItem.svgId ? 'Done inserting' : 'Insert items' }}
+                        </button>
+                        <div class="inspector-hint">Then click items on the canvas: each one joins the end of the stack, which then places it. Hidden items (an empty speech area, an unused choice, an anchor with no one on it) take no room when playing.</div>
+                      </template>
 
                       <template v-if="selectedItem.kind === 'entity'">
                         <button class="tb-btn ghost inspector-convert" @click="convertSelectedToAnchor">
@@ -2615,10 +2725,32 @@ function slugify(s) {
 }
 
 /* ── ENTITY PARSER ── */
+// Several entities joined with "+" ("@king + @queen") act together as a group:
+// one occurrence whose entityId is the group's key and whose `members` lists
+// the entities in it. The key sorts the members, so "@queen + @king" names
+// the same group, and it is also how Presentation stores the group's images.
+const ENTITY_ID_SRC = "@[\\p{L}\\p{N}_'-]+";
+const ENTITY_REF_SRC = `${ENTITY_ID_SRC}(?:\\s*\\+\\s*${ENTITY_ID_SRC})*`;
+
+function entityGroupKey(members) {
+  const unique = [...new Set(members)];
+  unique.sort((a, b) => idKey(a).localeCompare(idKey(b)));
+  return unique.join(' + ');
+}
+
+// "@king + @queen" -> { entityId: '@king + @queen', members: ['@king', '@queen'] };
+// a single entity (or one repeated) has no members.
+function parseEntityRef(text) {
+  const ids = text.split('+').map(t => t.trim()).filter(Boolean);
+  const key = entityGroupKey(ids);
+  return key.includes(' + ') ? { entityId: key, members: key.split(' + ') } : { entityId: key, members: null };
+}
+
 // Detects @entity mentions in three forms:
 //  1. standalone: "@prince right sad"  (whole line, optional state words)
 //  2. dialog: "-- @king left happy: Hello!" or "-- @king:\n...\n..." (state, then dialog until a blank line)
 //  3. inline: "@king" appearing anywhere inside ordinary prose (no state captured)
+// Each form also takes a group ("@king + @queen left").
 function analyzeEntities(source) {
   const lines = source.split('\n');
   const occurrences = [];
@@ -2628,20 +2760,24 @@ function analyzeEntities(source) {
   const DIALOG_RE = /^--\s*(.+)$/;
   // \p{L}/\p{N} (Unicode letter/number) instead of \w so accented identifiers
   // (e.g. "@príncipe") are recognized in full, not just their ASCII prefix.
-  const FORM1_RE  = /^@([\p{L}\p{N}_'-]+)((?:\s+[^\s:@]+)*)$/u;
-  const ID_RE     = /^@([\p{L}\p{N}_'-]+)/u;
-  const INLINE_RE = /@([\p{L}\p{N}_'-]+)/gu;
+  const FORM1_RE  = new RegExp(`^(${ENTITY_REF_SRC})((?:\\s+[^\\s:@]+)*)$`, 'u');
+  const ID_RE     = new RegExp(`^${ENTITY_REF_SRC}`, 'u');
+  const INLINE_RE = new RegExp(ENTITY_REF_SRC, 'gu');
 
   let currentScene = null;
 
-  function register(entityId, type, extra) {
+  // A group's occurrence is listed under the group and under each member.
+  function register(refText, type, extra) {
     const n = occurrences.length;
-    const occ = Object.assign({ n, entityId, type, state: '', dialogLines: [], context: '', scene: currentScene }, extra);
+    const { entityId, members } = parseEntityRef(refText);
+    const occ = Object.assign({ n, entityId, members, type, state: '', dialogLines: [], context: '', scene: currentScene }, extra);
     occurrences.push(occ);
-    if (!entityIndex.has(entityId)) entityIndex.set(entityId, { states: [], occurrenceIdx: [] });
-    const data = entityIndex.get(entityId);
-    data.occurrenceIdx.push(n);
-    if (occ.state && !data.states.includes(occ.state)) data.states.push(occ.state);
+    [entityId, ...(members || [])].forEach(id => {
+      if (!entityIndex.has(id)) entityIndex.set(id, { states: [], occurrenceIdx: [] });
+      const data = entityIndex.get(id);
+      data.occurrenceIdx.push(n);
+      if (occ.state && !data.states.includes(occ.state)) data.states.push(occ.state);
+    });
     return occ;
   }
 
@@ -2662,14 +2798,13 @@ function analyzeEntities(source) {
       const headPart = (colonIdx >= 0 ? header.slice(0, colonIdx) : header).trim();
       const idMatch = headPart.match(ID_RE);
       if (idMatch) {
-        const entityId = '@' + idMatch[1];
         const state = headPart.slice(idMatch[0].length).trim();
         const sameLine = colonIdx >= 0 ? header.slice(colonIdx + 1).trim() : '';
         const dialogLines = sameLine ? [sameLine] : [];
         let j = i + 1;
         // stop at a blank line, or at another dialog cue that immediately follows with no separator
         while (j < lines.length && lines[j].trim() !== '' && !DIALOG_RE.test(lines[j].trim())) { dialogLines.push(lines[j].trim()); j++; }
-        register(entityId, 'dialog', { state, dialogLines, lineStart: i, lineEnd: j - 1 });
+        register(idMatch[0], 'dialog', { state, dialogLines, lineStart: i, lineEnd: j - 1 });
         i = j - 1;
       }
       continue;
@@ -2677,14 +2812,14 @@ function analyzeEntities(source) {
 
     const wm = trimmed.match(FORM1_RE);
     if (wm) {
-      register('@' + wm[1], 'state', { state: (wm[2] || '').trim(), lineStart: i, lineEnd: i });
+      register(wm[1], 'state', { state: (wm[2] || '').trim(), lineStart: i, lineEnd: i });
       continue;
     }
 
     let m;
     INLINE_RE.lastIndex = 0;
     while ((m = INLINE_RE.exec(raw))) {
-      register('@' + m[1], 'mention', { context: trimmed, lineStart: i, lineEnd: i, matchIndex: m.index, matchText: m[0] });
+      register(m[0], 'mention', { context: trimmed, lineStart: i, lineEnd: i, matchIndex: m.index, matchText: m[0] });
     }
   }
 
@@ -2854,18 +2989,20 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
   let freeLines = []; // raw prose lines since the last dialog / beat boundary
   const roster = new Map(); // entityId -> latest known state ('' = present, no known state)
 
+  // The text roster lists a group's members one by one; the graphic Player
+  // gets the group as a whole (`members`), since it may have its own image.
   function applyEntityOccurrence(occ) {
+    const ids = occ.members || [occ.entityId];
     if (occ.type === 'state' && occ.state.trim() === '->') {
-      roster.delete(occ.entityId);
-      currentEvents.push({ entityId: occ.entityId, labels: [], exit: true });
+      ids.forEach(id => roster.delete(id));
+      currentEvents.push({ entityId: occ.entityId, members: occ.members, labels: [], exit: true });
       return;
     }
-    if (occ.state) {
-      roster.set(occ.entityId, occ.state);
-    } else if (!roster.has(occ.entityId)) {
-      roster.set(occ.entityId, '');
-    }
-    currentEvents.push({ entityId: occ.entityId, labels: occ.state.split(/\s+/).filter(Boolean), exit: false });
+    ids.forEach(id => {
+      if (occ.state) roster.set(id, occ.state);
+      else if (!roster.has(id)) roster.set(id, '');
+    });
+    currentEvents.push({ entityId: occ.entityId, members: occ.members, labels: occ.state.split(/\s+/).filter(Boolean), exit: false });
   }
 
   // Prose becomes one speech item per uninterrupted run, so its position
@@ -2900,7 +3037,7 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
       applyEntityOccurrence(occ);
       if (occ.type === 'dialog') {
         flushFree();
-        currentSpeech.push({ kind: 'dialog', entityId: occ.entityId, html: marked.parseInline(occ.dialogLines.join(' ')).trim() });
+        currentSpeech.push({ kind: 'dialog', entityId: occ.entityId, members: occ.members, html: marked.parseInline(occ.dialogLines.join(' ')).trim() });
       } else {
         freeLines.push(''); // a standalone entity line still separates the prose around it
       }
@@ -2940,9 +3077,10 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
 // without the Vue app.
 const MENTION_RE = /@([\p{L}\p{N}_'-]+)/gu;
 
-// "Dra_Sandra" -> "Dra Sandra": how an entity id reads in prose or as a speaker.
+// "Dra_Sandra" -> "Dra Sandra": how an entity id (or group) reads in prose or
+// as a speaker.
 function entityDisplayName(id) {
-  return String(id).replace(/^@/, '').replace(/_/g, ' ');
+  return String(id).replace(/@/g, '').replace(/_/g, ' ');
 }
 
 // Labels, anchor IDs and text-area IDs are all typed by hand in different
@@ -2989,28 +3127,57 @@ function pickEntityImage(assocs, labels) {
 }
 
 // Replays a scene's entity events beat by beat and returns, for each beat, who
-// is on stage: [{ entityId, assoc, anchorId }] in order of entry. An entity's
-// labels are read as a state first (its image) and, of what remains, the first
-// one naming an anchor of the SVG says where it stands. A later mention that
-// says nothing about one of the two keeps what it had — `@king left` after
-// `@king sad` moves the king without cheering him up.
+// is on stage: [{ entityId, members, assoc, anchorId }] in order of entry. An
+// entity's labels are read as a state first (its image) and, of what remains,
+// the first one naming an anchor of the SVG says where it stands. A later
+// mention that says nothing about one of the two keeps what it had —
+// `@king left` after `@king sad` moves the king without cheering him up.
+//
+// A group ("@king + @queen") with images of its own enters as one entry and,
+// while on stage, hides its members' own images; it starts where its first
+// member already stands unless it names an anchor. Leaving as a group takes
+// the members along; a member leaving alone breaks the group up. A group
+// without images is just its members, each mentioned with the same labels.
 function foldStageFrames(eventsByBeat, associations, anchorKeys) {
   const onStage = new Map();
+
+  function apply(ev) {
+    const members = ev.members || null;
+    if (ev.exit) {
+      onStage.delete(ev.entityId);
+      if (members) members.forEach(m => onStage.delete(m));
+      else onStage.forEach((e, k) => { if (e.members && e.members.includes(ev.entityId)) onStage.delete(k); });
+      return;
+    }
+    const prev = onStage.get(ev.entityId) || { entityId: ev.entityId, members, assoc: null, anchorId: null };
+    const pick = pickEntityImage(associations[ev.entityId] || [], ev.labels);
+    const restate = !!pick && (pick.score > 0 || !prev.assoc);
+    const rest = ev.labels.filter((_, i) => !(restate && pick.used.has(i)));
+    const anchorKey = rest.map(idKey).find(k => anchorKeys.has(k));
+    let anchorId = anchorKey ? anchorKeys.get(anchorKey) : prev.anchorId;
+    if (!anchorId && members) {
+      const placed = members.map(m => onStage.get(m)).find(e => e && e.anchorId);
+      anchorId = placed ? placed.anchorId : null;
+    }
+    onStage.set(ev.entityId, {
+      entityId: ev.entityId,
+      members,
+      assoc: restate ? pick.assoc : prev.assoc,
+      anchorId,
+    });
+  }
+
   return eventsByBeat.map(events => {
     events.forEach(ev => {
-      if (ev.exit) { onStage.delete(ev.entityId); return; }
-      const prev = onStage.get(ev.entityId) || { entityId: ev.entityId, assoc: null, anchorId: null };
-      const pick = pickEntityImage(associations[ev.entityId] || [], ev.labels);
-      const restate = !!pick && (pick.score > 0 || !prev.assoc);
-      const rest = ev.labels.filter((_, i) => !(restate && pick.used.has(i)));
-      const anchorKey = rest.map(idKey).find(k => anchorKeys.has(k));
-      onStage.set(ev.entityId, {
-        entityId: ev.entityId,
-        assoc: restate ? pick.assoc : prev.assoc,
-        anchorId: anchorKey ? anchorKeys.get(anchorKey) : prev.anchorId,
-      });
+      if (ev.members && !(associations[ev.entityId] || []).length) {
+        ev.members.forEach(m => apply({ entityId: m, labels: ev.labels, exit: ev.exit }));
+      } else {
+        apply(ev);
+      }
     });
-    return [...onStage.values()];
+    const grouped = new Set();
+    onStage.forEach(e => (e.members || []).forEach(m => grouped.add(m)));
+    return [...onStage.values()].filter(e => !grouped.has(e.entityId));
   });
 }
 
@@ -3049,8 +3216,9 @@ const isSpeechArea = item => item.kind === 'text' && /(^|\.)speech$/.test(idKey(
 
 // Sends each piece of a beat's speech to a text area: prose to `_.speech`,
 // a character's dialog to `<entity>.speech`, either falling back to `speech`.
-// Where several pieces share an area they stay in source order, and a shared
-// `speech` area names the speaker since the area itself no longer does.
+// A group's dialog goes to `speech`, else to the first member's own area.
+// Where several pieces share an area they stay in source order, and an area
+// that isn't the speaker's own names the speaker.
 // Speech with no area to go to isn't shown. Returns Map(svgId -> html).
 function routeSpeech(items, design) {
   const areas = new Map(design.items.filter(isSpeechArea).map(it => [idKey(it.svgId), it.svgId]));
@@ -3061,15 +3229,89 @@ function routeSpeech(items, design) {
       key = ['_.speech', 'speech'].find(k => areas.has(k));
       html = it.html;
     } else {
-      const own = idKey(it.entityId.replace(/^@/, '')) + '.speech';
-      key = areas.has(own) ? own : (areas.has('speech') ? 'speech' : undefined);
-      html = `<p>${key === 'speech' ? `<strong class="speaker">${escH(entityDisplayName(it.entityId))}:</strong> ` : ''}${it.html}</p>`;
+      const ownKey = id => idKey(id.replace(/^@/, '')) + '.speech';
+      if (it.members) {
+        key = areas.has('speech') ? 'speech' : it.members.map(ownKey).find(k => areas.has(k));
+      } else {
+        const own = ownKey(it.entityId);
+        key = areas.has(own) ? own : (areas.has('speech') ? 'speech' : undefined);
+      }
+      const named = !!it.members || key === 'speech';
+      html = `<p>${named ? `<strong class="speaker">${escH(entityDisplayName(it.entityId))}:</strong> ` : ''}${it.html}</p>`;
     }
     if (key === undefined) return;
     const id = areas.get(key);
     out.set(id, (out.get(id) || '') + html);
   });
   return out;
+}
+
+// Layouts are stacks in the manner of a CSS flexbox: a box, a direction
+// (`column` stacks top to bottom, `row` left to right), and an ordered list of
+// child item ids — which may be layouts themselves. Children keep their own
+// size; the layout decides where they go: `justify` places the run along the
+// direction (start / center / end / space-between), `align` places each child
+// across it (start / center / end), `gap` separates neighbours. Hidden
+// children take no room, so the rest close up — speech stacked above the
+// choices slides down when the choices aren't on offer. A layout with no
+// visible child is itself hidden (unless `keepEmpty`, as while designing).
+// Returns Map(svgId -> { x, y, w, h }), top-left boxes for every item.
+const LAYOUT_JUSTIFY = ['start', 'center', 'end', 'space-between'];
+const LAYOUT_ALIGN = ['start', 'center', 'end'];
+
+function itemBox(item) {
+  return item.kind === 'anchor'
+    ? { x: item.x - item.w / 2, y: item.y - item.h / 2, w: item.w, h: item.h }
+    : { x: item.x, y: item.y, w: item.w, h: item.h };
+}
+
+function layoutBoxes(design, isVisible, keepEmpty = false) {
+  const byId = new Map(design.items.map(it => [it.svgId, it]));
+  const boxes = new Map(design.items.map(it => [it.svgId, itemBox(it)]));
+  const layouts = design.items.filter(it => it.kind === 'layout');
+  const nested = new Set(layouts.flatMap(l => l.children));
+  const visible = new Map();
+  const placed = new Set();
+
+  function vis(item, path = new Set()) {
+    if (visible.has(item.svgId)) return visible.get(item.svgId);
+    let v;
+    if (item.kind !== 'layout') v = !!isVisible(item);
+    else if (path.has(item.svgId)) return false; // a cycle from a hand-edited file
+    else {
+      path.add(item.svgId);
+      v = keepEmpty || item.children.some(id => byId.has(id) && vis(byId.get(id), path));
+    }
+    visible.set(item.svgId, v);
+    return v;
+  }
+
+  function place(layout) {
+    if (placed.has(layout.svgId)) return;
+    placed.add(layout.svgId);
+    const box = boxes.get(layout.svgId);
+    // main axis: position/size along the direction; cross: across it
+    const [P, S, Q, T] = layout.direction === 'row' ? ['x', 'w', 'y', 'h'] : ['y', 'h', 'x', 'w'];
+    const kids = layout.children.map(id => byId.get(id)).filter(it => it && it !== layout && vis(it));
+    const sizes = kids.map(k => boxes.get(k.svgId));
+    const free = box[S] - sizes.reduce((sum, b) => sum + b[S], 0) - layout.gap * Math.max(0, kids.length - 1);
+    let at = box[P], gap = layout.gap;
+    if (layout.justify === 'center') at += free / 2;
+    else if (layout.justify === 'end') at += free;
+    else if (layout.justify === 'space-between' && kids.length > 1 && free > 0) gap += free / (kids.length - 1);
+    kids.forEach((k, i) => {
+      const b = sizes[i];
+      let cross = box[Q];
+      if (layout.align === 'center') cross += (box[T] - b[T]) / 2;
+      else if (layout.align === 'end') cross += box[T] - b[T];
+      boxes.set(k.svgId, { ...b, [P]: Math.round(at), [Q]: Math.round(cross) });
+      at += b[S] + gap;
+      if (k.kind === 'layout') place(k);
+    });
+  }
+
+  layouts.filter(l => !nested.has(l.svgId)).forEach(place);
+  return boxes;
 }
 
 // Draws one moment of a scene onto a scenario design, as layers in the
@@ -3081,17 +3323,18 @@ function routeSpeech(items, design) {
 //   canProceed / canRegress / atMenu — which controls are live right now
 // A layer is { key, type: 'image'|'text', x, y, w, h, ... } with `click`
 // ({ type: 'proceed'|'regress'|'choose', target? }) when it is a button.
+// What is shown is settled first, so the layouts can close up around what
+// isn't before anything gets a position.
 function buildPlayerStage(design, ctx) {
-  const layers = [];
+  const shown = new Map(); // svgId -> its layers, still without a box
   design.items.forEach(item => {
+    if (item.kind === 'layout') return;
     if (item.kind === 'anchor') {
-      ctx.frame.filter(f => f.anchorId === item.svgId && f.url).forEach(f => {
-        layers.push({ key: 'stage:' + f.entityId, type: 'image', url: f.url,
-          x: item.x - item.w / 2, y: item.y - item.h / 2, w: item.w, h: item.h });
-      });
+      const here = ctx.frame.filter(f => f.anchorId === item.svgId && f.url)
+        .map(f => ({ key: 'stage:' + f.entityId, type: 'image', url: f.url }));
+      if (here.length) shown.set(item.svgId, here);
       return;
     }
-    const box = { x: item.x, y: item.y, w: item.w, h: item.h };
     const role = actionRole(item);
     let click = null, choice = null;
     if (role) {
@@ -3104,7 +3347,7 @@ function buildPlayerStage(design, ctx) {
       }
     }
     if (item.kind === 'entity') {
-      layers.push({ key: item.svgId, type: 'image', url: item.url, click, ...box });
+      shown.set(item.svgId, [{ key: item.svgId, type: 'image', url: item.url, click }]);
     } else {
       const style = `font-family:${item.fontFamily};font-size:${item.fontSize}px;color:${item.color};`;
       let html, pre = false, live = false;
@@ -3117,8 +3360,13 @@ function buildPlayerStage(design, ctx) {
         live = true;
       }
       else { html = escH(item.text); pre = true; }
-      layers.push({ key: item.svgId, type: 'text', style, html, pre, live, click, ...box });
+      shown.set(item.svgId, [{ key: item.svgId, type: 'text', style, html, pre, live, click }]);
     }
+  });
+  const boxes = layoutBoxes(design, item => shown.has(item.svgId));
+  const layers = [];
+  design.items.forEach(item => {
+    (shown.get(item.svgId) || []).forEach(l => layers.push({ ...l, ...boxes.get(item.svgId) }));
   });
   return layers;
 }
@@ -3475,7 +3723,10 @@ function detectAndParseCatalog(text, catalogUrl) {
    needed to reconstruct the model; an anchor's <g> gets only its id and
    data-gno-anchor marker (holding the same id) — no image — since the entity
    shown while dragging was only a design-time aid, never meant to be shed
-   here. Its size travels as data-gno-width/height (its x/y is its center). A text area is a <foreignObject> (data-gno-text marker) wrapping an
+   here. Its size travels as data-gno-width/height (its x/y is its center). A
+   layout is an empty <g> too (data-gno-layout holding its direction), with
+   its settings and child ids in data-gno-* attributes; its children stay
+   where they are in the file's z-order rather than being nested in it. A text area is a <foreignObject> (data-gno-text marker) wrapping an
    XHTML <div>, since SVG <text> can't wrap long lines by itself; its font,
    size and color are written both inline (so any viewer honors them) and as
    data-gno-* attributes (so the model round-trips without parsing CSS).
@@ -3510,6 +3761,23 @@ const TEXT_FONTS = [
 // anchors could be resized). Its x/y is the center of this box.
 const ANCHOR_SIZE = 36;
 const TEXT_DEFAULTS = { text: 'Text', fontFamily: TEXT_FONTS[0].value, fontSize: 18, color: '#1a1610' };
+const LAYOUT_DEFAULTS = { justify: 'start', align: 'start', gap: 8 };
+
+// A layout item from stored or uploaded fields, with anything unknown set to
+// its default. Its x/y is its top-left corner, like a text area's.
+function cleanLayout(it) {
+  const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+  return {
+    kind: 'layout',
+    svgId: String(it.svgId || ''),
+    direction: it.direction === 'row' ? 'row' : 'column',
+    justify: LAYOUT_JUSTIFY.includes(it.justify) ? it.justify : LAYOUT_DEFAULTS.justify,
+    align: LAYOUT_ALIGN.includes(it.align) ? it.align : LAYOUT_DEFAULTS.align,
+    gap: Math.min(1000, Math.max(0, num(it.gap, LAYOUT_DEFAULTS.gap))),
+    children: Array.isArray(it.children) ? [...new Set(it.children.filter(c => typeof c === 'string' && c))] : [],
+    x: num(it.x, 0), y: num(it.y, 0), w: num(it.w, 200), h: num(it.h, 200),
+  };
+}
 
 // Font family and color end up inside an inline style attribute, and can
 // arrive from an uploaded file, so anything outside a conservative
@@ -3539,6 +3807,8 @@ function buildScenarioSvg(design) {
       parts.push(`  <image id="${svgEscape(item.svgId)}" x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" href="${svgEscape(item.url)}" xlink:href="${svgEscape(item.url)}" data-gno-entity="${svgEscape(item.entityId)}" data-gno-library="${svgEscape(item.library)}" data-gno-image="${svgEscape(item.image)}" />`);
     } else if (item.kind === 'anchor') {
       parts.push(`  <g id="${svgEscape(item.svgId)}" data-gno-anchor="${svgEscape(item.svgId)}" data-gno-width="${item.w}" data-gno-height="${item.h}" transform="translate(${item.x},${item.y})"></g>`);
+    } else if (item.kind === 'layout') {
+      parts.push(`  <g id="${svgEscape(item.svgId)}" data-gno-layout="${item.direction}" data-gno-justify="${item.justify}" data-gno-align="${item.align}" data-gno-gap="${item.gap}" data-gno-children="${svgEscape(item.children.join(' '))}" data-gno-width="${item.w}" data-gno-height="${item.h}" transform="translate(${item.x},${item.y})"></g>`);
     } else if (item.kind === 'text') {
       const style = `font-family:${item.fontFamily};font-size:${item.fontSize}px;color:${item.color};`
         + 'width:100%;height:100%;box-sizing:border-box;overflow:hidden;line-height:1.3;white-space:pre-wrap;overflow-wrap:anywhere;';
@@ -3581,9 +3851,22 @@ function parseScenarioSvg(svgText) {
       });
     } else if (tag === 'g') {
       const marker = el.getAttribute('data-gno-anchor');
-      if (marker != null) {
-        const t = el.getAttribute('transform') || '';
-        const m = /translate\(\s*([-\d.]+)[ ,]+([-\d.]+)\s*\)/.exec(t);
+      const t = el.getAttribute('transform') || '';
+      const m = /translate\(\s*([-\d.]+)[ ,]+([-\d.]+)\s*\)/.exec(t);
+      if (el.getAttribute('data-gno-layout') != null) {
+        items.push(cleanLayout({
+          svgId: el.getAttribute('id') || '',
+          direction: el.getAttribute('data-gno-layout'),
+          justify: el.getAttribute('data-gno-justify'),
+          align: el.getAttribute('data-gno-align'),
+          gap: parseFloat(el.getAttribute('data-gno-gap')),
+          children: (el.getAttribute('data-gno-children') || '').split(/\s+/).filter(Boolean),
+          x: m ? parseFloat(m[1]) : 0,
+          y: m ? parseFloat(m[2]) : 0,
+          w: parseFloat(el.getAttribute('data-gno-width')),
+          h: parseFloat(el.getAttribute('data-gno-height')),
+        }));
+      } else if (marker != null) {
         items.push({
           kind: 'anchor',
           // Files written before anchors had a separate id carried the
@@ -3675,12 +3958,20 @@ function normalizeEntityId(raw) {
   return /^[\p{L}\p{N}_'-]+$/u.test(id) ? '@' + id : null;
 }
 
-// Entities declared in Presentation without being mentioned in the narrative.
+// "king + @queen" -> "@king + @queen" (a group's key, see entityGroupKey), a
+// single entity as normalizeEntityId does, or null if any part is invalid.
+function normalizeEntityRef(raw) {
+  const parts = String(raw == null ? '' : raw).split('+').map(normalizeEntityId);
+  return parts.every(Boolean) ? entityGroupKey(parts) : null;
+}
+
+// Entities (and groups) declared in Presentation without being mentioned in
+// the narrative.
 function sanitizeExtraEntities(raw) {
   const out = [];
   if (Array.isArray(raw)) {
     raw.forEach(v => {
-      const id = normalizeEntityId(v);
+      const id = normalizeEntityRef(v);
       if (id && !out.includes(id)) out.push(id);
     });
   }
@@ -3697,6 +3988,7 @@ function sanitizeScenarioItem(it) {
   if (it.kind === 'anchor') {
     return { kind: 'anchor', svgId: String(it.svgId || it.label || ''), x: num(it.x, 0), y: num(it.y, 0), w: num(it.w, ANCHOR_SIZE), h: num(it.h, ANCHOR_SIZE) };
   }
+  if (it.kind === 'layout') return cleanLayout(it);
   if (it.kind === 'text') {
     return {
       kind: 'text',
@@ -4134,9 +4426,9 @@ createApp({
     function addExtraEntity() {
       const raw = newEntityId.value.trim();
       if (!raw) return;
-      const id = normalizeEntityId(raw);
+      const id = normalizeEntityRef(raw);
       if (!id) {
-        alert('An entity name may only contain letters, numbers, "_", "\'" and "-".');
+        alert('An entity name may only contain letters, numbers, "_", "\'" and "-" (join several with "+").');
         return;
       }
       // Already known (in the narrative, declared, or carrying images): just
@@ -4144,6 +4436,24 @@ createApp({
       if (!entityIdsForPresentation.value.includes(id)) extraEntities.push(id);
       openEntityImages.add(id);
       newEntityId.value = '';
+    }
+
+    // Entities picked to be joined into a group (Entity tab's "Join" row).
+    const joinPick = reactive([]);
+    const singleEntityIds = computed(() => entityIdsForPresentation.value.filter(id => !id.includes(' + ')));
+
+    function toggleJoinPick(id) {
+      const i = joinPick.indexOf(id);
+      if (i >= 0) joinPick.splice(i, 1);
+      else joinPick.push(id);
+    }
+
+    function joinEntities() {
+      if (joinPick.length < 2) return;
+      const key = entityGroupKey(joinPick);
+      if (!entityIdsForPresentation.value.includes(key)) extraEntities.push(key);
+      openEntityImages.add(key);
+      joinPick.length = 0;
     }
 
     function removeExtraEntity(id) {
@@ -4190,7 +4500,12 @@ createApp({
     const scenarioDesigns = reactive(sanitizeScenarioDesigns(draft && draft.presentation && draft.presentation.scenario_designs));
     const openScenario = ref(null);
     const bgPickerScenario = ref(null);
-    const placeMode = ref('entity'); // 'entity' | 'text'
+    // What a press on the canvas does. null: nothing — items are locked in
+    // place, and entities are added by dragging them from the palette in any
+    // mode; 'edit': select, move and resize items; 'text' / 'column' / 'row':
+    // draw a text area / vertical stack / horizontal stack.
+    const placeMode = ref(null);
+    const layoutPick = ref(null); // svgId of the stack that clicked items are inserted into (Edit mode)
     let dragPayload = null; // {entityId, library, image} — set on palette dragstart, consumed on canvas drop
     const itemDragState = ref(null);
     const bgResizeState = ref(null);   // dragging the canvas corner handle
@@ -4348,7 +4663,7 @@ createApp({
         kind: 'entity', svgId, entityId: payload.entityId, library: payload.library, image: payload.image, url: img.url,
         x: Math.round(x - size / 2), y: Math.round(y - size / 2), w: size, h: size,
       });
-      selectedItemId.value = svgId;
+      if (placeMode.value === 'edit') selectedItemId.value = svgId;
     }
 
     // Anchors are made from entities: place the entity, size it while its image
@@ -4364,6 +4679,7 @@ createApp({
       const auto = normalizeToSlug(String(item.entityId).replace(/^@/, ''));
       const isAutoId = item.svgId === auto || new RegExp('^' + auto + '_\\d+$').test(item.svgId);
       const svgId = isAutoId ? nextSeqId(usedItemIds(design), 'anchor_') : item.svgId;
+      renameLayoutRefs(design, item.svgId, svgId);
       design.items.splice(idx, 1, {
         kind: 'anchor', svgId,
         x: Math.round(item.x + item.w / 2), y: Math.round(item.y + item.h / 2), w: item.w, h: item.h,
@@ -4375,8 +4691,88 @@ createApp({
       const design = scenarioDesigns[name];
       if (!design) return;
       const [gone] = design.items.splice(idx, 1);
-      if (gone && gone.svgId === selectedItemId.value) selectedItemId.value = null;
+      if (!gone) return;
+      renameLayoutRefs(design, gone.svgId, null);
+      if (gone.svgId === selectedItemId.value) selectedItemId.value = null;
+      if (gone.svgId === layoutPick.value) layoutPick.value = null;
     }
+
+    /* ── Layouts (stacks) ──
+       A stack only holds its children's ids, so renaming or removing an item
+       must follow through to the stack listing it. While designing, every
+       child is shown, and its position is written back from the stack
+       whenever the design changes — so the canvas, the inspector and the
+       exported SVG all show where the stack puts it. */
+    function renameLayoutRefs(design, oldId, newId) {
+      design.items.forEach(it => {
+        if (it.kind !== 'layout') return;
+        const i = it.children.indexOf(oldId);
+        if (i < 0) return;
+        if (newId) it.children.splice(i, 1, newId);
+        else it.children.splice(i, 1);
+      });
+    }
+
+    function parentLayoutOf(design, id) {
+      return design.items.find(it => it.kind === 'layout' && it.children.includes(id)) || null;
+    }
+
+    // True when `id` is `layout` itself or sits somewhere inside it.
+    function isWithinLayout(design, layout, id, seen = new Set()) {
+      if (layout.svgId === id) return true;
+      if (seen.has(layout.svgId)) return false;
+      seen.add(layout.svgId);
+      return layout.children.some(cid => {
+        const child = design.items.find(it => it.svgId === cid);
+        return cid === id || (child && child.kind === 'layout' && isWithinLayout(design, child, id, seen));
+      });
+    }
+
+    function insertIntoLayout(design, layoutId, id) {
+      const layout = design.items.find(it => it.svgId === layoutId);
+      const item = design.items.find(it => it.svgId === id);
+      if (!layout || !item || layout.children.includes(id)) return;
+      if (item.kind === 'layout' && isWithinLayout(design, item, layoutId)) {
+        alert(`${id} contains ${layoutId}, so it can't go inside it.`);
+        return;
+      }
+      const old = parentLayoutOf(design, id);
+      if (old) old.children.splice(old.children.indexOf(id), 1);
+      layout.children.push(id);
+    }
+
+    function toggleLayoutPick(layout) {
+      layoutPick.value = layoutPick.value === layout.svgId ? null : layout.svgId;
+    }
+
+    function moveLayoutChild(layout, i, d) {
+      const [id] = layout.children.splice(i, 1);
+      layout.children.splice(i + d, 0, id);
+    }
+
+    function takeOutOfLayout(item) {
+      const design = scenarioDesigns[openScenario.value];
+      const layout = design && parentLayoutOf(design, item.svgId);
+      if (layout) layout.children.splice(layout.children.indexOf(item.svgId), 1);
+    }
+
+    const selectedParentLayout = computed(() => {
+      const design = openScenario.value && scenarioDesigns[openScenario.value];
+      return design && selectedItem.value ? parentLayoutOf(design, selectedItem.value.svgId) : null;
+    });
+
+    function relayoutDesign(design) {
+      if (!design.items.some(it => it.kind === 'layout')) return;
+      const boxes = layoutBoxes(design, () => true, true);
+      design.items.forEach(it => {
+        const b = boxes.get(it.svgId);
+        const x = it.kind === 'anchor' ? b.x + it.w / 2 : b.x;
+        const y = it.kind === 'anchor' ? b.y + it.h / 2 : b.y;
+        if (it.x !== x) it.x = x;
+        if (it.y !== y) it.y = y;
+      });
+    }
+    watch(scenarioDesigns, () => Object.values(scenarioDesigns).forEach(relayoutDesign), { deep: true, immediate: true });
 
     /* ── Selection, and the ID-rename procedure shared by every item kind ── */
     const selectedItem = computed(() => {
@@ -4413,6 +4809,8 @@ createApp({
       idError.value = err;
       if (err) return;
       idDraft.value = id;
+      renameLayoutRefs(design, item.svgId, id);
+      if (layoutPick.value === item.svgId) layoutPick.value = id;
       item.svgId = id;
       selectedItemId.value = id;
     }
@@ -4431,6 +4829,7 @@ createApp({
         'action_proceed',
         'action_regress',
       ];
+      if (item.kind === 'layout') return [];
       if (item.kind === 'text') list.push('speech', '_.speech', 'entity.speech');
       return list.filter(id => !used.has(id));
     });
@@ -4443,15 +4842,58 @@ createApp({
       e.target.value = item[key];
     }
 
+    // The X/Y fields always show the top-left corner, also for an anchor,
+    // whose stored x/y is its center.
+    function itemCorner(item, axis) {
+      return item.kind === 'anchor' ? item[axis] - (axis === 'x' ? item.w : item.h) / 2 : item[axis];
+    }
+
+    function setItemCorner(item, axis, e) {
+      const n = parseFloat(e.target.value);
+      if (Number.isFinite(n)) {
+        const v = clampInt(n, -10000, 10000);
+        item[axis] = item.kind === 'anchor' ? v + (axis === 'x' ? item.w : item.h) / 2 : v;
+      }
+      e.target.value = itemCorner(item, axis);
+    }
+
+    const isDrawMode = computed(() => ['text', 'column', 'row'].includes(placeMode.value));
+
+    function togglePlaceMode(mode) {
+      placeMode.value = placeMode.value === mode ? null : mode;
+    }
+
+    // Leaving Edit drops the selection, so nothing stays editable outside it.
+    watch(placeMode, mode => {
+      if (mode !== 'edit') { selectedItemId.value = null; layoutPick.value = null; }
+    });
+
+    const placeModeHint = computed(() => {
+      const m = placeMode.value;
+      if (m === 'edit') return layoutPick.value
+        ? `Click items to insert them into ${layoutPick.value}.`
+        : 'Drag items to move them; click one to edit it.';
+      if (m === 'text') return 'Drag over the canvas to draw the text area.';
+      if (m === 'column' || m === 'row') return "Drag over the canvas to draw the stack's area.";
+      return 'Drag entities from the palette onto the canvas. Turn on Edit to change what is placed.';
+    });
+
     function isKnownFont(value) {
       return TEXT_FONTS.some(f => f.value === value);
     }
 
     /* ── Moving items, drawing text areas, and the two corner-handle resizes
        (canvas, text area) — all driven by the shared window listeners below ── */
+    // Edit mode only (elsewhere items don't take the press — see the CSS).
+    // While inserting into a stack, a click inserts instead of selecting. An
+    // item inside a stack is selected but not dragged: the stack places it.
     function onItemMouseDown(name, idx, item, e) {
+      if (placeMode.value !== 'edit') return;
       e.stopPropagation();
+      const design = scenarioDesigns[name];
+      if (layoutPick.value) { insertIntoLayout(design, layoutPick.value, item.svgId); return; }
       selectedItemId.value = item.svgId;
+      if (parentLayoutOf(design, item.svgId)) return;
       itemDragState.value = { name, idx, startX: e.clientX, startY: e.clientY, origX: item.x, origY: item.y };
     }
 
@@ -4461,16 +4903,16 @@ createApp({
       itemResizeState.value = { name, idx, startX: e.clientX, startY: e.clientY, origW: item.w, origH: item.h };
     }
 
-    // Mousedown on empty canvas: in text mode it starts drawing a text area;
-    // otherwise it just clears the selection. Items stop propagation, so this
-    // only sees clicks that missed them.
+    // Mousedown on the canvas: in a drawing mode it starts drawing a text
+    // area or stack (items let the press through there); in Edit mode, a
+    // press that missed every item clears the selection.
     function onScenarioCanvasMouseDown(e, name) {
       if (e.button !== 0) return;
-      if (placeMode.value !== 'text') { selectedItemId.value = null; return; }
+      if (!isDrawMode.value) { selectedItemId.value = null; return; }
       e.preventDefault(); // no text selection while dragging
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left, y = e.clientY - rect.top;
-      textDraw.value = { name, left: rect.left, top: rect.top, x0: x, y0: y, x, y };
+      textDraw.value = { name, kind: placeMode.value, left: rect.left, top: rect.top, x0: x, y0: y, x, y };
     }
 
     function textDrawRect() {
@@ -4486,12 +4928,18 @@ createApp({
       if (!d || r.w < MIN_TEXT_SIDE || r.h < MIN_TEXT_SIDE) return;
       const design = scenarioDesigns[d.name];
       if (!design) return;
-      const svgId = nextSeqId(usedItemIds(design), 'text_');
-      design.items.push({
-        kind: 'text', svgId, ...TEXT_DEFAULTS,
-        x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h),
-      });
-      selectedItemId.value = svgId;
+      const box = { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h) };
+      let svgId;
+      if (d.kind === 'text') {
+        svgId = nextSeqId(usedItemIds(design), 'text_');
+        design.items.push({ kind: 'text', svgId, ...TEXT_DEFAULTS, ...box });
+      } else {
+        svgId = nextSeqId(usedItemIds(design), 'layout_');
+        design.items.push(cleanLayout({ svgId, direction: d.kind, ...LAYOUT_DEFAULTS, children: [], ...box }));
+      }
+      // Straight into Edit, with the new item selected, to name and set it up.
+      placeMode.value = 'edit';
+      nextTick(() => { selectedItemId.value = svgId; });
     }
 
     function onScenarioWindowMouseMove(e) {
@@ -5321,7 +5769,7 @@ Write your scene description here.
       defaultCatalogMdFilename: DEFAULT_CATALOG_MD_FILENAME,
       addImageLibraryFromInput, removeImageLibrary, renameImageLibrary, loadLibraryCatalog, showMoreImages, brokenCount,
       entityAssociations, entityIdsForPresentation, allCatalogImages, openEntityImages, imagePickerEntity,
-      newEntityId, addExtraEntity, removeExtraEntity, isDeclaredEntity,
+      newEntityId, addExtraEntity, removeExtraEntity, isDeclaredEntity, joinPick, singleEntityIds, toggleJoinPick, joinEntities,
       isImageAssociated, associateImage, removeEntityImage, addLabelToAssociation, onAddLabel,
       removeLabelFromAssociation, resolveAssocImage, toggleEntityImages, togglePicker,
       scenarioDesigns, scenarioIdsForPresentation, openScenario, bgPickerScenario, placeMode,
@@ -5330,6 +5778,8 @@ Write your scene description here.
       setScenarioSize, lockCanvasRatio, lockItemRatio, setItemSize, convertSelectedToAnchor, wideScenario, onBgResizeMouseDown, onItemResizeMouseDown, onScenarioCanvasMouseDown, textDraw, textDrawRect,
       selectedItemId, selectedItem, idDraft, idError, idSuggestions, onIdDraftInput, renameSelectedItem,
       setItemNumber, isKnownFont, TEXT_FONTS,
+      layoutPick, isDrawMode, togglePlaceMode, placeModeHint, itemCorner, setItemCorner, selectedParentLayout,
+      toggleLayoutPick, moveLayoutChild, takeOutOfLayout,
     };
   }
 }).mount('#vue-mount');

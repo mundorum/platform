@@ -54,6 +54,18 @@ In the middle of ordinary text, with no state:
 The @king enters the room.
 ~~~
 
+### Groups
+
+Two or more entities joined with `+` act together, in any of the three forms:
+
+~~~gno
+@king + @queen right happy
+-- @king + @queen: Welcome, friends!
+The @king + @queen bow.
+~~~
+
+The order doesn't matter: `@queen + @king` is the same group. A group's state applies to every member. In the graphic Player, a group can have images of its own (see [Graphic play](#graphic-play)).
+
 ## States
 
 Words that immediately follow an entity — either standalone or at the start of a dialog — describe its state, such as its position or mood. States are free-form text with no fixed vocabulary; they end at the end of the line or, in a dialog, at the colon. Example:
@@ -203,14 +215,17 @@ When the current scene's scenario has a design in **Presentation → Scenarios**
 
 Later mentions update what they say something about: `@king sad` changes the image and keeps the position, `@king right` moves the king and keeps the image. `@king ->` removes the entity. Labels, anchor IDs and text-area IDs are compared ignoring case and accents.
 
+**Groups.** Entities joined in **Presentation → Entity** (for example `@king + @queen`) can have images of their own, which are used only where the narrative writes the members joined (`@king + @queen right`). Their labels work as for a single entity. While the group is on stage, it is drawn as one image and the members' own images are hidden. Mentioning a member alone (`-- @king: …`) leaves the group as it is. The group stands at the anchor it names; if it names none, it stands where its first placed member already is. `@king + @queen ->` removes the group together with its members. A member leaving on its own (`@king ->`) breaks the group up, and any remaining member shows its own image again. A group with no images of its own is the same as mentioning each member with the same labels.
+
 **Speech.** Text is shown in the SVG's text areas, replaced at every pause like the text view:
 
 | What | Goes to text area | Otherwise |
 |---|---|---|
 | Free text (outside any dialog) | `_.speech` | `speech` |
 | A dialog of `@king` | `king.speech` | `speech` |
+| A dialog of `@king + @queen` | `speech` | the first member's own area (`king.speech`) |
 
-When dialogs share a `speech` area they are prefixed with the speaker's name. Text with no area to go to isn't shown, and a speech area with nothing to show at the current pause is hidden, like an unused choice.
+When dialogs share a `speech` area (and, always, for a group) they are prefixed with the speaker's name. Text with no area to go to isn't shown, and a speech area with nothing to show at the current pause is hidden, like an unused choice.
 
 **Actions.** Items with these IDs are the controls:
 
@@ -220,6 +235,8 @@ When dialogs share a `speech` area they are prefixed with the speaker's name. Te
 | `action_regress` | entity | Visible and clickable once past the first beat; steps back to the previous beat. |
 | `action_N` | entity | Choice N (the Nth `* Label -> Target` of the scene); clickable while the choices are on offer, goes to its target. |
 | `action_N_label` | text area | Filled with choice N's label; clickable like `action_N`. (`action_N_text` is accepted as well.) |
+
+**Stacks.** Items can be put into *stacks*, which place them the way a CSS flexbox does: a vertical stack lines its items up top to bottom, a horizontal one left to right, and stacks can contain other stacks. Each item keeps its own size, and the stack decides its position from three settings: where the run sits along the direction (start, center, end or spread out), how each item is aligned across it, and the gap between items. Items hidden at the current pause take no room, so the rest close up. A stack with nothing visible is hidden as well. Hidden items are an empty speech area, a choice not on offer, an inactive control, or an anchor with no one on it. For example, a vertical stack aligned to the bottom, holding `speech` and then the `action_N_label` areas, shows the speech right at the bottom while there are no choices, and moves it up above them when the choices appear.
 
 Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without `action_N` / `action_N_label`), so a scene can never get stuck; `Space` always continues.
 

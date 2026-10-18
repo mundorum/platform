@@ -94,22 +94,35 @@ all persisted together as `_presentation.yaml`:
   narrative entities, nothing in the text would bring them back on reload.
   They appear in the Scenarios palette like any other entity and can be
   removed again; narrative entities can't (the text defines them).
+  *Groups* (`@king + @queen`) are entities too, keyed by `entityGroupKey`
+  (members sorted, joined with ` + `). They come from the narrative
+  (`analyzeEntities` reads the joined form) or from the "Join" row, which
+  stores the key in `extraEntities`, so a group's images live in
+  `entityAssociations` like any entity's.
 - **Scenarios** — a small SVG design canvas per scenario
   (`buildScenarioSvg`/`parseScenarioSvg`), downloaded as one `.svg` file per
   scenario inside the export zip.
   - *Canvas:* its size, which the background always fills, is set by dragging
     the bottom-right corner or by typing width/height.
-  - *Items:* entities and text areas are placed on it ("Place: Entity" drags
-    a tile from the palette, "Place: Text" drags out an area); anchors are
+  - *Modes:* the toolbar's mode decides what a press on the canvas does
+    (`placeMode`). With no mode selected, items are locked in place. **Edit**
+    selects, moves and resizes them; it is the only mode in which items take
+    the pointer (`.scenario-svg.editing`) and the inspector shows a
+    selection. **Place: Text** / **Place: Vertical stack** / **Place:
+    Horizontal stack** draw a new text area or stack, and then switch to Edit
+    with it selected. Entities are added by dragging a tile from the palette,
+    in any mode.
+  - *Items:* entities, text areas and stacks are placed on it; anchors are
     made from entities (see below). Every item
     has an ID, unique within the scenario, edited in the sidebar inspector
-    after placement. New anchors and text areas start as `anchor_n` /
-    `text_n` (lowest free `n` from 1); entities start as their entity id. The
+    after placement. New anchors, text areas and stacks start as `anchor_n` /
+    `text_n` / `layout_n` (lowest free `n` from 1); entities start as their entity id. The
     inspector offers suggested IDs for all kinds (`action_n`,
     `action_n_label`, `action_proceed`, `action_regress`), plus `speech`,
     `_.speech` and `entity.speech` for text areas.
   - *Moving and resizing:* every item can be moved by dragging it or by typing
-    its X/Y in the inspector (top-left corner; an anchor's center). The canvas
+    its X/Y in the inspector. The X/Y fields always show the top-left corner,
+    including for anchors, whose stored x/y is their center. The canvas
     and every item can be resized by dragging a corner handle or typing
     width/height. Holding Shift while dragging, or the lock
     toggle beside the inputs (one for the canvas, one for items), keeps the
@@ -125,6 +138,20 @@ all persisted together as `_presentation.yaml`:
   - *Text areas* are drawn by dragging in "Place: Text" mode and exported as a
     `<foreignObject>` wrapping an HTML `<div>`, since SVG `<text>` cannot wrap
     lines; text, font, size and color are set in the inspector.
+  - *Stacks* (`kind: 'layout'`) are flexbox-like: a box, a `direction`
+    (`column` | `row`), `justify`, `align`, `gap`, and an ordered list of
+    child ids (`children`), which may include other stacks. The layout
+    itself is the pure `layoutBoxes`. While designing, every child counts as
+    visible, and a deep watcher (`relayoutDesign`) writes the positions back
+    into the children, so the canvas, the inspector and the exported SVG
+    agree. A child is selected but not dragged, and its X/Y fields are
+    disabled. Items are added with the inspector's "Insert items" (click
+    items on the canvas), reordered or removed from its list, or taken out
+    from the child's own inspector. Renaming or removing an item updates the
+    lists that reference it (`renameLayoutRefs`). A stack is exported as an
+    empty `<g data-gno-layout="column|row">` whose settings and child ids
+    are in `data-gno-*` attributes. The children stay flat in the SVG's
+    z-order.
   - *Wide editor:* a toolbar button lifts the whole workspace (toolbar,
     canvas, sidebar) into a fixed full-window layer (`.scenario-workspace.wide`),
     hiding the app's top bar, navigation and the 900px page column. Esc (or
@@ -152,8 +179,10 @@ round-trip. The pipeline is a chain of pure functions:
 and `speeches` (prose and dialogs, in order) → `foldStageFrames` replays the
 events into who is on stage and where, using `pickEntityImage` (best label
 match, first on ties) → `routeSpeech` assigns speech to text areas →
-`buildPlayerStage` walks the design in its own z-order and emits drawable
-layers, with `action_*` items turned into click targets. Entity images come
+`buildPlayerStage` first settles what each item shows at this moment (and so
+which items are hidden), then runs `layoutBoxes` so stacks close up around
+the hidden items, and finally emits drawable layers in the design's z-order,
+with `action_*` items turned into click targets. Entity images come
 from the live library catalogs (`findCatalogImage`), not from anything stored
 in the design, so an entity is drawn only once its catalog has loaded. The
 Vue template binds the SVG's `viewBox` through `v-bind="{viewBox: …}"`
