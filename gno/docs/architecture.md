@@ -95,10 +95,15 @@ all persisted together as `_presentation.yaml`:
   They appear in the Scenarios palette like any other entity and can be
   removed again; narrative entities can't (the text defines them).
   *Groups* (`@king + @queen`) are entities too, keyed by `entityGroupKey`
-  (members sorted, joined with ` + `). They come from the narrative
-  (`analyzeEntities` reads the joined form) or from the "Join" row, which
-  stores the key in `extraEntities`, so a group's images live in
-  `entityAssociations` like any entity's.
+  (members sorted, joined with ` + `), so a group's images live in
+  `entityAssociations` like any entity's. They come from the narrative
+  (`analyzeEntities` reads the joined form) or from typing them with `+` in
+  "Add entity" (`normalizeEntityRef`, spaces around `+` optional, any number
+  of members). Resolution goes by key, but a group is *shown* in the order it
+  was written (`entityWrittenRef`): `extraEntities` keeps the typed form
+  (re-typing a declared group in another order replaces it), occurrences carry
+  `written`, and the app's `entityLabel(key)` picks the typed form first, then
+  the narrative's first one.
 - **Scenarios** — a small SVG design canvas per scenario
   (`buildScenarioSvg`/`parseScenarioSvg`), downloaded as one `.svg` file per
   scenario inside the export zip.
@@ -109,7 +114,7 @@ all persisted together as `_presentation.yaml`:
     selects, moves and resizes them; it is the only mode in which items take
     the pointer (`.scenario-svg.editing`) and the inspector shows a
     selection. **Place: Text** / **Place: Vertical stack** / **Place:
-    Horizontal stack** draw a new text area or stack, and then switch to Edit
+    Horizontal stack** / **Place: Group** draw a new text area, stack or group, and then switch to Edit
     with it selected. Entities are added by dragging a tile from the palette,
     in any mode.
   - *Items:* entities, text areas and stacks are placed on it; anchors are
@@ -152,6 +157,24 @@ all persisted together as `_presentation.yaml`:
     empty `<g data-gno-layout="column|row">` whose settings and child ids
     are in `data-gno-*` attributes. The children stay flat in the SVG's
     z-order.
+  - *Groups* (`kind: 'group'`, `cleanGroup`) are the other container: a box
+    and `children`, with no placement rule of their own. Children keep their
+    absolute x/y; moving the group (drag or X/Y) moves them along
+    (`translateItem`), and when a stack places the group, `layoutBoxes`
+    shifts them by the group's displacement. Stacks and groups nest freely
+    (`isContainer`); an item sits in at most one container. A group's
+    `children` are back to front and mirror the design's z-order: inserting
+    files the item by its z-index, and reordering permutes the children's
+    slots in `items` (`moveLayoutChild`). Inserting also grows the box to
+    take the item in; "Fit to items" shrinks it to them. Visibility in play:
+    a group is shown while any child that can hide (anything but a plain,
+    non-action entity image, `isDecorItem`) is, else everything inside it is
+    hidden (`layoutBoxes` returns that set as `hidden`). Exported as an empty
+    `<g data-gno-group data-gno-children=…>`.
+  - *Hierarchy:* the sidebar lists the design as a tree (`designTree`):
+    top-level items in z-order, containers with their children indented.
+    A row selects its item (switching to Edit), or inserts it while a
+    container is collecting items.
   - *Wide editor:* a toolbar button lifts the whole workspace (toolbar,
     canvas, sidebar) into a fixed full-window layer (`.scenario-workspace.wide`),
     hiding the app's top bar, navigation and the 900px page column. Esc (or
