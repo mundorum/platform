@@ -3252,20 +3252,49 @@ function pickEntityImage(assocs, labels) {
 // A group ("@king + @queen") with images of its own enters as one entry and,
 // while on stage, hides its members' own images; it starts where its first
 // member already stands unless it names an anchor. Leaving as a group takes
-// the members along; a member leaving alone breaks the group up. A group
-// without images is just its members, each mentioned with the same labels.
+// the members along. A group without images is just its members, each
+// mentioned with the same labels.
+//
+// A member mentioned alone (`-- @king: …`, `@king left`, `@king ->`) splits
+// the group: every member goes back on stage on its own (see splitGroupsOf),
+// and then the mention applies to its entity as usual — so members mentioned
+// alone take their own labels, and the others stay as the group left them.
 function foldStageFrames(eventsByBeat, associations, anchorKeys) {
   const onStage = new Map();
 
+  // Breaks up every group on stage that has `id` as a member. Each member
+  // stays (until it leaves explicitly), with the image best matching the
+  // labels the group was last given (pickEntityImage: those labels, else
+  // its image without labels, else its first one), where it stood before the
+  // group formed, or else where the group stands.
+  function splitGroupsOf(id) {
+    [...onStage.entries()].forEach(([key, g]) => {
+      if (!g.members || !g.members.includes(id)) return;
+      onStage.delete(key);
+      g.members.forEach(m => {
+        const own = onStage.get(m);
+        const pick = pickEntityImage(associations[m] || [], g.labels);
+        onStage.delete(m); // re-entered, so it is drawn in the order of the split
+        onStage.set(m, {
+          entityId: m,
+          members: null,
+          assoc: pick ? pick.assoc : (own ? own.assoc : null),
+          anchorId: (own && own.anchorId) || g.anchorId,
+          labels: g.labels,
+        });
+      });
+    });
+  }
+
   function apply(ev) {
     const members = ev.members || null;
+    if (!members) splitGroupsOf(ev.entityId);
     if (ev.exit) {
       onStage.delete(ev.entityId);
       if (members) members.forEach(m => onStage.delete(m));
-      else onStage.forEach((e, k) => { if (e.members && e.members.includes(ev.entityId)) onStage.delete(k); });
       return;
     }
-    const prev = onStage.get(ev.entityId) || { entityId: ev.entityId, members, assoc: null, anchorId: null };
+    const prev = onStage.get(ev.entityId) || { entityId: ev.entityId, members, assoc: null, anchorId: null, labels: [] };
     const pick = pickEntityImage(associations[ev.entityId] || [], ev.labels);
     const restate = !!pick && (pick.score > 0 || !prev.assoc);
     const rest = ev.labels.filter((_, i) => !(restate && pick.used.has(i)));
@@ -3280,6 +3309,7 @@ function foldStageFrames(eventsByBeat, associations, anchorKeys) {
       members,
       assoc: restate ? pick.assoc : prev.assoc,
       anchorId,
+      labels: restate ? ev.labels : prev.labels, // the labels its image was picked by
     });
   }
 

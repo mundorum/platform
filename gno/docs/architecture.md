@@ -236,7 +236,10 @@ round-trip. The pipeline is a chain of pure functions:
 `buildScenePlayback` additionally returns per-beat `events` (entity mentions)
 and `speeches` (prose and dialogs, in order) → `foldStageFrames` replays the
 events into who is on stage and where, using `pickEntityImage` (best label
-match, first on ties) → `routeSpeech` assigns speech to text areas (by their authored ID; an
+match, first on ties); a member mentioned alone splits an on-stage group
+(`splitGroupsOf`: each member re-enters with the image the group's last
+labels pick for it, at its own earlier anchor or the group's, and the
+mention then applies on top) → `routeSpeech` assigns speech to text areas (by their authored ID; an
 entity sharing a speech area's ID, `isSpeechRole`, is shown only while that
 area has speech, and both items of an `action_*` pair follow `actionRole`) →
 `buildPlayerStage` first settles what each item shows at this moment (and so
