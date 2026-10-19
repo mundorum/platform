@@ -1,7 +1,7 @@
 # gnō- Architecture
 
 `gno/` is a **single-file, single-page application**: everything — markup, CSS,
-and application code — lives in [`editor.html`](../editor.html). There is no
+and application code — lives in [`index.html`](../index.html). There is no
 build step, no bundler, and no package.json; the file is opened directly in a
 browser. This is a deliberate scope choice, not a placeholder: `gno/` is
 isolated from the rest of the platform (see the root `CLAUDE.md`) and doesn't
@@ -23,13 +23,13 @@ how the editor application that reads/writes that format is built.
 | Fonts | Lora / Outfit / JetBrains Mono | Google Fonts |
 
 All libraries are pulled from CDNs via `<script>`/`<link>` tags at the top of
-`editor.html` — no local `node_modules`. This mirrors the "no build step"
+`index.html` — no local `node_modules`. This mirrors the "no build step"
 constraint but is otherwise independent from the CSS design-token system
 shared with the rest of the platform (`--c-*` custom properties), which `gno/`
 also follows even though it doesn't import `assets/tokens.css` from
 `frontend/`.
 
-## File layout inside `editor.html`
+## File layout inside `index.html`
 
 1. `<head>` — the favicon (an inline SVG `data:` URI of the app-tile icon from
    `design/icons/gno-icon-tile.svg`, so the file stays self-contained),
@@ -209,7 +209,13 @@ all persisted together as `_presentation.yaml`:
     place in their container when they all shared one. Rows are draggable
     (HTML5 DnD, `treeDrag`): dropped on a container they go in through
     `insertIntoLayout` (no cycles), dropped on empty space in the panel they
-    go to the top level.
+    go to the top level. A row's arrows (`moveTreeItem`) move it among its
+    siblings: inside a container through `moveLayoutChild`; at the top level
+    it passes its neighbour in `items`, each moving with its whole subtree
+    (`subtreeOf`), so the tree order stays the z-order. Its trash button, or
+    the head's one for the selection, deletes (`deleteTreeItems` →
+    `removeScenarioItem`); a deleted container's children take its place in
+    its own container (or go to the top level).
   - *Wide editor:* a toolbar button lifts the whole workspace (toolbar,
     canvas, sidebar) into a fixed full-window layer (`.scenario-workspace.wide`),
     hiding the app's top bar, navigation and the 900px page column. Esc (or

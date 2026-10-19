@@ -256,6 +256,8 @@ Items go into a stack or group in either of two ways in **Presentation → Scena
 1. Select the stack or group (or create one with **New group**), press **Insert items**, and click the items, on the canvas or in the hierarchy.
 2. In the sidebar's *hierarchy* (the design's stacks and groups with the items they hold, nested as they are), Shift- or Ctrl-click several items and group or stack them with the buttons at its top, or drag items onto a group or stack. Dragging them onto empty space in the hierarchy takes them out again.
 
+In the hierarchy, the arrows on a row move it up or down among its neighbours: at the top level and in a group that changes the drawing order (higher rows are behind lower ones), in a stack the placing order. The trash button on a row deletes that item, and the one at the top deletes all the selected items; deleting a group or stack keeps the items it held, which take its place.
+
 Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without an `action_N` entity or text area), so a scene can never get stuck; `Space` always continues.
 
 ## Side panels

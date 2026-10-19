@@ -1573,6 +1573,16 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
 .scenario-tree-row.container i { color: var(--c-accent); }
 .scenario-tree-id { flex: 1; font-family: var(--font-mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scenario-tree-kind { font-size: 10px; color: var(--c-muted); }
+.scenario-tree-actions { display: none; align-items: center; gap: 1px; }
+.scenario-tree-row:hover .scenario-tree-actions,
+.scenario-tree-row.primary .scenario-tree-actions { display: flex; }
+.scenario-tree-actions button {
+  border: none; background: none; padding: 0 2px; cursor: pointer;
+  color: var(--c-muted); line-height: 1;
+}
+.scenario-tree-actions button i { font-size: 12px; color: inherit; }
+.scenario-tree-actions button:hover { color: var(--c-accent); }
+.scenario-tree-actions button:disabled { opacity: 0.3; cursor: default; }
 
 .scenario-palette {
   width: auto;
@@ -2500,6 +2510,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                       <button class="nav-icon-btn" title="Group the selected items" :disabled="!treeSelection.length" @click="wrapTreeSelection('group')"><i class="ti ti-stack-2"></i></button>
                       <button class="nav-icon-btn" title="Put the selected items in a new vertical stack" :disabled="!treeSelection.length" @click="wrapTreeSelection('column')"><i class="ti ti-layout-rows"></i></button>
                       <button class="nav-icon-btn" title="Put the selected items in a new horizontal stack" :disabled="!treeSelection.length" @click="wrapTreeSelection('row')"><i class="ti ti-layout-columns"></i></button>
+                      <button class="nav-icon-btn" title="Delete the selected items" :disabled="!treeSelection.length" @click="deleteTreeItems(treeSelection)"><i class="ti ti-trash"></i></button>
                     </div>
                     <div class="scenario-tree-row" v-for="row in designTree" :key="row.item.svgId"
                          :class="{selected: treeSelection.includes(row.item.svgId), primary: selectedItemId === row.item.svgId,
@@ -2513,9 +2524,14 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                       <i class="ti" :class="itemIcon(row.item)"></i>
                       <span class="scenario-tree-id">{{ itemRoleId(row.item) }}</span>
                       <span class="scenario-tree-kind" v-if="row.item.kind === 'layout' || row.item.kind === 'group'">{{ row.item.children.length }}</span>
+                      <span class="scenario-tree-actions" @mousedown.stop @dragstart.prevent.stop>
+                        <button :title="row.inStack ? 'Earlier in the stack' : 'Further back'" :disabled="row.index === 0" @click.stop="moveTreeItem(row.item, -1)"><i class="ti ti-arrow-up"></i></button>
+                        <button :title="row.inStack ? 'Later in the stack' : 'Further front'" :disabled="row.index === row.count - 1" @click.stop="moveTreeItem(row.item, 1)"><i class="ti ti-arrow-down"></i></button>
+                        <button title="Delete" @click.stop="deleteTreeItems([row.item.svgId])"><i class="ti ti-trash"></i></button>
+                      </span>
                     </div>
                     <div class="inspector-empty" v-if="!designTree.length">Nothing placed yet.</div>
-                    <div class="inspector-hint" v-else>Shift- or Ctrl-click to select several, then group or stack them with the buttons above. Drag items onto a group or stack to put them in it, or onto empty space here to take them out.</div>
+                    <div class="inspector-hint" v-else>Shift- or Ctrl-click to select several, then group or stack them with the buttons above. Drag items onto a group or stack to put them in it, or onto empty space here to take them out. The arrows on a row move it among its neighbours (back to front, or along its stack); deleting a group or stack keeps what it holds.</div>
                   </div>
 
                   <div class="scenario-palette">
@@ -5020,7 +5036,17 @@ createApp({
       if (!design) return;
       const [gone] = design.items.splice(idx, 1);
       if (!gone) return;
-      renameLayoutRefs(design, gone.svgId, null);
+      // What a deleted group or stack held takes its place in its container.
+      const parent = parentLayoutOf(design, gone.svgId);
+      if (parent && isContainer(gone)) {
+        parent.children.splice(parent.children.indexOf(gone.svgId), 1, ...gone.children);
+        if (parent.kind === 'group') {
+          const z = cid => design.items.findIndex(it => it.svgId === cid);
+          parent.children.sort((a, b) => z(a) - z(b));
+        }
+      } else {
+        renameLayoutRefs(design, gone.svgId, null);
+      }
       if (gone.svgId === selectedItemId.value) selectedItemId.value = null;
       if (gone.svgId === layoutPick.value) layoutPick.value = null;
     }
@@ -5160,21 +5186,70 @@ createApp({
 
     /* ── Hierarchy (sidebar): containers with what they hold, top-level
        items in drawing order ── */
+    function topLevelItems(design) {
+      const nested = new Set(design.items.filter(isContainer).flatMap(c => c.children));
+      return design.items.filter(it => !nested.has(it.svgId));
+    }
+
+    // A row also knows its place among its siblings (`index` of `count`) and
+    // whether it sits in a stack, for its move buttons.
     const designTree = computed(() => {
       const design = openScenario.value && scenarioDesigns[openScenario.value];
       if (!design) return [];
       const byId = new Map(design.items.map(it => [it.svgId, it]));
-      const nested = new Set(design.items.filter(isContainer).flatMap(c => c.children));
       const rows = [];
-      function walk(item, depth, seen) {
-        rows.push({ item, depth });
-        if (!isContainer(item) || seen.has(item.svgId)) return;
-        seen.add(item.svgId);
-        item.children.forEach(cid => { if (byId.has(cid)) walk(byId.get(cid), depth + 1, seen); });
+      function walk(siblings, depth, inStack, seen) {
+        siblings.forEach((item, index) => {
+          rows.push({ item, depth, index, count: siblings.length, inStack });
+          if (!isContainer(item) || seen.has(item.svgId)) return;
+          seen.add(item.svgId);
+          walk(item.children.filter(cid => byId.has(cid)).map(cid => byId.get(cid)), depth + 1, item.kind === 'layout', seen);
+        });
       }
-      design.items.filter(it => !nested.has(it.svgId)).forEach(it => walk(it, 0, new Set()));
+      walk(topLevelItems(design), 0, false, new Set());
       return rows;
     });
+
+    // The item and everything inside it, in z-order.
+    function subtreeOf(design, item) {
+      return design.items.filter(it => it === item || (isContainer(item) && isWithinLayout(design, item, it.svgId)));
+    }
+
+    // Moves an item one place up (d = -1) or down (d = 1) among its siblings
+    // in the hierarchy. Inside a container that is moveLayoutChild; at the
+    // top level the item passes its neighbour in the z-order, each taking
+    // along everything it holds.
+    function moveTreeItem(item, d) {
+      const design = scenarioDesigns[openScenario.value];
+      if (!design) return;
+      const parent = parentLayoutOf(design, item.svgId);
+      if (parent) {
+        const i = parent.children.indexOf(item.svgId);
+        if (i + d >= 0 && i + d < parent.children.length) moveLayoutChild(parent, i, d);
+        return;
+      }
+      const tops = topLevelItems(design);
+      const other = tops[tops.indexOf(item) + d];
+      if (!other) return;
+      const mine = subtreeOf(design, item);
+      const rest = design.items.filter(it => !mine.includes(it));
+      const theirs = subtreeOf(design, other).map(it => rest.indexOf(it));
+      rest.splice(d < 0 ? Math.min(...theirs) : Math.max(...theirs) + 1, 0, ...mine);
+      design.items.splice(0, design.items.length, ...rest);
+    }
+
+    // Deletes the items `ids` names; what a deleted group or stack held stays.
+    function deleteTreeItems(ids) {
+      const name = openScenario.value;
+      const design = scenarioDesigns[name];
+      if (!design) return;
+      ids = [...ids];
+      ids.forEach(id => {
+        const idx = design.items.findIndex(it => it.svgId === id);
+        if (idx >= 0) removeScenarioItem(name, idx);
+      });
+      treeSelection.value = treeSelection.value.filter(id => !ids.includes(id));
+    }
 
     // The authored ID of the item `svgId` names in the open design (a
     // container's list holds svgIds).
@@ -6344,7 +6419,7 @@ Write your scene description here.
       selectedItemId, selectedItem, idDraft, idError, idSuggestions, onIdDraftInput, renameSelectedItem,
       setItemNumber, isKnownFont, TEXT_FONTS,
       layoutPick, isDrawMode, togglePlaceMode, placeModeHint, itemCorner, setItemCorner, selectedParentLayout,
-      toggleLayoutPick, moveLayoutChild, takeOutOfLayout, selectedPlacedByStack,
+      toggleLayoutPick, moveLayoutChild, takeOutOfLayout, moveTreeItem, deleteTreeItems, selectedPlacedByStack,
       designTree, itemIcon, itemKindLabel, itemRoleId, roleIdOf, selectTreeItem, treeSelection, newGroup, wrapTreeSelection,
       treeDropTarget, onTreeDragStart, onTreeDragEnd, onTreeDragOver, onTreeDragLeave, onTreeDrop,
     };
