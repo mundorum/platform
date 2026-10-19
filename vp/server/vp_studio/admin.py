@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Case, ContentPack, PreviewSample, Session
+from .models import AuthoringSettings, Case, ContentPack, PreviewSample, Session
 
 
 @admin.register(Case)
@@ -34,3 +34,14 @@ class SessionAdmin(admin.ModelAdmin):
     list_filter = ('mode', 'finished')
     search_fields = ('case__title', 'user__email')
     readonly_fields = ('id', 'case', 'user', 'mode', 'revision', 'document', 'state', 'created_at', 'updated_at')
+
+
+@admin.register(AuthoringSettings)
+class AuthoringSettingsAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'updated_by', 'updated_at')
+    # Edited in the Authoring Assistant's settings panel, which validates
+    # them against the pack; deleting one here resets it.
+    readonly_fields = ('user', 'data', 'updated_by', 'updated_at')
+
+    def has_add_permission(self, request):
+        return False

@@ -7,6 +7,7 @@ from django.http import FileResponse, HttpResponse
 from openai import APIError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -49,8 +50,10 @@ class ContentView(APIView):
     structural constants the editor shares with casedoc.py."""
 
     def get(self, request):
+        pack = services.active_pack()
         return Response({
-            **services.public_pack(services.active_pack()),
+            **services.public_pack(pack, services.authoring_for(request.user, pack)),
+            'can_configure_authoring': request.user.is_staff,
             'levels': casedoc.LEVELS,
             'system_fields': casedoc.SYSTEM_FIELDS,
         })
@@ -230,6 +233,32 @@ class AuthoringCaseView(APIView):
         texts = {k: str(request.data.get(k, '')) for k in ('title', 'vignette', 'explanation', 'summary')}
         case = services.create_assisted_case(request.user, **texts)
         return Response(CaseSerializer(case).data, status=status.HTTP_201_CREATED)
+
+
+class AuthoringSettingsView(APIView):
+    """Staff only. GET → the pack's authoring defaults, everyone's and the
+    user's own settings, what applies and the scripts to choose from.
+    PUT {scope: 'me'|'everyone', settings} saves; DELETE ?scope= resets.
+    Both return what GET does."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        return Response(services.authoring_settings_view(request.user))
+
+    def put(self, request):
+        try:
+            services.save_authoring_settings(request.user, request.data.get('scope', ''),
+                                             request.data.get('settings'))
+        except services.StudioError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return self.get(request)
+
+    def delete(self, request):
+        try:
+            services.reset_authoring_settings(request.user, request.query_params.get('scope', ''))
+        except services.StudioError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return self.get(request)
 
 
 # ── player ────────────────────────────────────────────────────────────────────

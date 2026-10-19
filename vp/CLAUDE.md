@@ -81,6 +81,11 @@ vp/
    optional in a pack (fallback: placeholder instructions + the pack's
    know/explain/transfer template). Uploaded files and extracted text are
    never stored; the browser keeps them until the case is created.
+   Staff may override that section (prompts, `summary_words`, template)
+   from the assistant's settings icon: one `AuthoringSettings` row for
+   everyone (user null) and one per staff user on top of it, layered by
+   `content.authoring_section(pack, everyone, mine)`. Only staff
+   (`is_staff`) ever see the pack's authoring prompts.
 10. **gnō- export is one-way and for reading.** `gnoexport.py` writes a case
    as a `.gno` narrative (`docs/gno-export.md`); nothing imports or runs it.
    Its extensions (`>>` bindings, `>` prompts, the `===== Data =====` layer)

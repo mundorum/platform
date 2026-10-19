@@ -7,7 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from llm.models import LLMUsage
 from vp_studio import casedoc, content, sources
-from vp_studio.models import Case
+from vp_studio.models import AuthoringSettings, Case
 from vp_studio.tests.helpers import id_factory
 
 
@@ -189,3 +189,101 @@ def test_create_case_from_the_assistant(api):
     assert explain['elements'][-1]['sideInfo'][0]['text'] == 'E.'
     ids = [x['id'] for s in case.document['steps'] for x in (s, *s['elements'])]
     assert len(set(ids)) == len(ids) and all(i.startswith(('s_', 'e_')) for i in ids)
+
+
+# ── authoring settings (staff overrides) ─────────────────────────────────────
+
+def settings_for(**changes):
+    pack = content.placeholder_pack()
+    return {**{k: pack['authoring'][k] for k in content.AUTHORING_SETTING_KEYS}, **changes}
+
+
+def test_only_eligible_scripts_can_be_chosen():
+    pack = content.placeholder_pack()
+    assert content.authoring_templates(pack) == ['recall_explain_transfer', 'recall_explain', 'explain_assess_transfer']
+    assert content.clean_authoring_settings(pack, settings_for(system='  S  ', template='recall_explain')) == \
+        settings_for(system='S', template='recall_explain')
+
+
+@pytest.mark.parametrize('changes, message', [
+    ({'summary': ' '}, 'The summary prompt can’t be empty'),
+    ({'system': 'x' * (content.MAX_AUTHORING_PROMPT + 1)}, 'too long'),
+    ({'summary_words': '400'}, 'word limit'),
+    ({'summary_words': content.MAX_SUMMARY_WORDS + 1}, 'word limit'),
+    ({'template': 'explain_reflect'}, 'Choose a script'),
+])
+def test_invalid_authoring_settings_are_rejected(changes, message):
+    with pytest.raises(content.ContentError, match=message):
+        content.clean_authoring_settings(content.placeholder_pack(), settings_for(**changes))
+
+
+def test_overrides_layer_over_the_pack():
+    pack = content.placeholder_pack()
+    everyone = settings_for(summary='Everyone.', template='recall_explain')
+    mine = settings_for(summary='Mine.', template='gone')
+    section = content.authoring_section(pack, everyone, mine)
+    # A template the pack no longer offers keeps the one below it.
+    assert (section['summary'], section['template']) == ('Mine.', 'recall_explain')
+    assert content.authoring_section(pack, None, everyone)['summary'] == 'Everyone.'
+
+
+def test_settings_are_staff_only(api):
+    assert api.get('/vp/api/content/').json()['can_configure_authoring'] is False
+    assert api.get('/vp/api/authoring/settings/').status_code == 403
+    assert api.put('/vp/api/authoring/settings/', {'scope': 'everyone', 'settings': settings_for()},
+                   format='json').status_code == 403
+
+
+def test_settings_view_shows_defaults_and_scripts(staff):
+    assert staff.get('/vp/api/content/').json()['can_configure_authoring'] is True
+    data = staff.get('/vp/api/authoring/settings/').json()
+    assert data['defaults'] == data['effective'] == settings_for()
+    assert data['everyone'] is None and data['mine'] is None
+    assert [t['id'] for t in data['templates']] == content.authoring_templates(content.placeholder_pack())
+
+
+def test_settings_for_me_shape_only_my_drafts(staff, api, fake_llm):
+    r = staff.put('/vp/api/authoring/settings/', {'scope': 'me', 'settings': settings_for(
+        system='My system.', summary='My summary task.', summary_words=50, template='recall_explain')}, format='json')
+    assert r.status_code == 200, r.content
+    assert r.json()['mine']['updated_by'] == 'staff@example.org' and r.json()['everyone'] is None
+    assert staff.get('/vp/api/content/').json()['authoring'] == {'template': 'recall_explain', 'summary_words': 50}
+
+    staff.post('/vp/api/authoring/draft/', {**DRAFT, 'part': 'summary'}, format='json')
+    system, user = fake_llm.calls[0]['messages']
+    assert system['content'] == 'My system.'
+    assert user['content'].endswith('My summary task.\n\nLength: at most 50 words.')
+    case = staff.post('/vp/api/authoring/case/', {'vignette': 'V.', 'explanation': 'E.', 'summary': 'S.'},
+                      format='json').json()
+    assert Case.objects.get(pk=case['id']).document['settings']['scriptTemplate'] == 'recall_explain'
+
+    # Another author still drafts with the pack's instructions.
+    api.post('/vp/api/authoring/draft/', {**DRAFT, 'part': 'summary'}, format='json')
+    assert fake_llm.calls[1]['messages'][0]['content'] == content.placeholder_pack()['authoring']['system']
+
+
+def test_settings_for_everyone_replace_my_own(staff, api, fake_llm):
+    staff.put('/vp/api/authoring/settings/', {'scope': 'me', 'settings': settings_for(system='Mine.')}, format='json')
+    r = staff.put('/vp/api/authoring/settings/', {'scope': 'everyone', 'settings': settings_for(
+        explanation='Everyone’s task.')}, format='json')
+    assert r.status_code == 200, r.content
+    assert r.json()['mine'] is None and r.json()['effective']['explanation'] == 'Everyone’s task.'
+    api.post('/vp/api/authoring/draft/', {**DRAFT, 'part': 'explanation'}, format='json')
+    assert fake_llm.calls[0]['messages'][1]['content'].endswith('Everyone’s task.')
+
+
+def test_saving_what_applies_anyway_removes_the_override(staff):
+    staff.put('/vp/api/authoring/settings/', {'scope': 'everyone', 'settings': settings_for(system='E.')}, format='json')
+    staff.put('/vp/api/authoring/settings/', {'scope': 'me', 'settings': settings_for(system='E.')}, format='json')
+    assert list(AuthoringSettings.objects.values_list('user', flat=True)) == [None]
+    staff.put('/vp/api/authoring/settings/', {'scope': 'everyone', 'settings': settings_for()}, format='json')
+    assert not AuthoringSettings.objects.exists()
+
+
+def test_reset_and_bad_requests(staff):
+    staff.put('/vp/api/authoring/settings/', {'scope': 'me', 'settings': settings_for(system='M.')}, format='json')
+    r = staff.delete('/vp/api/authoring/settings/?scope=me')
+    assert r.status_code == 200 and r.json()['mine'] is None
+    assert staff.delete('/vp/api/authoring/settings/?scope=all').status_code == 400
+    r = staff.put('/vp/api/authoring/settings/', {'scope': 'me', 'settings': settings_for(summary='')}, format='json')
+    assert r.status_code == 400 and 'summary prompt' in r.json()['detail']

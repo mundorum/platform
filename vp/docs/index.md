@@ -49,6 +49,16 @@ per turn or at end.
   expert explanation and the summary as the knowledge text. Nothing is
   stored until the case is created. Scanned PDFs without a text layer can't
   be read.
+- **Authoring Assistant settings** (staff only: the faint
+  <i>adjustments</i> icon beside *Start over*). Edit the system prompt, the
+  explanation and summary prompts, the summary's word limit and the script
+  the new case uses. **Apply to** chooses who gets them: *Only me* or
+  *Everyone*. Your own settings come before everyone's, and everyone's come
+  before the content pack's. *Reset* removes a set. Saving for everyone also
+  removes your own set. The script is not a prompt: the case is built by
+  placing the three texts in that script's elements, so only scripts that
+  have a case 1 vignette, a case 1 expert explanation and a knowledge text
+  are offered.
 - **Steps** can be added, moved, renamed and removed. The script rules are
   enforced: Welcome first, Final feedback last, transfers and assessments
   after "Explain case 1", single steps at most once. An option that would

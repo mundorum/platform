@@ -2,6 +2,8 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Value
+from django.db.models.functions import Coalesce
 
 
 class Case(models.Model):
@@ -99,3 +101,29 @@ class Session(models.Model):
 
     def __str__(self):
         return f'{self.get_mode_display()} · {self.case} · {self.user}'
+
+
+class AuthoringSettings(models.Model):
+    """Staff overrides of the content pack's authoring-assistant section
+    (prompts, word limit, template; see content.clean_authoring_settings).
+
+    `user` is null for the one row that applies to everyone; a user's own
+    row comes on top of it, for that user only. Reloading the pack keeps
+    them: content.authoring_section layers them over the new pack.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE,
+                             related_name='vp_authoring_settings')
+    data = models.JSONField()
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL,
+                                   related_name='+')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = 'authoring settings'
+        constraints = [
+            # One row per user, and one (user null) for everyone.
+            models.UniqueConstraint(Coalesce('user', Value(0)), name='vp_authoring_settings_one_per_scope'),
+        ]
+
+    def __str__(self):
+        return f'Authoring settings for {self.user or "everyone"}'

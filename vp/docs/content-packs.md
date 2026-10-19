@@ -215,3 +215,10 @@ explanation and the summary as the knowledge text.
 A pack without this section uses the placeholder's instructions with the
 pack's own template whose steps are `know`, `explain`, `transfer` (or its
 `default_template` if it has none).
+
+Staff can override all five keys from the assistant's settings panel, either
+for everyone or for themselves (`AuthoringSettings`,
+`/vp/api/authoring/settings/`, staff only). These overrides sit on top of the
+pack. Loading a new pack keeps them. If the overridden `template` is no
+longer offered, the pack's template is used instead. Settings identical to
+what would apply anyway are not stored.

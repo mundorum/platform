@@ -9,16 +9,17 @@ import re
 import uuid
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from llm import services as llm
 
 from . import casedoc, gnoexport, runtime, sources
 from .content import (
-    AUTHORING_PARTS, ContentError, assisted_case_document, authoring_section, placeholder_pack,
-    strategy_map, validate_pack,
+    AUTHORING_PARTS, AUTHORING_SETTING_KEYS, ContentError, assisted_case_document, authoring_section,
+    authoring_templates, clean_authoring_settings, placeholder_pack, strategy_map, validate_pack,
 )
-from .models import Case, ContentPack, PreviewSample, Session
+from .models import AuthoringSettings, Case, ContentPack, PreviewSample, Session
 
 log = logging.getLogger('vp')
 
@@ -55,12 +56,12 @@ def load_pack(data: dict, source: str = '') -> ContentPack:
     return ContentPack.objects.create(name=data['name'], source=source, data=data)
 
 
-def public_pack(pack: dict) -> dict:
+def public_pack(pack: dict, authoring: dict | None = None) -> dict:
     """What the editor needs: templates, defaults, strategies with their
     default prompts and the agent prompts (authors edit both per case).
     The assistant's, preview's and player's own instructions stay on the
-    server."""
-    authoring = authoring_section(pack)
+    server. `authoring` is the section that applies (see authoring_for)."""
+    authoring = authoring or authoring_section(pack)
     return {
         'name': pack['name'],
         'placeholder': bool(pack.get('placeholder')),
@@ -226,7 +227,7 @@ def authoring_draft(user, *, part: str, vignette: str, symptoms: str, documents)
     buried under long documents."""
     if part not in AUTHORING_PARTS:
         raise StudioError(f'Unknown part {part!r}.')
-    section = authoring_section(active_pack())
+    section = authoring_for(user)
     documents = _clean_documents(documents)
     vignette, symptoms = vignette.strip(), symptoms.strip()
     if not documents:
@@ -252,11 +253,88 @@ def _new_id(prefix: str) -> str:
 
 
 def create_assisted_case(user, *, title: str, vignette: str, explanation: str, summary: str) -> Case:
-    """A new draft case on the pack's authoring template, with the texts in place."""
-    doc = assisted_case_document(active_pack(), _new_id, title=title.strip()[:300],
+    """A new draft case on the authoring template, with the texts in place."""
+    pack = active_pack()
+    doc = assisted_case_document(pack, _new_id, title=title.strip()[:300],
                                  vignette=vignette.strip(), explanation=explanation.strip(),
-                                 summary=summary.strip())
+                                 summary=summary.strip(), template=authoring_for(user, pack)['template'])
     return Case.objects.create(owner=user, title=doc['title'], document=doc)
+
+
+# Authoring settings: staff overrides of the pack's authoring section, for
+# everyone (user null) and per user on top of that (see AuthoringSettings).
+
+AUTHORING_SCOPES = ('me', 'everyone')
+
+
+def _authoring_rows(user) -> tuple[AuthoringSettings | None, AuthoringSettings | None]:
+    rows = {r.user_id: r for r in AuthoringSettings.objects.filter(Q(user__isnull=True) | Q(user=user))
+            .select_related('updated_by')}
+    return rows.get(None), rows.get(user.pk)
+
+
+def authoring_for(user, pack: dict | None = None) -> dict:
+    """The authoring section `user` drafts with: the pack's, then
+    everyone's settings, then the user's own."""
+    everyone, mine = _authoring_rows(user)
+    return authoring_section(pack if pack is not None else active_pack(),
+                             everyone and everyone.data, mine and mine.data)
+
+
+def _setting_fields(section: dict) -> dict:
+    return {k: section[k] for k in AUTHORING_SETTING_KEYS}
+
+
+def authoring_settings_view(user) -> dict:
+    """What the settings panel shows: the pack's defaults, everyone's and
+    the user's own settings (None when unset), what applies to the user and
+    the scripts the assistant can fill."""
+    pack = active_pack()
+    everyone, mine = _authoring_rows(user)
+
+    def row(r):
+        if r is None:
+            return None
+        return {'settings': r.data, 'updated_at': r.updated_at.isoformat(),
+                'updated_by': r.updated_by.email if r.updated_by else ''}
+
+    names = {t['id']: t['name'] for t in pack['templates']}
+    return {
+        'defaults': _setting_fields(authoring_section(pack)),
+        'everyone': row(everyone),
+        'mine': row(mine),
+        'effective': _setting_fields(authoring_section(pack, everyone and everyone.data, mine and mine.data)),
+        'templates': [{'id': t, 'name': names[t]} for t in authoring_templates(pack)],
+    }
+
+
+def save_authoring_settings(user, scope: str, data) -> None:
+    """Store settings for `scope` ('me' or 'everyone'). Settings equal to
+    what the scope would otherwise get remove the override instead. Saving
+    for everyone also drops the user's own, so they get what everyone gets."""
+    if scope not in AUTHORING_SCOPES:
+        raise StudioError('Choose who the settings apply to.')
+    pack = active_pack()
+    try:
+        clean = clean_authoring_settings(pack, data)
+    except ContentError as exc:
+        raise StudioError(str(exc)) from exc
+    with transaction.atomic():
+        everyone, _ = _authoring_rows(user)
+        target = user if scope == 'me' else None
+        below = authoring_section(pack, everyone.data if everyone and scope == 'me' else None)
+        if clean == _setting_fields(below):
+            AuthoringSettings.objects.filter(user=target).delete()
+        else:
+            AuthoringSettings.objects.update_or_create(user=target, defaults={'data': clean, 'updated_by': user})
+        if scope == 'everyone':
+            AuthoringSettings.objects.filter(user=user).delete()
+
+
+def reset_authoring_settings(user, scope: str) -> None:
+    if scope not in AUTHORING_SCOPES:
+        raise StudioError('Choose which settings to reset.')
+    AuthoringSettings.objects.filter(user=user if scope == 'me' else None).delete()
 
 
 # ── preview samples ───────────────────────────────────────────────────────────

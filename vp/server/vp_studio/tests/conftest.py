@@ -9,8 +9,8 @@ from llm import services as llm_services
 from llm.gateway import PROVIDERS, LLMGateway
 
 
-def client_for(email):
-    user = User.objects.create_user(username=email, email=email)
+def client_for(email, **fields):
+    user = User.objects.create_user(username=email, email=email, **fields)
     c = APIClient()
     c.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=user).key}')
     return c
@@ -19,6 +19,11 @@ def client_for(email):
 @pytest.fixture
 def api(db):
     return client_for('author@example.org')
+
+
+@pytest.fixture
+def staff(db):
+    return client_for('staff@example.org', is_staff=True)
 
 
 @pytest.fixture

@@ -474,11 +474,143 @@ const GalleryView = {
 const words = text => (text || '').split(/\s+/).filter(Boolean).length;
 const materialSig = a => JSON.stringify([a.vignette.trim(), a.symptoms.trim(), a.files.map(f => [f.name, f.size, f.lastModified])]);
 
+// Staff settings of the authoring assistant: its prompts, the summary's word
+// limit and the script a new case uses, for the user only or for everyone.
+const SETTING_PROMPTS = [
+  { key: 'system', label: 'System prompt', hint: 'sent with both drafts', rows: 4 },
+  { key: 'explanation', label: 'Explanation of the symptoms', hint: 'task, after the documents, vignette and symptoms', rows: 8 },
+  { key: 'summary', label: 'Summary of the documents', hint: 'task, after the documents', rows: 8 },
+];
+const fmtDate = iso => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+const AuthoringSettingsDialog = {
+  emits: ['close'],
+  setup(_, { emit }) {
+    const data = ref(null);
+    const scope = ref('me');
+    const form = ref(null);
+    const loaded = ref('');
+    const busy = ref(false);
+    const error = ref('');
+    const dirty = computed(() => !!form.value && JSON.stringify(form.value) !== loaded.value);
+    const own = computed(() => (scope.value === 'me' ? data.value?.mine : data.value?.everyone));
+    const applies = computed(() => {
+      const d = data.value;
+      if (d.mine) return 'your own settings';
+      if (d.everyone) return `the settings for everyone (${d.everyone.updated_by || 'unknown'}, ${fmtDate(d.everyone.updated_at)})`;
+      return 'the content pack’s defaults';
+    });
+
+    function fill() {
+      const d = data.value;
+      const base = scope.value === 'everyone' ? (d.everyone?.settings || d.defaults) : d.effective;
+      const values = { ...d.defaults, ...base };
+      if (!d.templates.some(t => t.id === values.template)) values.template = d.effective.template;
+      form.value = values;
+      loaded.value = JSON.stringify(values);
+    }
+    function apply(view) {
+      data.value = view;
+      fill();
+      store.pack.authoring = { template: view.effective.template, summary_words: view.effective.summary_words };
+    }
+    async function load() {
+      try { apply(await api('/vp/api/authoring/settings/')); } catch (e) { error.value = e.message; }
+    }
+    function setScope(next) {
+      if (next === scope.value || (dirty.value && !window.confirm('Discard your changes to these settings?'))) return;
+      scope.value = next;
+      error.value = '';
+      fill();
+    }
+    async function run(request, done) {
+      busy.value = true;
+      error.value = '';
+      try { apply(await request()); toast(done, { ms: 2500 }); } catch (e) { error.value = e.message; } finally { busy.value = false; }
+    }
+    const save = () => run(() => api('/vp/api/authoring/settings/', { method: 'PUT', body: {
+      scope: scope.value, settings: { ...form.value, summary_words: Number(form.value.summary_words) },
+    } }), scope.value === 'me' ? 'Saved for you.' : 'Saved for everyone.');
+    function reset() {
+      const who = scope.value === 'me' ? 'your own settings' : 'the settings for everyone';
+      if (!window.confirm(`Remove ${who}? The assistant goes back to ${scope.value === 'me' ? 'what everyone gets' : 'the content pack’s defaults'}.`)) return;
+      run(() => api(`/vp/api/authoring/settings/?scope=${scope.value}`, { method: 'DELETE' }), 'Settings reset.');
+    }
+    function close() {
+      if (dirty.value && !window.confirm('Discard your changes to these settings?')) return;
+      emit('close');
+    }
+    const changed = key => form.value[key] !== data.value.defaults[key];
+    function useDefault(key) { form.value[key] = data.value.defaults[key]; }
+
+    onMounted(load);
+    return { data, scope, form, busy, error, dirty, own, applies, setScope, save, reset, close, changed, useDefault,
+             SETTING_PROMPTS, fmtDate };
+  },
+  template: `
+  <div class="backdrop" @mousedown.self="close">
+    <div class="dialog as-settings" role="dialog" aria-modal="true">
+      <div class="dialog-head"><b>Authoring Assistant settings</b>
+        <button class="icon-btn" title="Close" @click="close"><i class="ti ti-x"></i></button></div>
+      <div class="dialog-body" v-if="!form">
+        <p class="as-error" v-if="error"><i class="ti ti-alert-circle"></i>[[ error ]]</p>
+        <span class="as-progress" v-else><i class="ti ti-loader-2 as-spin"></i>Loading…</span>
+      </div>
+      <div class="dialog-body as-set-body" v-else>
+        <div class="as-set-scope">
+          <span class="as-label">Apply to</span>
+          <div class="seg">
+            <button :class="{on: scope === 'me'}" @click="setScope('me')">Only me</button>
+            <button :class="{on: scope === 'everyone'}" @click="setScope('everyone')">Everyone</button>
+          </div>
+          <span class="as-hint">You draft with [[ applies ]].</span>
+        </div>
+        <p class="as-note" v-if="scope === 'everyone' && data.mine"><i class="ti ti-info-circle"></i>
+          Saving for everyone also removes your own settings, so you get what everyone gets.</p>
+        <p class="as-note" v-else-if="scope === 'everyone'"><i class="ti ti-info-circle"></i>
+          Every author’s drafts and new cases use these, except staff who saved their own.</p>
+
+        <div class="as-field" v-for="p in SETTING_PROMPTS" :key="p.key">
+          <div class="as-label-row">
+            <span class="as-label">[[ p.label ]] <span class="as-opt">[[ p.hint ]]</span></span>
+            <button class="as-link" v-if="changed(p.key)" @click="useDefault(p.key)">Use the pack’s text</button>
+          </div>
+          <textarea class="literal-text as-set-prompt" v-model="form[p.key]" :rows="p.rows"></textarea>
+        </div>
+        <label class="as-field as-set-words">
+          <span class="as-label">Summary word limit</span>
+          <input class="as-input" type="number" min="1" max="5000" step="1" v-model.number="form.summary_words">
+        </label>
+
+        <div class="as-field">
+          <span class="as-label">Script for the new case</span>
+          <select class="as-input" v-model="form.template">
+            <option v-for="t in data.templates" :key="t.id" :value="t.id">[[ t.name ]][[ t.id === data.defaults.template ? ' (pack default)' : '' ]]</option>
+          </select>
+          <span class="as-hint">No prompt here: the case is built, not generated. The vignette becomes case 1, the explanation
+            its expert explanation and the summary the knowledge text; every other step starts with the script’s default texts.
+            Only scripts with those three elements are listed.</span>
+        </div>
+        <p class="as-error" v-if="error"><i class="ti ti-alert-circle"></i>[[ error ]]</p>
+      </div>
+      <div class="dialog-foot" v-if="form">
+        <span class="as-hint as-set-meta" v-if="own">Saved by [[ own.updated_by || 'unknown' ]], [[ fmtDate(own.updated_at) ]]</span>
+        <button class="btn-ghost" v-if="own" :disabled="busy" @click="reset">Reset</button>
+        <button class="btn-ghost" @click="close">Cancel</button>
+        <button class="btn-primary" :disabled="busy || !dirty" @click="save">
+          <i class="ti" :class="busy ? 'ti-loader-2 as-spin' : 'ti-device-floppy'"></i><span>Save [[ scope === 'me' ? 'for me' : 'for everyone' ]]</span></button>
+      </div>
+    </div>
+  </div>`,
+};
+
 const AssistantView = {
+  components: { AuthoringSettingsDialog },
   setup() {
     const a = computed(() => store.assistant);
     const fileInput = ref(null);
     const dragging = ref(false);
+    const settingsOpen = ref(false);
     const tpl = computed(() => store.pack.templates.find(t => t.id === store.pack.authoring.template));
     const limit = computed(() => store.pack.authoring.summary_words);
     const busy = computed(() => !!a.value.stage || a.value.partBusy.explanation || a.value.partBusy.summary);
@@ -589,7 +721,7 @@ const AssistantView = {
     function back() { store.view = 'gallery'; }
     function size(n) { return n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`; }
 
-    return { store, a, fileInput, dragging, tpl, limit, busy, usable, canGenerate, stale, hasDrafts, canCreate, progress,
+    return { store, a, fileInput, dragging, settingsOpen, tpl, limit, busy, usable, canGenerate, stale, hasDrafts, canCreate, progress,
              pickFiles, addFiles, removeFile, onDrop, docFor, isPdf, generate, regenerate, createCase, startOver, back,
              size, words, has };
   },
@@ -601,10 +733,13 @@ const AssistantView = {
         <span class="gallery-sub">Give the case and your reference documents. The assistant drafts the expert explanation and a summary of the documents; you edit both, then create the case.</span>
       </div>
       <div class="gallery-actions">
+        <button class="icon-btn as-gear" v-if="store.pack.can_configure_authoring" title="Assistant settings (staff)"
+                :disabled="busy" @click="settingsOpen = true"><i class="ti ti-adjustments-horizontal"></i></button>
         <button class="btn-back" :disabled="busy" @click="startOver"><i class="ti ti-eraser"></i>Start over</button>
         <button class="btn-back" @click="back"><i class="ti ti-arrow-left"></i>Back</button>
       </div>
     </div>
+    <AuthoringSettingsDialog v-if="settingsOpen" @close="settingsOpen = false" />
 
     <section class="as-card">
       <div class="as-card-head"><span class="as-num">1</span><b>Case material</b></div>

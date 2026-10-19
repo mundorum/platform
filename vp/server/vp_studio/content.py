@@ -31,6 +31,13 @@ AUTHORING_PARTS = ('explanation', 'summary')
 AUTHORING_REFS = {'vignette': 'case1.vignette', 'explanation': 'case1.expert', 'summary': 'knowledge'}
 # Steps the fallback authoring template has when a pack doesn't name one.
 AUTHORING_FALLBACK_STEPS = ['know', 'explain', 'transfer']
+# What the authoring settings (staff, per user or for everyone) may replace,
+# with the names their errors use.
+AUTHORING_PROMPT_LABELS = {'system': 'The system prompt', 'explanation': 'The explanation prompt',
+                           'summary': 'The summary prompt'}
+AUTHORING_SETTING_KEYS = ('template', *AUTHORING_PROMPT_LABELS, 'summary_words')
+MAX_AUTHORING_PROMPT = 20000
+MAX_SUMMARY_WORDS = 5000
 
 # Placeholder for the case number inside transfer-step defaults.
 CASE_N = '{N}'
@@ -177,12 +184,46 @@ def _validate_authoring(pack: dict) -> None:
              'authoring.template must name one of the templates.')
     for key in ('system', *AUTHORING_PARTS):
         _text(section.get(key), f'authoring.{key}')
-    words = section.get('summary_words')
-    _require(isinstance(words, int) and not isinstance(words, bool) and words > 0,
+    _require(_positive_int(section.get('summary_words')),
              'authoring.summary_words must be a positive whole number.')
-    refs = _refs(new_case_document(pack, template, _counter_ids()))
-    missing = [ref for ref in AUTHORING_REFS.values() if ref not in refs]
+    missing = _missing_authoring_refs(pack, template)
     _require(not missing, f'authoring.template has no element for {", ".join(missing)}.')
+
+
+def _positive_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _missing_authoring_refs(pack: dict, template_id: str) -> list[str]:
+    refs = _refs(new_case_document(pack, template_id, _counter_ids()))
+    return [ref for ref in AUTHORING_REFS.values() if ref not in refs]
+
+
+def authoring_templates(pack: dict) -> list[str]:
+    """The templates the authoring assistant can fill: those with an
+    element for every AUTHORING_REFS."""
+    return [t['id'] for t in pack['templates'] if not _missing_authoring_refs(pack, t['id'])]
+
+
+def clean_authoring_settings(pack: dict, data) -> dict:
+    """Authoring settings (every AUTHORING_SETTING_KEYS) checked against
+    the pack. The messages are shown to the author."""
+    _require(isinstance(data, dict), 'The settings must be an object.')
+    out = {}
+    for key, label in AUTHORING_PROMPT_LABELS.items():
+        value = data.get(key)
+        _require(isinstance(value, str) and value.strip(), f'{label} can’t be empty.')
+        _require(len(value) <= MAX_AUTHORING_PROMPT,
+                 f'{label} is too long (at most {MAX_AUTHORING_PROMPT} characters).')
+        out[key] = value.strip()
+    words = data.get('summary_words')
+    _require(_positive_int(words) and words <= MAX_SUMMARY_WORDS,
+             f'The word limit must be a whole number from 1 to {MAX_SUMMARY_WORDS}.')
+    out['summary_words'] = words
+    _require(data.get('template') in authoring_templates(pack),
+             'Choose a script with a case 1 vignette, a case 1 expert explanation and a knowledge text.')
+    out['template'] = data['template']
+    return out
 
 
 def load_pack_file(path) -> dict:
@@ -204,15 +245,27 @@ def strategy_map(pack: dict) -> dict[str, dict]:
     return {s['key']: s for s in pack['strategies']}
 
 
-def authoring_section(pack: dict) -> dict:
+def authoring_section(pack: dict, *overrides: dict | None) -> dict:
     """The pack's authoring-assistant instructions and template. A pack
     without them uses the placeholder's instructions with its own template
-    whose steps are AUTHORING_FALLBACK_STEPS (else its default template)."""
+    whose steps are AUTHORING_FALLBACK_STEPS (else its default template).
+
+    Each override (authoring settings, see clean_authoring_settings; None
+    skips) then replaces it in turn. One whose template the pack no longer
+    offers keeps the earlier template."""
     if 'authoring' in pack:
-        return pack['authoring']
-    template = next((t['id'] for t in pack['templates'] if t['steps'] == AUTHORING_FALLBACK_STEPS),
-                    pack['default_template'])
-    return {**placeholder_pack()['authoring'], 'template': template}
+        section = pack['authoring']
+    else:
+        template = next((t['id'] for t in pack['templates'] if t['steps'] == AUTHORING_FALLBACK_STEPS),
+                        pack['default_template'])
+        section = {**placeholder_pack()['authoring'], 'template': template}
+    for override in filter(None, overrides):
+        template = override.get('template')
+        if template not in authoring_templates(pack):
+            template = section['template']
+        section = {**section, **{k: override[k] for k in AUTHORING_SETTING_KEYS if k in override},
+                   'template': template}
+    return section
 
 
 # ── building new cases (mirrors casemodel.js newCase/instantiateStep) ─────────
@@ -296,11 +349,11 @@ def _refs(doc: dict) -> set[str]:
 
 
 def assisted_case_document(pack: dict, new_id, *, title: str, vignette: str,
-                           explanation: str, summary: str) -> dict:
-    """A new case from the authoring assistant: the pack's authoring
-    template, with the vignette, the expert explanation and the summary of
-    the documents (the knowledge text) in place."""
-    doc = new_case_document(pack, authoring_section(pack)['template'], new_id)
+                           explanation: str, summary: str, template: str | None = None) -> dict:
+    """A new case from the authoring assistant: `template` (default: the
+    pack's authoring template), with the vignette, the expert explanation
+    and the summary of the documents (the knowledge text) in place."""
+    doc = new_case_document(pack, template or authoring_section(pack)['template'], new_id)
     doc['title'] = title
     texts = {AUTHORING_REFS['vignette']: vignette, AUTHORING_REFS['explanation']: explanation,
              AUTHORING_REFS['summary']: summary}
