@@ -288,7 +288,18 @@ In the hierarchy, the arrows on a row move it up or down among its neighbours: a
 
 Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without an `action_N` entity or text area, a button for each entity divert whose entity isn't drawn), so a scene can never get stuck; `Space` always continues.
 
-**Subscenes.** A subscene (`~>`) is drawn on the stage of the scene it opens over, which is dimmed behind it and takes no clicks. It is centered, at the size of its own scenario's design, scaled down to fit if that is larger than the scene's. Its controls (`action_proceed`, `action_regress`, `action_N`) come from its own design, and its `action_regress` closes it. A subscene whose scenario has no design is shown as a text card on the stage. Whether the Player is graphic follows the scene underneath: when it plays as text, its subscenes are text too, shown as cards below the dimmed scene.
+**Subscenes.** A subscene (`~>`) is drawn on the stage of the scene it opens over, which is dimmed behind it and takes no clicks. Where it goes is set in the design of the scene it opens over, with an item named for it:
+
+| ID | Places |
+|---|---|
+| `subscene.<scenario>` | a subscene of that scenario (spaces written as `_`: `subscene.sala_de_exames`) |
+| `subscene` | any other subscene |
+
+The subscene is fitted into that item's box, keeping its proportion, and centered in it. A text area or an anchor makes an invisible box (draw one with **Place: Text** and leave it empty). An entity with the same ID is a *frame*: an image shown only while that subscene is open, such as a border or a shadow behind it (when a box and a frame share the ID, the box places the subscene). Like any item, the box can sit in a stack or a group. Without such an item, the subscene is centered at the size of its own scenario's design, scaled down to fit if that is larger. A subscene opened from a subscene is placed in the same way, in the design of the subscene it opens from.
+
+To see the result while designing, pick a scenario in **Preview subscene**, in the toolbar of **Presentation → Scenarios**. It is drawn faintly where it would open: moving or resizing the box moves the preview along. The scenarios this one opens as subscenes are listed first. The preview is only for designing and is never exported. In the inspector, the ID suggestions include `subscene` and a `subscene.<scenario>` for each scenario this one opens as a subscene.
+
+The subscene's controls (`action_proceed`, `action_regress`, `action_N`) come from its own design, and its `action_regress` closes it. A subscene whose scenario has no design is shown as a text card on the stage. Whether the Player is graphic follows the scene underneath: when it plays as text, its subscenes are text too, shown as cards below the dimmed scene.
 
 ## Side panels
 

@@ -1552,6 +1552,12 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 .scenario-selection { fill: none; stroke: var(--c-accent); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
 .scenario-resize-handle { fill: var(--c-accent); stroke: var(--c-surface); stroke-width: 1.5; cursor: nwse-resize; }
 .scenario-text-fo { pointer-events: none; overflow: hidden; }
+/* subscene preview ghost: see-through, and clicks reach the items below */
+.scenario-subscene-preview { pointer-events: none; opacity: 0.6; }
+.scenario-subscene-preview .pv-frame { fill: var(--c-surface); }
+.scenario-subscene-preview .pv-outline { fill: none; stroke: var(--c-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.scenario-subscene-preview .pv-border { fill: none; stroke: var(--c-accent); stroke-width: 2; stroke-dasharray: 8 4; vector-effect: non-scaling-stroke; }
+.scenario-preview-select { width: auto; max-width: 260px; }
 .scenario-text-body {
   width: 100%; height: 100%; box-sizing: border-box; overflow: hidden;
   line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere;
@@ -2262,6 +2268,23 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                   </button>
                   <span class="scenario-size-hint">px — the background fills the canvas; drag its bottom-right corner to resize (hold Shift to keep the proportion).</span>
                 </div>
+                <div class="scenario-size-row" v-if="subsceneCandidates(name).length">
+                  <span class="scenario-size-label"><i class="ti ti-picture-in-picture"></i> Preview subscene</span>
+                  <select class="inspector-input scenario-preview-select" :value="subscenePreviewChoice[name] || ''"
+                          @change="subscenePreviewChoice[name] = $event.target.value"
+                          title="Show another scenario ghosted where it opens as a subscene over this one (design time only)">
+                    <option value="">None</option>
+                    <option v-for="c in subsceneCandidates(name)" :key="c.scenario" :value="c.scenario">
+                      {{ c.scenario }}{{ c.linked ? '' : ' (not opened from here)' }}
+                    </option>
+                  </select>
+                  <span class="scenario-size-hint" v-if="subscenePreviews[name] && subscenePreviews[name].placeId">
+                    placed in <code>{{ subscenePreviews[name].placeId }}</code> — move or resize it to adjust.
+                  </span>
+                  <span class="scenario-size-hint" v-else-if="subscenePreviews[name]">
+                    centered — name a text area or anchor <code>{{ subscenePreviews[name].ownId }}</code> (or <code>subscene</code>) to place it.
+                  </span>
+                </div>
                 <div class="image-grid" v-if="bgPickerScenario === name">
                   <div
                     class="image-tile"
@@ -2401,6 +2424,22 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                           <text v-if="placeMode === 'edit'" :x="item.x + item.w + 4" :y="item.y + item.h + 16" text-anchor="end" font-size="12" fill="#a33" style="cursor:pointer;" @mousedown.stop @click.stop="removeScenarioItem(name, idx)">✕</text>
                         </g>
                       </template>
+                      <!-- subscene preview: a design-time ghost, never exported; clicks go through to the items below -->
+                      <g v-for="pv in (subscenePreviews[name] ? [subscenePreviews[name]] : [])" :key="'subscene-preview'"
+                         class="scenario-subscene-preview" :transform="pv.transform">
+                        <rect class="pv-frame" x="0" y="0" :width="pv.width" :height="pv.height" />
+                        <image v-if="pv.background" x="0" y="0" :width="pv.width" :height="pv.height"
+                               :href="pv.background" preserveAspectRatio="xMidYMid slice" />
+                        <template v-for="it in pv.items" :key="it.key">
+                          <image v-if="it.kind === 'entity'" :x="it.x" :y="it.y" :width="it.w" :height="it.h"
+                                 :href="it.url" preserveAspectRatio="xMidYMid meet" />
+                          <rect v-else class="pv-outline" :x="it.x" :y="it.y" :width="it.w" :height="it.h" />
+                          <foreignObject v-if="it.kind === 'text'" :x="it.x" :y="it.y" :width="it.w" :height="it.h">
+                            <div class="scenario-text-body" :style="it.style">{{ it.text }}</div>
+                          </foreignObject>
+                        </template>
+                        <rect class="pv-border" x="0" y="0" :width="pv.width" :height="pv.height" />
+                      </g>
                       <rect
                         v-if="textDraw && textDraw.name === name"
                         :class="textDraw.kind === 'text' ? 'scenario-text-frame selected' : 'scenario-layout-frame selected'" style="pointer-events: none;"
@@ -3661,10 +3700,59 @@ function itemBox(item) {
     : { x: item.x, y: item.y, w: item.w, h: item.h };
 }
 
-// An entity image that never hides on its own (not a control, a choice or
-// a speech bubble).
+// An entity image that never hides on its own (not a control, a choice, a
+// speech bubble or a subscene frame).
 function isDecorItem(item) {
-  return item.kind === 'entity' && !actionRole(item) && !isSpeechRole(item);
+  return item.kind === 'entity' && !actionRole(item) && !isSpeechRole(item) && !isSubsceneRole(item);
+}
+
+/* ── Subscene placement ──
+   A subscene ("~>") is drawn over the scene it opens from. Where it goes is
+   up to that scene's design: an item with the ID `subscene.<scenario>` (the
+   subscene's scenario, spaces written as "_", compared ignoring case and
+   accents) or, for any subscene, plain `subscene`, gives the box it is fitted
+   into. A text area or an anchor is an invisible box; an entity image with
+   the same ID is a frame shown only while that subscene is open. Without
+   such an item the subscene is centered at its own size. */
+const SUBSCENE_ID = 'subscene';
+
+// `subscene.<scenario>` as an ID can hold it: no spaces.
+function subsceneRoleKey(scenario) {
+  return SUBSCENE_ID + '.' + idKey(scenario).trim().replace(/\s+/g, '_');
+}
+
+function isSubsceneRole(item) {
+  if (item.kind !== 'entity' && item.kind !== 'text' && item.kind !== 'anchor') return false;
+  const key = idKey(itemRoleId(item));
+  return key === SUBSCENE_ID || key.startsWith(SUBSCENE_ID + '.');
+}
+
+// The items of `design` that place a subscene of `scenario`: those named for
+// it, else those named plain `subscene`. A box (text area, anchor) comes
+// before an entity image, which may be a larger frame around it.
+function subscenePlaceholders(design, scenario) {
+  const items = design.items.filter(isSubsceneRole);
+  const own = subsceneRoleKey(scenario);
+  let list = items.filter(it => idKey(itemRoleId(it)) === own);
+  if (!list.length) list = items.filter(it => idKey(itemRoleId(it)) === SUBSCENE_ID);
+  return list.sort((a, b) => (a.kind === 'entity') - (b.kind === 'entity'));
+}
+
+// Where a subscene goes over a frame of size W×H, in that frame's units:
+// { x, y, w, h, scale } — w×h being the subscene's own size before `scale`.
+// Into `box` when the frame names one (fitted, keeping its proportion,
+// centered), else centered at its own size, scaled down if it doesn't fit. A
+// subscene with no design is a text card filling the box.
+function subsceneBox(design, W, H, box) {
+  if (design) {
+    const w = design.width, h = design.height;
+    const scale = box ? Math.min(box.w / w, box.h / h) : Math.min(1, W / w, H / h);
+    const area = box || { x: 0, y: 0, w: W, h: H };
+    return { x: area.x + (area.w - w * scale) / 2, y: area.y + (area.h - h * scale) / 2, w, h, scale };
+  }
+  if (box) return { ...box, scale: 1 };
+  const w = Math.min(W * 0.8, 640), h = H * 0.7;
+  return { x: (W - w) / 2, y: (H - h) / 2, w, h, scale: 1 };
 }
 
 function layoutBoxes(design, isVisible, keepEmpty = false) {
@@ -3746,6 +3834,9 @@ function layoutBoxes(design, isVisible, keepEmpty = false) {
 //   speech   Map(svgId -> html) from routeSpeech
 //   diverts  [{ label, target, overlay }] — offered choices, once `atMenu`
 //   canProceed / canRegress / atMenu — which controls are live right now
+//   subscene the scenario of a subscene open over this frame, or null
+// Returns { layers, subsceneBox } — `subsceneBox` being where that subscene
+// goes (see subsceneBox), or null when the design names no place for it.
 // A layer is { key, type: 'image'|'text', x, y, w, h, ... } with `click`
 // ({ type: 'proceed'|'regress' } or { type: 'divert', divert }) when it is a
 // button: a control, a choice, or an entity carrying a divert.
@@ -3753,8 +3844,16 @@ function layoutBoxes(design, isVisible, keepEmpty = false) {
 // isn't before anything gets a position.
 function buildPlayerStage(design, ctx) {
   const shown = new Map(); // svgId -> its layers, still without a box
+  const placeholders = ctx.subscene ? subscenePlaceholders(design, ctx.subscene) : [];
   design.items.forEach(item => {
     if (isContainer(item)) return;
+    if (isSubsceneRole(item)) {
+      // only the open subscene's place shows: a box takes room (for the
+      // stacks) but draws nothing, an entity image is its frame
+      if (!placeholders.includes(item)) return;
+      shown.set(item.svgId, item.kind === 'entity' ? [{ key: item.svgId, type: 'image', url: item.url, click: null }] : []);
+      return;
+    }
     if (item.kind === 'anchor') {
       const here = ctx.frame.filter(f => f.anchorId === item.svgId && f.url)
         .map(f => ({ key: 'stage:' + f.entityId, type: 'image', url: f.url, entityId: f.entityId, click: f.divert ? { type: 'divert', divert: f.divert } : null }));
@@ -3802,7 +3901,8 @@ function buildPlayerStage(design, ctx) {
     if (hidden.has(item.svgId)) return;
     (shown.get(item.svgId) || []).forEach(l => layers.push({ ...l, ...boxes.get(item.svgId) }));
   });
-  return layers;
+  const place = placeholders.find(it => !hidden.has(it.svgId));
+  return { layers, subsceneBox: place ? boxes.get(place.svgId) : null };
 }
 
 /* ── SOURCE EDITOR SYNTAX HIGHLIGHTING ── */
@@ -5081,6 +5181,66 @@ createApp({
       return [...ids].sort();
     });
 
+    /* ── Scenarios: subscene preview ──
+       A design-time aid, never exported or saved: while designing a scenario,
+       the reader picks another scenario to see it ghosted where it would open
+       as a subscene (in the `subscene.<scenario>` / `subscene` item, else
+       centered), so moving or resizing that item shows the result at once. */
+    const subscenePreviewChoice = reactive({}); // scenario -> scenario previewed over it ('' = none)
+
+    // The scenarios a scene of `scenario` opens as subscenes ("~>"), in order.
+    function subsceneTargetsOf(scenario) {
+      const byTitle = new Map(scenes.value.map(s => [s.title.toLowerCase(), s]));
+      const out = [];
+      scenes.value.filter(s => s.scenario === scenario).forEach(s => {
+        sceneDiverts(s).filter(d => d.overlay).forEach(d => {
+          const t = byTitle.get(d.target.toLowerCase());
+          if (t && !out.includes(t.scenario)) out.push(t.scenario);
+        });
+      });
+      return out;
+    }
+
+    // What the preview can show over `scenario`: its subscenes first, then
+    // every other scenario with a design.
+    function subsceneCandidates(scenario) {
+      const linked = subsceneTargetsOf(scenario).filter(n => scenarioDesigns[n]);
+      const others = Object.keys(scenarioDesigns).filter(n => n !== scenario && !linked.includes(n)).sort();
+      return [...linked.map(n => ({ scenario: n, linked: true })), ...others.map(n => ({ scenario: n, linked: false }))];
+    }
+
+    // Per scenario being previewed over: the ghost's transform and size, and
+    // the subscene's items as plain shapes (the editor's own look, not a beat).
+    const subscenePreviews = computed(() => {
+      const out = {};
+      Object.keys(subscenePreviewChoice).forEach(name => {
+        const parent = scenarioDesigns[name];
+        const subName = subscenePreviewChoice[name];
+        const sub = subName && scenarioDesigns[subName];
+        if (!parent || !sub) return;
+        const place = subscenePlaceholders(parent, subName)[0] || null;
+        const box = subsceneBox(sub, parent.width, parent.height, place ? itemBox(place) : null);
+        out[name] = {
+          scenario: subName,
+          placeId: place ? itemRoleId(place) : '',
+          ownId: subsceneRoleKey(subName),
+          transform: `translate(${box.x} ${box.y}) scale(${box.scale})`,
+          width: box.w,
+          height: box.h,
+          background: sub.background && sub.background.url ? sub.background.url : '',
+          items: sub.items.filter(it => !isContainer(it)).map(it => ({
+            key: it.svgId,
+            kind: it.kind,
+            ...itemBox(it),
+            url: it.url || '',
+            text: it.kind === 'text' ? (it.text || itemRoleId(it)) : '',
+            style: it.kind === 'text' ? { fontFamily: it.fontFamily, fontSize: it.fontSize + 'px', color: it.color } : null,
+          })),
+        };
+      });
+      return out;
+    });
+
     function ensureScenarioDesign(name) {
       if (!scenarioDesigns[name]) {
         scenarioDesigns[name] = { background: null, width: 960, height: 540, items: [] };
@@ -5662,8 +5822,11 @@ createApp({
     const idSuggestions = computed(() => {
       const item = selectedItem.value;
       const design = scenarioDesigns[openScenario.value];
-      if (!item || !design || (item.kind !== 'entity' && item.kind !== 'text')) return [];
+      if (!item || !design || (item.kind !== 'entity' && item.kind !== 'text' && item.kind !== 'anchor')) return [];
       const used = usedRoleIds(design, item.kind);
+      // where this scenario's subscenes open: one ID for each, then any
+      const subsceneIds = [...subsceneTargetsOf(openScenario.value).map(subsceneRoleKey), SUBSCENE_ID];
+      if (item.kind === 'anchor') return subsceneIds.filter(id => !used.has(id) && id !== itemRoleId(item));
       const other = item.kind === 'text' ? 'entity' : 'text';
       const partners = design.items
         .filter(it => it.kind === other && (actionRole(it) || isSpeechRole(it)))
@@ -5675,6 +5838,7 @@ createApp({
         'action_proceed',
         'action_regress',
         'speech', '_.speech', 'entity.speech',
+        ...subsceneIds,
       ];
       return [...new Set(list)].filter(id => !used.has(id) && id !== itemRoleId(item));
     });
@@ -6239,20 +6403,8 @@ createApp({
         : { proceed: false, regress: false, choices: new Set() };
     });
 
-    // Where a subscene sits on the stage of the scene below it, in that
-    // stage's units: centered, at its own design's size, scaled down to fit
-    // if it is larger. A subscene with no design is a text card.
-    function subsceneBox(fr, W, H) {
-      if (fr.design) {
-        const w = fr.design.width, h = fr.design.height;
-        const scale = Math.min(1, W / w, H / h);
-        return { x: (W - w * scale) / 2, y: (H - h * scale) / 2, w, h, scale };
-      }
-      const w = Math.min(W * 0.8, 640), h = H * 0.7;
-      return { x: (W - w) / 2, y: (H - h) / 2, w, h, scale: 1 };
-    }
-
-    function frameStageLayers(fr) {
+    // `subscene`: the scenario of the subscene open over this frame, if any.
+    function frameStage(fr, subscene) {
       const design = fr.design;
       const frame = (fr.stageFrames[fr.beat] || []).map(f => {
         const img = f.assoc && findCatalogImage(f.assoc.library, f.assoc.image);
@@ -6265,31 +6417,42 @@ createApp({
         atMenu: fr.atMenu,
         canProceed: !fr.atMenu,
         canRegress: fr.depth > 0 || fr.beat > 0,
+        subscene,
       });
     }
 
-    // The stage: the bottom frame's design, then each subscene over it in its
-    // own box, behind a backdrop that dims (and blocks) what lies below.
+    // The stage: the bottom frame's design, then each subscene over the frame
+    // it opened from, in the box that frame's design names for it (else
+    // centered), behind a backdrop that dims (and blocks) what lies below.
+    // Each frame's box is in its parent's units; the transforms compose.
     const playerStage = computed(() => {
       const base = playerDesign.value;
       if (!base || !playerUseGraphic.value) return null;
-      const W = base.width, H = base.height;
       const all = playerFrames.value;
+      let parent = null; // { abs: {x, y, scale}, w, h, place }
       const frames = all.map((fr, i) => {
-        const box = fr.depth ? subsceneBox(fr, W, H) : { x: 0, y: 0, w: W, h: H, scale: 1 };
+        const next = all[i + 1];
+        const stage = fr.design ? frameStage(fr, next ? next.scene.scenario : null) : { layers: [], subsceneBox: null };
+        const local = parent
+          ? subsceneBox(fr.design, parent.w, parent.h, parent.place)
+          : { x: 0, y: 0, w: base.width, h: base.height, scale: 1 };
+        const abs = parent
+          ? { x: parent.abs.x + parent.abs.scale * local.x, y: parent.abs.y + parent.abs.scale * local.y, scale: parent.abs.scale * local.scale }
+          : { x: 0, y: 0, scale: 1 };
+        parent = { abs, w: local.w, h: local.h, place: stage.subsceneBox };
         return {
           key: fr.depth + ':' + fr.scene.id,
           depth: fr.depth,
           top: i === all.length - 1,
-          transform: `translate(${box.x} ${box.y}) scale(${box.scale})`,
-          width: box.w,
-          height: box.h,
+          transform: `translate(${abs.x} ${abs.y}) scale(${abs.scale})`,
+          width: local.w,
+          height: local.h,
           background: fr.design && fr.design.background && fr.design.background.url ? fr.design.background.url : '',
-          layers: fr.design ? frameStageLayers(fr) : [],
+          layers: stage.layers,
           html: fr.design ? null : (fr.playback.beatsHtml[fr.beat] || ''),
         };
       });
-      return { width: W, height: H, frames };
+      return { width: base.width, height: base.height, frames };
     });
 
     // Plain-button fallbacks for whatever the design has no graphic control for.
@@ -6752,7 +6915,8 @@ Write your scene description here.
       newEntityId, addExtraEntity, removeExtraEntity, isDeclaredEntity, entityLabel,
       isImageAssociated, associateImage, removeEntityImage, addLabelToAssociation, onAddLabel,
       removeLabelFromAssociation, resolveAssocImage, toggleEntityImages, togglePicker,
-      scenarioDesigns, scenarioIdsForPresentation, openScenario, bgPickerScenario, placeMode,
+      scenarioDesigns, scenarioIdsForPresentation, openScenario,
+      subscenePreviewChoice, subsceneCandidates, subscenePreviews, bgPickerScenario, placeMode,
       toggleScenario, resetScenario, toggleBgPicker, setScenarioBackground, removeScenarioBackground,
       onPaletteDragStart, onCanvasDrop, removeScenarioItem, onItemMouseDown,
       setScenarioSize, lockCanvasRatio, lockItemRatio, setItemSize, convertSelectedToAnchor, wideScenario, onBgResizeMouseDown, onItemResizeMouseDown, onScenarioCanvasMouseDown, textDraw, textDrawRect,

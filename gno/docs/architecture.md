@@ -223,6 +223,14 @@ all persisted together as `_presentation.yaml`:
     the head's one for the selection, deletes (`deleteTreeItems` →
     `removeScenarioItem`); a deleted container's children take its place in
     its own container (or go to the top level).
+  - *Subscene preview:* the toolbar's *Preview subscene* picks another
+    scenario (`subscenePreviewChoice`, per browser session, never saved or
+    exported) to draw as a ghost (`subscenePreviews`) where it would open as a
+    subscene: the same `subscenePlaceholders` + `subsceneBox` the Player uses,
+    from the items' current boxes. It takes no pointer events, so the box
+    under it can still be dragged. `subsceneCandidates` lists first the
+    scenarios this one opens with `~>` (`subsceneTargetsOf`), which also feed
+    the inspector's ID suggestions (anchors get only those).
   - *Wide editor:* a toolbar button lifts the whole workspace (toolbar,
     canvas, sidebar) into a fixed full-window layer (`.scenario-workspace.wide`),
     hiding the app's top bar, navigation and the 900px page column. Esc (or
@@ -279,9 +287,15 @@ because the template is parsed as HTML, which lowercases a `:viewBox` name.
 
 `playerStage` draws every frame into that one `<svg>`, each in a `<g>`
 transformed into its box: the bottom frame fills the stage, a subscene sits
-where `subsceneBox` puts it (centered, its own design's size, scaled down to
-fit), behind a backdrop rect, and a subscene with no design becomes a text
-card (`<foreignObject>`). Frames below the top are `.stage-inert`. Whether the
+where `subsceneBox` puts it, behind a backdrop rect, and a subscene with no
+design becomes a text card (`<foreignObject>`). The place comes from the
+frame below: `buildPlayerStage` is told which subscene is open over it
+(`ctx.subscene`) and returns, beside its layers, the box of the matching
+`subscene.<scenario>` / `subscene` item (`subscenePlaceholders`, boxes before
+entity frames) as laid out by `layoutBoxes`; it counts as visible then, so
+stacks make room for it, and is hidden otherwise. Without one, `subsceneBox`
+centers the subscene at its design's size. Each box is in its parent frame's
+units, so the transforms compose down the stack. Frames below the top are `.stage-inert`. Whether the
 Player is graphic follows the bottom frame's design; the controls' fallbacks
 (`playerActionSlots`) follow the top frame's.
 
