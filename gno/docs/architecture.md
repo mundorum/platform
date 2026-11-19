@@ -81,13 +81,20 @@ mentions substituted into styled spans first).
 A node-per-scene diagram. `layoutGraphNodes` auto-arranges scenes into
 left-to-right topological columns (BFS from root scenes, orphans handled
 separately); `layoutGraphEdges` draws cubic-bezier divert arrows between
-nodes based on their *final* rendered position. Nodes can be dragged; a
+nodes based on their *final* rendered position (`sceneDiverts`: choices and
+entity diverts; a subscene divert, `~>`, is drawn dotted instead of dashed).
+Nodes can be dragged anywhere, including above or left of the origin (the
+canvas and its arrow layer don't clip, so there is no lower bound); a
 dragged position, a chosen color, and a free-text annotation are stored per
 scene **title** in `nodeMeta` (title, not id, so the graph survives scene
 reordering/renumbering). `nodeMeta` round-trips through the session
 autosave and the downloadable `_graph.yaml`, but is **not** part of named
 browser-storage saves or the `.gno` file itself — it's presentation
 metadata, not narrative content.
+
+Zoom (wheel or toolbar) is bounded by `ZOOM_MIN`/`ZOOM_MAX` (0.05–4) only to
+keep the view usable; the toolbar's *Fit* button (`fitView`) zooms and pans
+so every node is in view, which is also how to find nodes dragged far away.
 
 ### Presentation
 Three sub-tabs building the visual/staging layer on top of the narrative,
@@ -228,8 +235,20 @@ a scene's body into *beats* (pause points), per the rules documented in
 `README.md` (a lone `--` line, or the end of a dialog/dialog-set unless
 only diverts follow). Alongside beats it tracks which entities are "on
 stage" — present since first mention, carrying their last-given state,
-until an explicit `@entity ->` exit or the scene ends — rendered in a
-separate panel independent of the narrative text itself.
+until an explicit `@entity =>` exit or the scene ends — rendered in a
+separate panel independent of the narrative text itself. It also lists, per
+beat, the entity diverts on stage (`entityDiverts`).
+
+The reader's place is a stack of frames, `playerStack` (`{ sceneId, reveal }`):
+the scene being played at the bottom, then any subscene opened over it with
+`~>` (`playerDivert` pushes; a `->` divert replaces the whole stack;
+`playerRegress` pops a subscene, or steps back a beat at the bottom). Only the
+top frame advances and takes clicks. `playerSceneData` holds what doesn't
+depend on the beat (the scene's playback, design and folded stage frames), so
+advancing doesn't re-parse; `playerFrames` adds each frame's beat. Before the
+Player starts, the stack is empty and the start scene stands in for it
+(`playerFrameList`). A watcher closes subscene frames whose scene was edited
+away.
 
 *Graphic mode* plays the same beats on the scenario's designed SVG (rules in
 `README.md`, "Graphic play"). It is on by default when `scenarioDesigns` has an
@@ -251,11 +270,20 @@ area has speech, and both items of an `action_*` pair follow `actionRole`) →
 `buildPlayerStage` first settles what each item shows at this moment (and so
 which items are hidden), then runs `layoutBoxes` so stacks close up around
 the hidden items, and finally emits drawable layers in the design's z-order,
-with `action_*` items turned into click targets. Entity images come
+with `action_*` items, and entities carrying a divert, turned into click
+targets (`{ type: 'divert', divert }` for both kinds of divert). Entity images come
 from the live library catalogs (`findCatalogImage`), not from anything stored
 in the design, so an entity is drawn only once its catalog has loaded. The
 Vue template binds the SVG's `viewBox` through `v-bind="{viewBox: …}"`
 because the template is parsed as HTML, which lowercases a `:viewBox` name.
+
+`playerStage` draws every frame into that one `<svg>`, each in a `<g>`
+transformed into its box: the bottom frame fills the stage, a subscene sits
+where `subsceneBox` puts it (centered, its own design's size, scaled down to
+fit), behind a backdrop rect, and a subscene with no design becomes a text
+card (`<foreignObject>`). Frames below the top are `.stage-inert`. Whether the
+Player is graphic follows the bottom frame's design; the controls' fallbacks
+(`playerActionSlots`) follow the top frame's.
 
 ## Persistence model
 
@@ -282,8 +310,12 @@ restore it from.
 independent and re-run reactively as the user types:
 
 1. `parseGno(source)` — splits the text into scenes by `# Title: Scenario
-   (Start|End)?` headings, extracting each scene's body and its trailing
-   divert list (`* Label -> Target`).
+   (\*|\*\*)?` headings (the former `(Start)`/`(End)` too, via
+   `sceneMarker`), extracting each scene's body, its choices
+   (`* Label -> Target`, or `~>` for a subscene) and its entity diverts
+   (`@door -> Target`, matched by `ENTITY_DIVERT_RE`; lines of a dialog's
+   text are skipped). Choices and entity diverts are separate lists because
+   `action_N` numbers the choices only.
 2. `analyzeEntities(source)` — regex-based detection of the three `@entity`
    forms (standalone, dialog-leading, inline), using Unicode letter/number
    classes so accented ids are matched in full.

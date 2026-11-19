@@ -16,7 +16,7 @@ IDs e os contêineres fazem durante a execução está em
 ## Antes de começar
 
 A narrativa já deve ter cenas no cenário `Recepção` (um título como
-`# Abertura: Recepção (Start)`), e a apresentação precisa de imagens:
+`# Abertura: Recepção (*)`), e a apresentação precisa de imagens:
 
 1. **Presentation → Image Libraries:** adicione a biblioteca com as imagens do
    caso (aqui, `https://mundorum.github.io/harena-cases/ethics/syphilis/images/`).
@@ -84,7 +84,7 @@ um item está selecionado, o inspetor sugere esses IDs como botões em
 | `speech` | A área de fala geral. | Tudo o que é dito no trecho: a narração (a menos que exista `_.speech`) e os diálogos (das entidades que não têm área própria). |
 | `_.speech` | A área do narrador. | O texto livre da cena, escrito fora de qualquer diálogo. |
 | `entity.speech` | A área própria de uma entidade, como `Luísa.speech` (com o ID da entidade no lugar de `entity`). | Os diálogos dessa entidade: `-- @Luísa: …`. |
-| `action_N` | A escolha número N: `action_1`, `action_2`, … | O rótulo do N-ésimo desvio da cena (`* Rótulo -> Destino`). Um clique leva ao destino desse desvio. |
+| `action_N` | A escolha número N: `action_1`, `action_2`, … | O rótulo do N-ésimo desvio da cena (`* Rótulo -> Destino`). Um clique leva ao destino desse desvio (ou, para `* Rótulo ~> Destino`, abre-o como subcena sobre a cena atual). |
 
 Algumas regras fazem esses IDs funcionarem juntos:
 
@@ -103,7 +103,7 @@ Algumas regras fazem esses IDs funcionarem juntos:
   botão comum para ela abaixo do cenário, para que a cena nunca fique travada.
 
 As sugestões também incluem `action_proceed` (continuar depois de uma pausa)
-e `action_regress` (voltar um trecho), os controles para avançar pela cena.
+e `action_regress` (voltar um trecho, ou fechar uma subcena), os controles para avançar pela cena.
 
 Neste tutorial, a `Recepção` recebe uma única área `speech`, usada tanto pela
 narração quanto pelos diálogos, e duas escolhas, `action_1` e `action_2`.

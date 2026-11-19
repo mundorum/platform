@@ -16,7 +16,7 @@ reference of what the IDs and containers do in play, see
 ## Before you start
 
 The narrative must already have scenes in the `Recepção` scenario (a heading
-such as `# Abertura: Recepção (Start)`), and the presentation needs images:
+such as `# Abertura: Recepção (*)`), and the presentation needs images:
 
 1. **Presentation → Image Libraries:** add the library with the case images
    (here, `https://mundorum.github.io/harena-cases/ethics/syphilis/images/`).
@@ -80,7 +80,7 @@ a click on a chip renames the item.
 | `speech` | The general speech area. | Everything said in the beat: narration (unless `_.speech` exists) and dialogs (of entities that don't have their own area). |
 | `_.speech` | The narrator's area. | The free text of the scene, written outside any dialog. |
 | `entity.speech` | One entity's own area, such as `Luísa.speech` (with the entity's ID in place of `entity`). | The dialogs of that entity: `-- @Luísa: …`. |
-| `action_N` | Choice number N: `action_1`, `action_2`, … | The label of the Nth divert of the scene (`* Label -> Target`). Clicking it goes to that divert's target. |
+| `action_N` | Choice number N: `action_1`, `action_2`, … | The label of the Nth divert of the scene (`* Label -> Target`). Clicking it goes to that divert's target (or, for `* Label ~> Target`, opens it as a subscene over the current scene). |
 
 A few rules make these work together:
 
@@ -99,7 +99,7 @@ A few rules make these work together:
   it below the scenario, so a scene never gets stuck.
 
 The suggestions also include `action_proceed` (continue past a pause) and
-`action_regress` (go back one beat), the controls for moving through the
+`action_regress` (go back one beat, or close a subscene), the controls for moving through the
 scene.
 
 In this tutorial, `Recepção` gets one `speech` area, used by both narration

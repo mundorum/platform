@@ -29,11 +29,33 @@ Inside a scene, one can write a Markdown text, that will be presented inside the
 
 ## Diverts
 
-Diverts are transitions from the current scene to another. It starts with a markdown bullet (asterisk) followed by a transition label, an arrow (`->`) and the target scene. Example:
+Diverts are transitions from the current scene to another. A divert offered as a choice starts with a markdown bullet (asterisk) followed by a transition label, an arrow (`->`) and the target scene. Example:
 
 ~~~gno
 * Label -> Target Scene
 ~~~
+
+### Entity diverts
+
+An entity can carry a divert too: a standalone entity line (see [Entities](#entities)) followed by the arrow and the target scene. Words describing its state may come before the arrow:
+
+~~~gno
+@door -> The Garden
+@old_map left ~> The Northern Border
+~~~
+
+The entity enters the scene as any standalone mention would, and from then on, while it is on stage, it can be clicked to take the divert, at any point of the scene rather than only at its end. It keeps the divert through later mentions until it leaves the scene. In the graphic Player its image becomes clickable; where there is no image to click (the text Player, or an entity not drawn), the Player shows a button for it instead. The arrow needs a space before it, since `-` may be part of an entity id.
+
+### Subscenes
+
+A divert written with a wavy arrow (`~>`) instead of `->` opens its target as a *subscene*: the target scene is played over the current one instead of replacing it. It works for choices and for entity diverts:
+
+~~~gno
+* Read the scouts' report ~> The Scouts' Report
+@old_map ~> The Northern Border
+~~~
+
+While a subscene is open, the scene underneath stays frozen where it was, dimmed and not clickable. Going back (`action_regress`, or the Player's close button) in a subscene closes it and returns to the scene exactly where it was left; it does not step back through the subscene's own pauses. A subscene can open further subscenes over itself. A `->` divert taken inside a subscene leaves for its target, closing every open subscene. See [Graphic play](#graphic-play) for how a subscene is placed on the stage.
 
 ## Entities
 
@@ -79,6 +101,12 @@ Words that immediately follow an entity — either standalone or at the start of
 
 Here `right sad` is the state of `@prince`: positioned on the right, in a sad mood.
 
+A state made of just the symbol `=>` means the entity leaves the scene (see [Entities on stage](#entities-on-stage)):
+
+~~~gno
+@guard =>
+~~~
+
 ## Dialogs
 
 A dialog is text spoken by an entity. It always starts with a double dash (`--`), followed by the entity (with an optional state), a colon, and the dialog text:
@@ -108,19 +136,19 @@ The `Player` tab in the editor lets you step through a narrative as a reader wou
 
 ### Start and End scenes
 
-Exactly one scene should be marked `(Start)` — in parentheses, right after the scenario name in the heading. The player begins there:
+Exactly one scene should be marked `(*)` — in parentheses, right after the scenario name in the heading. The player begins there:
 
 ~~~gno
-# The Council Chamber: Castle (Start)
+# The Council Chamber: Castle (*)
 ~~~
 
-One scene should likewise be marked `(End)`. When the player reaches it and finishes presenting it, the narrative ends:
+One scene should likewise be marked `(**)`. When the player reaches it and finishes presenting it, the narrative ends:
 
 ~~~gno
-# The Aftermath: Castle (End)
+# The Aftermath: Castle (**)
 ~~~
 
-If no scene is marked `(Start)`, the player falls back to the first scene in the file.
+If no scene is marked `(*)`, the player falls back to the first scene in the file. Being symbols rather than words, the markers read the same whatever the narrative's language. The former markers `(Start)` and `(End)` are still read the same way, so older narratives keep working.
 
 ### Pauses
 
@@ -129,11 +157,11 @@ While playing a scene, the player reveals its content a little at a time, cleari
 1. **After a dialog.** Once a single dialog line, or an unbroken run of consecutive dialog lines (a *dialog set*), has been shown, the player pauses before continuing — **unless** nothing but the scene's diverts follow that dialog. In that case there's no pause: the dialog stays on screen together with the divert options, since offering the diverts is already a wait for the reader to pick one.
 2. **At a lone `--` line.** A line containing only `--` forces a pause at that point. The `--` itself is never shown to the reader — it is a pure pause marker.
 
-A back button, shown beside the continue button once the reader is past a scene's first pause, steps back to the previous screen (a graphic design can supply its own with `action_regress`, see below). The `Restart` button at the top of the Player starts the narrative over from its `(Start)` scene at any time.
+A back button, shown beside the continue button once the reader is past a scene's first pause, steps back to the previous screen (a graphic design can supply its own with `action_regress`, see below). The `Restart` button at the top of the Player starts the narrative over from its `(*)` scene at any time.
 
 Plain prose, standalone entity lines (`@princess right curious`), and inline mentions do **not** cause a pause by themselves; they simply accumulate into whatever is shown at the next pause.
 
-At the end of a scene, once its last bit of content is on screen, the scene's diverts appear right alongside it. For an `(End)` scene, that same moment shows that the narrative is finished instead of a divert list.
+At the end of a scene, once its last bit of content is on screen, the scene's diverts appear right alongside it. For a `(**)` scene, that same moment shows that the narrative is finished instead of a divert list.
 
 ### Entities on stage
 
@@ -141,7 +169,7 @@ The Player shows a separate panel — independent of the narrative text — list
 
 - An entity becomes present in this panel the moment it's first mentioned, in any of the three forms (standalone, dialog, or inline).
 - It stays present, keeping whatever state it was last given, even as the scene moves on to other content — until either the scene ends or it's explicitly marked as having left.
-- A standalone line whose entire state is the symbol `->` — e.g. `@guard ->` — marks that entity as having exited: it's removed from the panel from that point on. Being a symbol rather than a word, it reads the same regardless of the narrative's language. An entity that's mentioned again after leaving simply becomes present again.
+- A standalone line whose entire state is the symbol `=>` — e.g. `@guard =>` — marks that entity as having exited: it's removed from the panel from that point on. Being a symbol rather than a word, it reads the same regardless of the narrative's language. An entity that's mentioned again after leaving simply becomes present again. (Older narratives wrote `@guard ->`, which is still read as an exit, since an arrow with no target scene can't be a divert.)
 - Each entity appears only once in the panel, showing its most recent state — not a history of every state it's had.
 - The panel is scoped to the current scene: it always starts empty when a new scene begins.
 
@@ -209,20 +237,20 @@ Note that the two consecutive `-- @guard` / `-- @princess` lines form a single d
 
 ### Graphic play
 
-When the current scene's scenario has a design in **Presentation → Scenarios**, the Player plays it graphically by default: the scenario's SVG is loaded and the scene is acted out on it, instead of printed as text. The `Graphic` / `Text` switch at the top of the Player picks between the two; a scenario with no design always plays as text. The pauses, `(Start)`/`(End)` scenes and diverts work exactly as described above — only the presentation changes.
+When the current scene's scenario has a design in **Presentation → Scenarios**, the Player plays it graphically by default: the scenario's SVG is loaded and the scene is acted out on it, instead of printed as text. The `Graphic` / `Text` switch at the top of the Player picks between the two; a scenario with no design always plays as text. The pauses, `(*)`/`(**)` scenes and diverts work exactly as described above — only the presentation changes.
 
 **Entities.** When an entity enters, its image is placed on the SVG. Its labels (the words after `@id`) are read in two steps:
 
 1. *State → image.* The label sets defined for the entity in **Presentation → Entity** are compared with the labels written after it, and the image sharing the most labels is used. On a tie, the first one defined wins. Given `@king happy left` and images labeled `happy` and `sad`, the `happy` image is used, since `left` isn't one of its labels. A label made of several words (`very happy`) must appear as such. If no label matches (or none is written), the entity's image with no labels is used; if every image has labels, the first one defined is used.
 2. *Label → anchor.* Of the labels that weren't used as a state, the first one that names an anchor ID in the SVG says where the entity stands; its image is fitted into that anchor's box. An entity with no anchor label (and none from before) isn't drawn.
 
-Later mentions update what they say something about: `@king sad` changes the image and keeps the position, `@king right` moves the king and keeps the image. `@king ->` removes the entity. Labels, anchor IDs and text-area IDs are compared ignoring case and accents.
+Later mentions update what they say something about: `@king sad` changes the image and keeps the position, `@king right` moves the king and keeps the image. `@king =>` removes the entity. An entity carrying a divert (`@door -> The Garden`) is clickable while on stage and takes the divert. Labels, anchor IDs and text-area IDs are compared ignoring case and accents.
 
-**Groups.** Entities joined in **Presentation → Entity**, by typing them with `+` in *Add entity* (for example `@king + @queen`, or `@king + @queen + @jester` for more), can have images of their own, which are used only where the narrative writes the members joined, in any order (`@king + @queen right` or `@queen + @king right`). The Presentation tab shows a group with its members in the order they were typed. Their labels work as for a single entity. While the group is on stage, it is drawn as one image and the members' own images are hidden. The group stands at the anchor it names; if it names none, it stands where its first placed member already is. `@king + @queen ->` removes the group together with its members.
+**Groups.** Entities joined in **Presentation → Entity**, by typing them with `+` in *Add entity* (for example `@king + @queen`, or `@king + @queen + @jester` for more), can have images of their own, which are used only where the narrative writes the members joined, in any order (`@king + @queen right` or `@queen + @king right`). The Presentation tab shows a group with its members in the order they were typed. Their labels work as for a single entity. While the group is on stage, it is drawn as one image and the members' own images are hidden. The group stands at the anchor it names; if it names none, it stands where its first placed member already is. `@king + @queen =>` removes the group together with its members.
 
-Mentioning a member alone (`-- @king: …`, `@king sad`, or `@king ->`), in the same beat or after a pause, *splits* the group: from then on, each member is on stage on its own.
+Mentioning a member alone (`-- @king: …`, `@king sad`, or `@king =>`), in the same beat or after a pause, *splits* the group: from then on, each member is on stage on its own.
 
-1. A member mentioned alone takes that mention and its labels, as usual (`@king ->` makes it leave).
+1. A member mentioned alone takes that mention and its labels, as usual (`@king =>` makes it leave).
 2. A member not mentioned alone stays on stage until it leaves explicitly. Its image is the one best matching the labels the group was given (`@king + @queen happy` → the queen's `happy` image). If none matches, its image with no labels is used, or else its first image. It stands where it stood before the group formed, or else where the group stands.
 
 For example, after `@king + @queen middle happy` and a pause, `-- @king: Hello.` shows the king and the queen apart, each in a `happy` image if they have one. A group with no images of its own is the same as mentioning each member with the same labels.
@@ -244,8 +272,8 @@ When dialogs share a `speech` area (and, always, for a group) they are prefixed 
 | ID | Behavior |
 |---|---|
 | `action_proceed` | Visible and clickable while the scene is paused; continues. A text area shows its own text ("Continue"). |
-| `action_regress` | Visible and clickable once past the first beat; steps back to the previous beat. A text area shows its own text. |
-| `action_N` | Choice N (the Nth `* Label -> Target` of the scene); clickable while the choices are on offer, goes to its target. A text area is filled with the choice's label. |
+| `action_regress` | Visible and clickable once past the first beat; steps back to the previous beat. In a subscene it is always visible and closes the subscene. A text area shows its own text. |
+| `action_N` | Choice N (the Nth `* Label -> Target` or `* Label ~> Target` of the scene); clickable while the choices are on offer, goes to its target (or opens it as a subscene). A text area is filled with the choice's label. |
 
 **Stacks.** Items can be put into *stacks*, which place them the way a CSS flexbox does: a vertical stack lines its items up top to bottom, a horizontal one left to right, and stacks can contain other stacks. Each item keeps its own size, and the stack decides its position from three settings: where the run sits along the direction (start, center, end or spread out), how each item is aligned across it, and the gap between items. Items hidden at the current pause take no room, so the rest close up. A stack with nothing visible is hidden as well. Hidden items are an empty speech area, a choice not on offer, an inactive control, or an anchor with no one on it. For example, a vertical stack aligned to the bottom, holding the `speech` text area and then the `action_N` text areas, shows the speech right at the bottom while there are no choices, and moves it up above them when the choices appear.
 
@@ -258,7 +286,9 @@ Items go into a stack or group in either of two ways in **Presentation → Scena
 
 In the hierarchy, the arrows on a row move it up or down among its neighbours: at the top level and in a group that changes the drawing order (higher rows are behind lower ones), in a stack the placing order. The trash button on a row deletes that item, and the one at the top deletes all the selected items; deleting a group or stack keeps the items it held, which take its place.
 
-Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without an `action_N` entity or text area), so a scene can never get stuck; `Space` always continues.
+Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without an `action_N` entity or text area, a button for each entity divert whose entity isn't drawn), so a scene can never get stuck; `Space` always continues.
+
+**Subscenes.** A subscene (`~>`) is drawn on the stage of the scene it opens over, which is dimmed behind it and takes no clicks. It is centered, at the size of its own scenario's design, scaled down to fit if that is larger than the scene's. Its controls (`action_proceed`, `action_regress`, `action_N`) come from its own design, and its `action_regress` closes it. A subscene whose scenario has no design is shown as a text card on the stage. Whether the Player is graphic follows the scene underneath: when it plays as text, its subscenes are text too, shown as cards below the dimmed scene.
 
 ## Side panels
 
