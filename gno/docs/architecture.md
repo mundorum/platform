@@ -145,10 +145,10 @@ all persisted together as `_presentation.yaml`:
     share one and play a role as a pair (`action_1`, `speech`). Internally
     `svgId` stays unique: a text area's always carries `TEXT_ID_SUFFIX`
     (`_text`); `itemRoleId` gives the authored ID, `roleSvgId(kind, id)` the
-    svgId for a typed one (dropping a typed `_text`/`_label`), and
-    `migrateTextIds` (run by `sanitizeScenarioDesigns` and
-    `parseScenarioSvg`) suffixes text areas of older designs, renaming
-    `action_N_label` to `action_N_text`. The UI always shows `itemRoleId`.
+    svgId for a typed one (dropping a typed `_text`/`_label`). Text areas
+    of version 1 designs named without the suffix are renamed by the
+    1 → 1.1 converter, not by the decoders. The UI always shows
+    `itemRoleId`.
     New anchors, text areas and stacks start as `anchor_n` /
     `text_n` / `layout_n` (lowest free `n` from 1); entities start as their entity id. The
     inspector suggests IDs for entities and text areas: first the action and

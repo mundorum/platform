@@ -89,13 +89,20 @@ graph format (graph YAML).** Editor-only changes don't go in it.
 - Never edit the section of a finished version, except to fix an error in
   it.
 
-### The syntax reference
+### The syntax and SVG references
 
 `docs/syntax.md` describes the syntax of the `.gno` text for the current
 version, structure by structure, with EBNF-Lite rules and examples. **Update
 it in the same change whenever the syntax of the `.gno` text changes** (a new
-or changed structure, symbol or rule for how a line is read), including the
-version number in its introduction when a new version starts.
+or changed structure, symbol or rule for how a line is read).
+
+`docs/scenario-svg.md` describes the scenario SVG files in the same way: their
+elements, `data-gno-*` attributes and role IDs. **Update it in the same
+change whenever how a scenario SVG is written or read changes** (an element,
+an attribute, a role ID, or what the Player shows or hides).
+
+When a new version starts, update the version number in the introduction of
+both.
 
 ### How to write a converter
 

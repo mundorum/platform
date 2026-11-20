@@ -38,6 +38,13 @@ Newest version first.
   fitted into. A text area or an anchor is an invisible box; an entity with
   the same ID is a frame shown only while the subscene is open. *Items
   already named so are listed to check.*
+- **Text area IDs always end in `_text`** in the scenario designs. Version 1
+  also read text areas named without it (`speech`, `action_N_label`) and
+  renamed them as it opened them; 1.1 reads only the suffixed form.
+  *Converted.*
+- **Anchors are named by their `id` alone.** Version 1 also read an anchor
+  `<g>` with no `id`, by its `data-gno-anchor` marker, and an anchor of a
+  browser save with no ID, by its former `label`. *Converted.*
 - **No `version` key** in the presentation YAML: the version now lives in the
   narrative's manifest (`manifest.json` in the zip). *Nothing to convert: an
   old key is ignored.*

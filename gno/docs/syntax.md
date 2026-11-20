@@ -4,8 +4,9 @@ This document describes the syntax of the gnō narrative language, version
 1.1: every structure an author can write in a `.gno` file, what it is for,
 how it is written, and examples. What the Player does with each structure
 (screens, the stage, graphic play) is described in the
-[README](../README.md); what changed from one version of the language to the
-next, in the [versions journal](versions.md).
+[README](../README.md); the files that hold the scenarios' graphic design, in
+the [scenario SVG reference](scenario-svg.md); what changed from one version
+of the language to the next, in the [versions journal](versions.md).
 
 A `.gno` file is Markdown. gnō adds a few kinds of line to it (scene
 headings, entity lines, dialogs, pauses and diverts) and leaves every other

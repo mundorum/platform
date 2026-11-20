@@ -3037,7 +3037,10 @@ function manifestVersion(manifest) {
 // subscene (see README, "Versions").
 //   - "(Start)" / "(End)" after a scene heading become "(*)" / "(**)";
 //   - an entity leaving, "@guard ->", becomes "@guard =>", since "->" after an
-//     entity now starts a divert.
+//     entity now starts a divert;
+//   - in the scenario designs, every text area's id gets the "_text" suffix,
+//     and an anchor saved with only a `label` gets it as its id (the anchor
+//     written without an id in an SVG file is the `files` stage's, below).
 // Lines that version 1 read one way and 1.1 reads another, but that can't be
 // rewritten to keep their old meaning, are listed for the author to check.
 function convert_1_to_1_1(bundle) {
@@ -3075,7 +3078,45 @@ function convert_1_to_1_1(bundle) {
   });
   if (markers) notes.push(`${markers} start/end marker(s) rewritten: (Start) → (*), (End) → (**).`);
   if (exits) notes.push(`${exits} entity exit(s) rewritten: "@entity ->" → "@entity =>".`);
-  const designs = (bundle.presentation && bundle.presentation.scenario_designs) || {};
+  // Scenario designs. Version 1 text areas could be named without the "_text"
+  // suffix ("speech", "text_1", "action_N_label"); in 1.1 every text area's
+  // id carries it, so each gets it (the "_label" dropped first), followed
+  // through the lists of the stacks and groups holding it. Anchors of older
+  // browser saves had no svgId, only a `label`; it becomes their id.
+  const renamedTexts = [];
+  let namedAnchors = 0;
+  const designs = {};
+  Object.entries((bundle.presentation && bundle.presentation.scenario_designs) || {}).forEach(([name, d]) => {
+    if (!d || typeof d !== 'object' || !Array.isArray(d.items)) { designs[name] = d; return; }
+    const items = d.items.map(it => (it && typeof it === 'object' ? { ...it } : it));
+    items.forEach(it => {
+      if (it && it.kind === 'anchor' && !it.svgId && it.label) {
+        it.svgId = String(it.label);
+        delete it.label;
+        namedAnchors++;
+      }
+    });
+    const used = new Set(items.map(it => it && it.svgId));
+    items.forEach(it => {
+      if (!it || it.kind !== 'text') return;
+      const old = String(it.svgId || '');
+      if (old.endsWith('_text')) return;
+      const base = old.replace(/_label$/, '');
+      let id = base + '_text', n = 1;
+      while (used.has(id)) id = `${base}_${n++}_text`;
+      items.forEach(c => {
+        if (c && (c.kind === 'layout' || c.kind === 'group') && Array.isArray(c.children)) {
+          c.children = c.children.map(cid => (cid === old ? id : cid));
+        }
+      });
+      used.add(id);
+      it.svgId = id;
+      renamedTexts.push(`${old} → ${id}`);
+    });
+    designs[name] = { ...d, items };
+  });
+  if (renamedTexts.length) notes.push(`${renamedTexts.length} text area ID(s) given the "_text" suffix: ${renamedTexts.join(', ')}.`);
+  if (namedAnchors) notes.push(`${namedAnchors} anchor(s) of an older save named after their label.`);
   Object.entries(designs).forEach(([name, d]) => {
     ((d && d.items) || []).forEach(it => {
       const id = String((it && it.svgId) || '').replace(/_text$/, '').toLowerCase();
@@ -3085,7 +3126,30 @@ function convert_1_to_1_1(bundle) {
     });
   });
   check.forEach(c => notes.push('Check ' + c));
-  return { bundle: { ...bundle, source: lines.join('\n') }, notes };
+  const presentation = bundle.presentation && bundle.presentation.scenario_designs
+    ? { ...bundle.presentation, scenario_designs: designs }
+    : bundle.presentation;
+  return { bundle: { ...bundle, source: lines.join('\n'), presentation }, notes };
+}
+
+// Version 1 -> 1.1, on a zip's raw files: the 1.1 reader names an anchor by
+// its `id` alone, while version 1 fell back to its data-gno-anchor marker
+// when the `<g>` had no id. Such an anchor gets the marker as its id.
+function convert_1_to_1_1_files(files) {
+  const ANCHOR_TAG = /<g\b[^>]*\sdata-gno-anchor\s*=\s*("[^"]*"|'[^']*')[^>]*>/g;
+  const HAS_ID = /\sid\s*=/;
+  let anchors = 0;
+  const out = {};
+  Object.entries(files).forEach(([path, text]) => {
+    if (typeof text !== 'string' || !/\.svg$/i.test(path)) { out[path] = text; return; }
+    out[path] = text.replace(ANCHOR_TAG, (tag, marker) => {
+      if (HAS_ID.test(tag)) return tag;
+      anchors++;
+      return tag.replace(/^<g\b/, `<g id=${marker}`);
+    });
+  });
+  const notes = anchors ? [`${anchors} anchor(s) without an id named after their data-gno-anchor marker.`] : [];
+  return { files: out, notes };
 }
 
 // The converters, in order. Each takes a package from `from` to `to`:
@@ -3100,7 +3164,7 @@ function convert_1_to_1_1(bundle) {
 //     meaning always belongs in `bundle`, which must then also accept data
 //     a `files` stage already brought up to date.
 const CONVERTERS = [
-  { from: '1', to: '1.1', bundle: convert_1_to_1_1 },
+  { from: '1', to: '1.1', bundle: convert_1_to_1_1, files: convert_1_to_1_1_files },
 ];
 
 // The chain of converters from `version` to GNO_VERSION, or an error when
@@ -3788,25 +3852,6 @@ function itemRoleId(item) {
 // the suffix is the system's to add.
 function roleSvgId(kind, id) {
   return kind === 'text' ? id.replace(/_(?:text|label)$/, '') + TEXT_ID_SUFFIX : id;
-}
-
-// Designs made before the suffix existed: their text areas were named
-// `speech`, `text_1` or `action_N_label` (`action_N_text` already fits). Gives
-// each its suffix and follows the rename through the containers' lists.
-function migrateTextIds(design) {
-  const used = new Set(design.items.map(it => it.svgId));
-  design.items.forEach(it => {
-    if (it.kind !== 'text' || it.svgId.endsWith(TEXT_ID_SUFFIX)) return;
-    const base = it.svgId.replace(/_label$/, '');
-    let id = base + TEXT_ID_SUFFIX, n = 1;
-    while (used.has(id)) id = `${base}_${n++}${TEXT_ID_SUFFIX}`;
-    design.items.forEach(c => {
-      if (isContainer(c)) c.children = c.children.map(cid => (cid === it.svgId ? id : cid));
-    });
-    used.add(id);
-    it.svgId = id;
-  });
-  return design;
 }
 
 // Which special role, if any, a scenario item plays — the same for both items
@@ -4638,9 +4683,7 @@ function parseScenarioSvg(svgText) {
       } else if (marker != null) {
         items.push({
           kind: 'anchor',
-          // Files written before anchors had a separate id carried the
-          // user's label in the marker and a slug of it in id; id wins.
-          svgId: el.getAttribute('id') || marker,
+          svgId: el.getAttribute('id') || '',
           x: m ? parseFloat(m[1]) : 0,
           y: m ? parseFloat(m[2]) : 0,
           w: parseFloat(el.getAttribute('data-gno-width')) || ANCHOR_SIZE,
@@ -4663,7 +4706,7 @@ function parseScenarioSvg(svgText) {
       });
     }
   });
-  return migrateTextIds({ background, width, height, items });
+  return { background, width, height, items };
 }
 
 /* ── PERSISTED-SHAPE SANITIZERS ──
@@ -4755,14 +4798,12 @@ function sanitizeExtraEntities(raw) {
 }
 
 // Rebuilds one placed item from stored data, or returns null to drop it.
-// Anchors from older saves carried a separate `label`; their svgId (a slug of
-// that label) is now the only identifier, so the label is simply not carried on.
 function sanitizeScenarioItem(it) {
   if (!it || typeof it !== 'object') return null;
   const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
   if (it.kind === 'entity') return it;
   if (it.kind === 'anchor') {
-    return { kind: 'anchor', svgId: String(it.svgId || it.label || ''), x: num(it.x, 0), y: num(it.y, 0), w: num(it.w, ANCHOR_SIZE), h: num(it.h, ANCHOR_SIZE) };
+    return { kind: 'anchor', svgId: String(it.svgId || ''), x: num(it.x, 0), y: num(it.y, 0), w: num(it.w, ANCHOR_SIZE), h: num(it.h, ANCHOR_SIZE) };
   }
   if (it.kind === 'layout') return cleanLayout(it);
   if (it.kind === 'group') return cleanGroup(it);
@@ -4788,12 +4829,12 @@ function sanitizeScenarioDesigns(raw) {
       const items = Array.isArray(design.items)
         ? design.items.map(sanitizeScenarioItem).filter(Boolean)
         : [];
-      out[name] = migrateTextIds({
+      out[name] = {
         background: design.background && typeof design.background === 'object' ? design.background : null,
         width: typeof design.width === 'number' ? design.width : 960,
         height: typeof design.height === 'number' ? design.height : 540,
         items,
-      });
+      };
     });
   }
   return out;

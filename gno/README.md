@@ -4,7 +4,9 @@ This document describes the `.gno` narrative format and the editor's Player
 behavior. For how the editor application itself is built (stack, views,
 persistence, parsing pipeline), see [`docs/architecture.md`](docs/architecture.md).
 For a reference of the language's syntax alone, structure by structure, see
-[`docs/syntax.md`](docs/syntax.md).
+[`docs/syntax.md`](docs/syntax.md); for the format of the scenario SVG files
+(their `data-gno-*` attributes and role IDs), see
+[`docs/scenario-svg.md`](docs/scenario-svg.md).
 For a step-by-step tutorial on designing a scenario's graphic presentation,
 see [`docs/scenario-tutorial.md`](docs/scenario-tutorial.md) (in Portuguese:
 [`docs/scenario-tutorial.pt-BR.md`](docs/scenario-tutorial.pt-BR.md)).
