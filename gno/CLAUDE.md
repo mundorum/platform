@@ -89,6 +89,14 @@ graph format (graph YAML).** Editor-only changes don't go in it.
 - Never edit the section of a finished version, except to fix an error in
   it.
 
+### The syntax reference
+
+`docs/syntax.md` describes the syntax of the `.gno` text for the current
+version, structure by structure, with EBNF-Lite rules and examples. **Update
+it in the same change whenever the syntax of the `.gno` text changes** (a new
+or changed structure, symbol or rule for how a line is read), including the
+version number in its introduction when a new version starts.
+
 ### How to write a converter
 
 - It is a pure function. It carries **its own copies** of every pattern it
