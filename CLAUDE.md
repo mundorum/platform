@@ -6,7 +6,7 @@
 |---|---|---|
 | `noid/` | yes, mounted at `/noid/` | `noid/CLAUDE.md`, `noid/docs/` |
 | `vp/` | yes, mounted at `/vp/` | `vp/CLAUDE.md`, `vp/docs/` |
-| `gno/` | **no**: standalone client-side app | `gno/README.md` |
+| `gno/` | **no**: standalone client-side app | `gno/CLAUDE.md`, `gno/README.md`, `gno/docs/` |
 
 `noid/` and `vp/` run on **one shared Django server** (`server/`) with one
 PostgreSQL database and one Google sign-in. The server owns `config/`
@@ -206,7 +206,18 @@ the shared server described above; neither shares code with the composition
 platform (backend/, frontend/) described earlier in this file.
 
 For anything noid-related read `noid/CLAUDE.md` first; for anything
-vp-related read `vp/CLAUDE.md` first.
+vp-related read `vp/CLAUDE.md` first; for anything gno-related read
+`gno/CLAUDE.md` first.
+
+**gno language versions — always follow the protocol in `gno/CLAUDE.md`.**
+The gnō language is versioned as a whole (narrative text, graph YAML,
+presentation YAML, scenario SVGs), and the version is recorded only in each
+narrative's manifest. The editor and Player know only the latest version; any
+gno change that alters how a narrative is written or read must update the
+converter of the version under development in the same change, and, when
+it affects the GNO language, the presentation format or the graph format,
+the versions journal `gno/docs/versions.md`. Only the user starts a new
+version.
 
 | File | Contents |
 |------|----------|

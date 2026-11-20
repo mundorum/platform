@@ -148,7 +148,7 @@ One scene should likewise be marked `(**)`. When the player reaches it and finis
 # The Aftermath: Castle (**)
 ~~~
 
-If no scene is marked `(*)`, the player falls back to the first scene in the file. Being symbols rather than words, the markers read the same whatever the narrative's language. The former markers `(Start)` and `(End)` are still read the same way, so older narratives keep working.
+If no scene is marked `(*)`, the player falls back to the first scene in the file. Being symbols rather than words, the markers read the same whatever the narrative's language.
 
 ### Pauses
 
@@ -169,7 +169,7 @@ The Player shows a separate panel — independent of the narrative text — list
 
 - An entity becomes present in this panel the moment it's first mentioned, in any of the three forms (standalone, dialog, or inline).
 - It stays present, keeping whatever state it was last given, even as the scene moves on to other content — until either the scene ends or it's explicitly marked as having left.
-- A standalone line whose entire state is the symbol `=>` — e.g. `@guard =>` — marks that entity as having exited: it's removed from the panel from that point on. Being a symbol rather than a word, it reads the same regardless of the narrative's language. An entity that's mentioned again after leaving simply becomes present again. (Older narratives wrote `@guard ->`, which is still read as an exit, since an arrow with no target scene can't be a divert.)
+- A standalone line whose entire state is the symbol `=>` — e.g. `@guard =>` — marks that entity as having exited: it's removed from the panel from that point on. Being a symbol rather than a word, it reads the same regardless of the narrative's language. An entity that's mentioned again after leaving simply becomes present again.
 - Each entity appears only once in the panel, showing its most recent state — not a history of every state it's had.
 - The panel is scoped to the current scene: it always starts empty when a new scene begins.
 
@@ -305,13 +305,37 @@ The subscene's controls (`action_proceed`, `action_regress`, `action_N`) come fr
 
 Every side panel can be resized by dragging its inner edge: the left navigation, the Editor's preview, the Graph's scene panel, the Scenarios sidebar and the Player's entity panel. Double-clicking an edge restores the default width. The widths are remembered in this browser.
 
+## Versions
+
+The gnō language has versions. A narrative is written in one of them: its text, its graph layout and its presentation (the YAML and the scenario SVGs) together. The version is recorded in one place only, the narrative's **manifest**, and never inside the YAML or SVG files.
+
+A downloaded zip carries the manifest as `manifest.json`, at the root:
+
+~~~json
+{
+  "format": "gno",
+  "version": "1.1",
+  "narrative": "caso.gno",
+  "graph": "caso_graph.yaml",
+  "presentation": "caso_presentation.yaml"
+}
+~~~
+
+`narrative`, `graph` and `presentation` name the zip's files (the scenario SVGs are listed in the presentation YAML). A named browser save and the autosaved draft carry the same manifest. **A narrative without a manifest is version 1**: a zip made before versions existed, an older browser save, or a bare `.gno` file.
+
+The editor and the Player work with the latest version only. When a narrative of an older version is opened, it is converted, one version after the other, to the latest one, and a notice lists what was changed and any line worth checking: lines the older version read one way and the new one reads another, which couldn't be rewritten to keep their old meaning. The original file or save is left as it was until the converted narrative is saved or downloaded. A narrative of a version newer than the editor's is opened as it is, with a warning. The current version is shown in the tooltip of the gnō logo.
+
+### Version history
+
+What changed from one version to the next, in the narrative text, the presentation format and the graph format, is recorded in the versions journal, [`docs/versions.md`](docs/versions.md).
+
 ## Browser Storage (Save / Load)
 
-The `Save` and `Load` buttons keep named narratives in the browser's `localStorage`, under the key prefix `gno-narrative-v2:<name>`. Each entry is a JSON bundle: the narrative source, the graph layout (`_graph.yaml` equivalent), and the presentation setup (`_presentation.yaml` equivalent — image libraries, entity/image associations, declared entities, scenario designs). Scenario SVGs aren't stored separately here; the scenario design data is what `Download` renders them from, so keeping one copy avoids the two ever drifting apart.
+The `Save` and `Load` buttons keep named narratives in the browser's `localStorage`, under the key prefix `gno-narrative-v2:<name>`. Each entry is a JSON bundle: the manifest (see [Versions](#versions)), the narrative source, the graph layout (`_graph.yaml` equivalent), and the presentation setup (`_presentation.yaml` equivalent — image libraries, entity/image associations, declared entities, scenario designs). Scenario SVGs aren't stored separately here; the scenario design data is what `Download` renders them from, so keeping one copy avoids the two ever drifting apart.
 
-### Migrating narratives saved before this format (v1)
+### Migrating plain-text browser saves
 
-Versions prior to this one stored only the raw narrative text, under the key prefix `gno-narrative:<name>` (no `-v2`). That format is incompatible with the current app and is **not** read automatically — v1 saves stay exactly where they are in `localStorage` (nothing is deleted), they just no longer appear in the `Load` menu. To bring one forward:
+The earliest editors stored only the raw narrative text, under the key prefix `gno-narrative:<name>` (no `-v2`). That storage format is **not** read automatically — those saves stay exactly where they are in `localStorage` (nothing is deleted), they just don't appear in the `Load` menu. To bring one forward:
 
 1. Open the browser's DevTools console on this page.
 2. Run `localStorage.getItem('gno-narrative:<name>')` (with the narrative's saved name) to get its raw text, or list every old entry at once:
@@ -321,6 +345,6 @@ Versions prior to this one stored only the raw narrative text, under the key pre
      .forEach(k => console.log(k, '=>', localStorage.getItem(k)));
    ```
 3. Copy the text into a new `.gno` file and use `Upload` to bring it into the editor (or paste it directly into the editor pane).
-4. Use `Save` under the same (or a new) name — this writes it under the new `gno-narrative-v2:` prefix as a full bundle. Graph layout and presentation setup start empty, since v1 saves never had any.
+4. Use `Save` under the same (or a new) name — this writes it under the `gno-narrative-v2:` prefix as a full bundle. Graph layout and presentation setup start empty, since plain-text saves never had any. The uploaded text has no manifest, so it is converted from version 1 of the language as it is opened.
 5. Once confirmed, the old `gno-narrative:<name>` entry can be removed with `localStorage.removeItem('gno-narrative:<name>')` — optional, since the app never reads or writes that prefix anymore.
 

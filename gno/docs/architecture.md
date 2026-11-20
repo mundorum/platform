@@ -307,8 +307,8 @@ Three independent mechanisms share the same underlying bundle shape
 | Mechanism | Trigger | Shape |
 |---|---|---|
 | Session autosave | Debounced (~600ms) on every edit, flushed immediately on tab hide/close | One `localStorage` draft key; restores work after a reload even without an explicit Save |
-| Named save (Save/Load buttons) | Explicit user action | One JSON blob per name in `localStorage`, prefix `gno-narrative-v2:<name>` (see migration notes in `README.md` for the pre-v2 format) |
-| Download / Upload | Explicit user action | A `.zip` containing `<name>.gno` + `<name>_graph.yaml` + `<name>_presentation.yaml` + one `scene/*.svg` per scenario design |
+| Named save (Save/Load buttons) | Explicit user action | One JSON blob per name in `localStorage`, prefix `gno-narrative-v2:<name>` (see `README.md` for the older plain-text saves) |
+| Download / Upload | Explicit user action | A `.zip` containing `manifest.json` + `<name>.gno` + `<name>_graph.yaml` + `<name>_presentation.yaml` + one `scene/*.svg` per scenario design |
 
 Named saves and the session draft keep `scenario_designs` as live data (the
 same structure `buildScenarioSvg` renders from) rather than pre-rendered
@@ -318,14 +318,45 @@ Uploading a single `.gno`/`.md`/`.txt` file (not a zip) loads narrative text
 only and clears graph/presentation state, since there's nothing else to
 restore it from.
 
+### Language versions and converters
+
+All three carry the gnō language version in a manifest
+(`makeManifest`: `{ format, version, … }`): `manifest.json` in the zip
+(which also names the zip's `narrative`, `graph` and `presentation` files),
+the `manifest` field of a named save and of the draft. The YAML and SVG files
+hold no version. The protocol for changing versions is in
+[`../CLAUDE.md`](../CLAUDE.md); what changed in each version is in
+[`versions.md`](versions.md).
+
+Every way in goes through one path: decode into a *package*
+`{ source, layout, presentation: { image_libraries, entities,
+extra_entities, scenario_designs } }` (a zip via `readZipPackage`,
+`decodeLayoutYaml` and `decodePresentationYaml`; a save or the draft is
+already one), bring it to `GNO_VERSION` with `upgradeBundle`, then
+`applyBundle` swaps it into the live state. `manifestVersion` reads the
+version, `GNO_FIRST_VERSION` (`1`) when there is no manifest.
+`converterChain` walks `CONVERTERS` (`{ from, to, bundle, files? }`) from
+that version up; each step's `bundle(pkg)` returns `{ bundle, notes }`. A
+zip's raw files (`{ path: text }`) first go through the steps' optional
+`files` stages (`upgradeFiles`), for versions that change how something is
+written in the files, so the current decoders can read them. The notes, or
+an error for a version with no path to the current one (newer, or unknown),
+become `versionNotice`, shown until dismissed. The draft is upgraded in
+`loadCurrentDraft`, before the app state is built from it.
+
+Converters are pure, and each keeps its own copies of the patterns it
+matches (`convert_1_to_1_1` has its own entity and heading regexes) so that
+later changes to the parser can't alter what an old converter does. The
+parser, the Player and the editor know only the latest version.
+
 ## Parsing pipeline
 
 `source` (raw text) flows through a small set of pure functions, each
 independent and re-run reactively as the user types:
 
 1. `parseGno(source)` — splits the text into scenes by `# Title: Scenario
-   (\*|\*\*)?` headings (the former `(Start)`/`(End)` too, via
-   `sceneMarker`), extracting each scene's body, its choices
+   (\*|\*\*)?` headings (`sceneMarker` turns the marker into `start` /
+   `end`), extracting each scene's body, its choices
    (`* Label -> Target`, or `~>` for a subscene) and its entity diverts
    (`@door -> Target`, matched by `ENTITY_DIVERT_RE`; lines of a dialog's
    text are skipped). Choices and entity diverts are separate lists because

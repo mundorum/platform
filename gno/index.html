@@ -101,6 +101,34 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 #app.resizing * { pointer-events: none; }
 #app.resizing .panel-splitter.active { pointer-events: auto; }
 
+/* ── Language version conversion notice ── */
+.version-notice {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  width: min(680px, calc(100vw - 32px));
+  max-height: 60vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border: 0.5px solid var(--c-border-strong);
+  border-left: 3px solid var(--c-accent);
+  border-radius: 8px;
+  background: var(--c-surface);
+  box-shadow: 0 6px 24px var(--c-shadow);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--c-text);
+}
+.version-notice-head { display: flex; align-items: flex-start; gap: 8px; line-height: 1.45; }
+.version-notice-head > i { color: var(--c-accent); font-size: 16px; margin-top: 1px; }
+.version-notice-head > span { flex: 1; }
+.version-notice ul { margin: 8px 0 0 24px; padding: 0; font-size: 12.5px; line-height: 1.5; }
+.version-notice-error { margin: 8px 0 0 24px; color: var(--c-accent); }
+.version-notice-foot { margin: 8px 0 0 24px; font-size: 12px; color: var(--c-muted); font-style: italic; }
+
 /* ── Topbar ── */
 #topbar {
   grid-column: 1 / -1;
@@ -1711,8 +1739,27 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
 <div id="app" v-if="ready" :class="{resizing: !!panelResize}" :style="{ gridTemplateColumns: (leftCollapsed ? '0px' : panelWidths.nav + 'px') + ' 1fr' }">
 
   <!-- Topbar -->
+  <!-- Language version conversion: what was converted when an older narrative was opened -->
+  <div class="version-notice" v-if="versionNotice" role="status">
+    <div class="version-notice-head">
+      <i class="ti" :class="versionNotice.error ? 'ti-alert-triangle' : 'ti-versions'"></i>
+      <span v-if="versionNotice.notes.length || !versionNotice.error">
+        {{ versionNotice.what }} was written in version {{ versionNotice.from }} of the gnō language and was converted to version {{ versionNotice.to }}.
+      </span>
+      <span v-else>{{ versionNotice.what }}: {{ versionNotice.error }}</span>
+      <button class="nav-icon-btn" title="Dismiss" @click="versionNotice = null"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="version-notice-error" v-if="versionNotice.error && versionNotice.notes.length">{{ versionNotice.error }}</div>
+    <ul v-if="versionNotice.notes.length">
+      <li v-for="(n, i) in versionNotice.notes" :key="i">{{ n }}</li>
+    </ul>
+    <div class="version-notice-foot" v-if="!versionNotice.error || versionNotice.notes.length">
+      The original is unchanged until you save or download the converted narrative.
+    </div>
+  </div>
+
   <header id="topbar">
-    <div id="topbar-logo">
+    <div id="topbar-logo" :title="'gnō language version ' + gnoVersion">
       <svg class="gno-logo" viewBox="0 0 64 64" aria-hidden="true">
         <path d="M6 52 V32 A26 26 0 0 1 58 32 V52"/>
         <path d="M3 52 H61"/>
@@ -2944,27 +2991,187 @@ The @king and @advisor return through the gates in silence, the howl still echoi
 The gates close behind them, and the castle settles into an uneasy quiet.
 `;
 
+/* ── LANGUAGE VERSIONS AND CONVERTERS ──
+   A narrative package — the .gno text, the graph layout, the presentation
+   setup and its scenario SVGs — is written in one version of the gnō
+   language, recorded only in its manifest (`manifest.json` in a zip, the
+   `manifest` field of a browser save or of the autosave draft), never in
+   the YAML or SVG files. The editor and the Player understand only the
+   latest version, GNO_VERSION. Anything older is brought up to date when
+   it is opened, by chaining the converters below, and the author is told
+   what changed. A package with no manifest is version 1.
+
+   The protocol for changing the language is in gno/CLAUDE.md. In short:
+   while a version is under development, every change that alters how a
+   package is written or read updates that version's converter (the last one
+   in CONVERTERS); a converter of a finished version is never changed again.
+   Each converter carries its own copies of the patterns it needs, so later
+   changes to the parser can't change what it does. */
+const GNO_VERSION = '1.1';          // the version this editor reads and writes (under development)
+const GNO_FIRST_VERSION = '1';      // assumed for a package without a manifest
+const MANIFEST_FILE = 'manifest.json';
+
+// "1" < "1.1" < "1.2" < "2": compared part by part, numerically.
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return Math.sign(d);
+  }
+  return 0;
+}
+
+function makeManifest(files) {
+  return { format: 'gno', version: GNO_VERSION, ...(files || {}) };
+}
+
+// The version a manifest declares; no manifest (or no version in it) is the
+// first version.
+function manifestVersion(manifest) {
+  return manifest && typeof manifest === 'object' && manifest.version != null
+    ? String(manifest.version)
+    : GNO_FIRST_VERSION;
+}
+
+// Version 1 -> 1.1: language symbols instead of English words, and the
+// subscene (see README, "Versions").
+//   - "(Start)" / "(End)" after a scene heading become "(*)" / "(**)";
+//   - an entity leaving, "@guard ->", becomes "@guard =>", since "->" after an
+//     entity now starts a divert.
+// Lines that version 1 read one way and 1.1 reads another, but that can't be
+// rewritten to keep their old meaning, are listed for the author to check.
+function convert_1_to_1_1(bundle) {
+  const notes = [];
+  const ID = "@[\\p{L}\\p{N}_'-]+";
+  const REF = `${ID}(?:\\s*\\+\\s*${ID})*`;
+  const HEADING = /^(#{1,6}\s+.+?\s*:\s*.+?\s*)\(\s*(start|end)\s*\)(\s*)$/i;
+  const EXIT = new RegExp(`^(\\s*${REF})(\\s+)->(\\s*)$`, 'u');
+  const NOW_EXIT = new RegExp(`^${REF}\\s+=>$`, 'u');
+  const NOW_DIVERT = new RegExp(`^${REF}(?:\\s+[^\\s:@]+)*?\\s+(?:->|~>)\\s*\\S`, 'u');
+  const DIALOG = new RegExp(`^--\\s*${REF}`, 'u');
+  let markers = 0, exits = 0;
+  const check = [];
+  let inDialog = false; // a dialog's text runs from its "-- @who" cue to a blank line
+  const lines = String(bundle.source || '').split('\n').map((line, i) => {
+    const t = line.trim();
+    const hm = line.match(HEADING);
+    if (hm) {
+      markers++;
+      inDialog = false;
+      return `${hm[1]}(${hm[2].toLowerCase() === 'start' ? '*' : '**'})${hm[3]}`;
+    }
+    if (t === '') { inDialog = false; return line; }
+    if (DIALOG.test(t)) { inDialog = true; return line; }
+    if (inDialog) return line;
+    if (t.startsWith('*')) {
+      if (/^\*\s+.+?~>\s*\S/.test(t) && !/->/.test(t)) check.push(`line ${i + 1}: "${t}" was plain text; it is now a choice opening a subscene.`);
+      return line;
+    }
+    const em = line.match(EXIT);
+    if (em) { exits++; return `${em[1]}${em[2]}=>${em[3]}`; }
+    if (NOW_EXIT.test(t)) check.push(`line ${i + 1}: "${t}" gave the entity the state "=>"; it now makes the entity leave.`);
+    else if (NOW_DIVERT.test(t)) check.push(`line ${i + 1}: "${t}" gave the entity state words; it is now an entity divert.`);
+    return line;
+  });
+  if (markers) notes.push(`${markers} start/end marker(s) rewritten: (Start) → (*), (End) → (**).`);
+  if (exits) notes.push(`${exits} entity exit(s) rewritten: "@entity ->" → "@entity =>".`);
+  const designs = (bundle.presentation && bundle.presentation.scenario_designs) || {};
+  Object.entries(designs).forEach(([name, d]) => {
+    ((d && d.items) || []).forEach(it => {
+      const id = String((it && it.svgId) || '').replace(/_text$/, '').toLowerCase();
+      if (id === 'subscene' || id.startsWith('subscene.')) {
+        check.push(`scenario "${name}": the item "${id}" now marks where subscenes open.`);
+      }
+    });
+  });
+  check.forEach(c => notes.push('Check ' + c));
+  return { bundle: { ...bundle, source: lines.join('\n') }, notes };
+}
+
+// The converters, in order. Each takes a package from `from` to `to`:
+//   bundle(bundle) -> { bundle, notes } — on the decoded package { source,
+//     layout, presentation: { image_libraries, entities, extra_entities,
+//     scenario_designs } }, the shape every way of opening a narrative
+//     arrives at; this is where changes of meaning are converted;
+//   files(files) -> { files, notes } — optional, on a zip's raw files
+//     ({ path: text }), run before they are decoded; only for a version that
+//     changes how something is written in the files, so the current reader
+//     can read them. Browser saves hold the decoded package, so a change of
+//     meaning always belongs in `bundle`, which must then also accept data
+//     a `files` stage already brought up to date.
+const CONVERTERS = [
+  { from: '1', to: '1.1', bundle: convert_1_to_1_1 },
+];
+
+// The chain of converters from `version` to GNO_VERSION, or an error when
+// there is none (a version newer than this editor, or an unknown one).
+function converterChain(version) {
+  const chain = [];
+  let v = String(version);
+  while (compareVersions(v, GNO_VERSION) < 0) {
+    const step = CONVERTERS.find(c => compareVersions(c.from, v) === 0);
+    if (!step) return { chain, error: `No converter from version ${v} of the gnō language.` };
+    chain.push(step);
+    v = step.to;
+  }
+  if (compareVersions(v, GNO_VERSION) > 0) {
+    return { chain, error: `This narrative is in version ${v} of the gnō language, newer than this editor's (${GNO_VERSION}). It was opened as is and may not show correctly.` };
+  }
+  return { chain, error: null };
+}
+
+// Runs the `files` stages of the chain on a zip's raw files.
+function upgradeFiles(files, version) {
+  const { chain } = converterChain(version);
+  const notes = [];
+  chain.forEach(step => {
+    if (!step.files) return;
+    const r = step.files(files);
+    files = r.files;
+    notes.push(...r.notes);
+  });
+  return { files, notes };
+}
+
+// Brings a decoded package up to GNO_VERSION. Returns { bundle, report },
+// report being null when nothing was done, else { from, to, notes, error }
+// for the author.
+function upgradeBundle(bundle, version, fileNotes = []) {
+  const { chain, error } = converterChain(version);
+  const notes = [...fileNotes];
+  chain.forEach(step => {
+    const r = step.bundle(bundle);
+    bundle = r.bundle;
+    notes.push(...r.notes);
+  });
+  const report = chain.length || error ? { from: String(version), to: GNO_VERSION, notes, error } : null;
+  return { bundle, report };
+}
+
+// The autosave draft, brought up to date. `report` says what was converted.
 function loadCurrentDraft() {
   try {
     const raw = localStorage.getItem(CURRENT_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return { draft: null, report: null };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.source !== 'string') return { draft: null, report: null };
+    const { bundle, report } = upgradeBundle(parsed, manifestVersion(parsed.manifest));
+    return { draft: bundle, report };
   } catch (e) {
-    return null;
+    return { draft: null, report: null };
   }
 }
 
 /* ── GNO PARSER ── */
 // Scene heading: "# Title: Scenario" with an optional trailing "(*)" / "(**)"
 // marker used by the Player to find where the narrative begins and ends —
-// symbols, so a narrative in any language reads the same. The former
-// "(Start)" / "(End)" are still read, so older files keep their scenario names.
-const SCENE_RE = /^(#{1,6})\s+(.+?)\s*:\s*(.+?)\s*(?:\(\s*(\*\*?|start|end)\s*\))?\s*$/i;
+// symbols, so a narrative in any language reads the same.
+const SCENE_RE = /^(#{1,6})\s+(.+?)\s*:\s*(.+?)\s*(?:\(\s*(\*\*?)\s*\))?\s*$/;
 
 // The marker group of a SCENE_RE match -> 'start' | 'end' | null.
 function sceneMarker(raw) {
   if (!raw) return null;
-  const m = raw.toLowerCase();
-  return m === '*' || m === 'start' ? 'start' : 'end';
+  return raw === '*' ? 'start' : 'end';
 }
 
 // A choice: "* Label -> Target" goes to Target; "* Label ~> Target" opens
@@ -3043,10 +3250,8 @@ const ENTITY_REF_SRC = `${ENTITY_ID_SRC}(?:\\s*\\+\\s*${ENTITY_ID_SRC})*`;
 // Groups: 1 the entity (or group), 2 its state words, 3 the arrow, 4 the target.
 const ENTITY_DIVERT_RE = new RegExp(`^(${ENTITY_REF_SRC})((?:\\s+[^\\s:@]+)*?)\\s+(->|~>)\\s*(\\S.*)$`, 'u');
 
-// "@guard =>": the entity leaves the scene. The former "@guard ->" (an arrow
-// with no target) is still read the same way.
-const EXIT_STATES = new Set(['=>', '->']);
-const isExitState = state => EXIT_STATES.has(String(state).trim());
+// "@guard =>": the entity leaves the scene.
+const isExitState = state => String(state).trim() === '=>';
 
 function entityGroupKey(members) {
   const unique = [...new Set(members)];
@@ -4601,8 +4806,14 @@ createApp({
     // A current-draft record (autosaved below) survives reloads even if the
     // user never explicitly saves — restore it here, falling back to a blank
     // narrative (the demo is available on demand from the Load menu instead).
-    const draft = loadCurrentDraft();
+    const { draft, report: draftReport } = loadCurrentDraft();
     const source = ref(draft ? draft.source : '');
+    // What was converted when a narrative of an older language version was
+    // opened (see "LANGUAGE VERSIONS AND CONVERTERS"): shown until dismissed.
+    const versionNotice = ref(draftReport ? { ...draftReport, what: 'The autosaved draft' } : null);
+    function showVersionReport(report, what) {
+      versionNotice.value = report ? { ...report, what } : null;
+    }
     const filename = ref(draft ? draft.filename : 'untitled.gno');
     const view = ref('editor');
     const navTab = ref('scenes');
@@ -6040,9 +6251,9 @@ createApp({
       return map;
     }
 
+    // No version in here: the zip's manifest gives the version of everything in it.
     function presentationToYaml() {
       return jsyaml.dump({
-        version: 1,
         image_libraries: { ...imageLibraries },
         entities: { ...entityAssociations },
         extra_entities: [...extraEntities],
@@ -6050,37 +6261,51 @@ createApp({
       }, { lineWidth: -1 });
     }
 
-    // zip is optional: passed only when applying a just-uploaded zip's
-    // _presentation.yaml, so any scenarios: {id: path} entries can be
-    // resolved against that same zip's other files and reparsed.
-    async function applyPresentationYaml(text, zip) {
-      clearImageLibraries();
-      clearEntitySetup();
-      clearScenarioDesigns();
+    // Reads a presentation YAML into the decoded package's `presentation`,
+    // its scenario designs from the SVG files it lists (`files`: path -> text).
+    function decodePresentationYaml(text, files) {
       let data;
       try {
         data = jsyaml.load(text);
       } catch (err) {
         alert('Could not parse presentation YAML: ' + err.message);
-        return;
+        data = null;
       }
-      Object.entries(sanitizeImageLibraries(data && data.image_libraries)).forEach(([id, url]) => {
-        imageLibraries[id] = url;
-        loadLibraryCatalog(id);
-      });
-      Object.assign(entityAssociations, sanitizeEntityAssociations(data && data.entities));
-      extraEntities.push(...sanitizeExtraEntities(data && data.extra_entities));
-      if (data && data.scenarios && typeof data.scenarios === 'object' && zip) {
+      const designs = {};
+      if (data && data.scenarios && typeof data.scenarios === 'object') {
         for (const [scenarioId, path] of Object.entries(data.scenarios)) {
-          if (typeof path !== 'string') continue;
-          const entry = zip.file(path);
-          if (!entry) continue;
+          if (typeof path !== 'string' || typeof files[path] !== 'string') continue;
           try {
-            const svgText = await entry.async('string');
-            scenarioDesigns[scenarioId] = parseScenarioSvg(svgText);
+            designs[scenarioId] = parseScenarioSvg(files[path]);
           } catch (e) { /* unreadable scenario file — skip, rest of the load still succeeds */ }
         }
       }
+      return {
+        image_libraries: data && data.image_libraries,
+        entities: data && data.entities,
+        extra_entities: data && data.extra_entities,
+        scenario_designs: designs,
+      };
+    }
+
+    // Swaps a decoded package ({ source, layout, presentation }, already at
+    // GNO_VERSION) into the live state.
+    function applyBundle(bundle) {
+      source.value = bundle.source;
+      clearNodeMeta();
+      clearImageLibraries();
+      clearEntitySetup();
+      clearScenarioDesigns();
+      Object.assign(nodeMeta, sanitizeNodeMeta(bundle.layout));
+      const p = bundle.presentation || {};
+      Object.entries(sanitizeImageLibraries(p.image_libraries)).forEach(([id, url]) => {
+        imageLibraries[id] = url;
+        loadLibraryCatalog(id);
+      });
+      Object.assign(entityAssociations, sanitizeEntityAssociations(p.entities));
+      extraEntities.push(...sanitizeExtraEntities(p.extra_entities));
+      Object.assign(scenarioDesigns, sanitizeScenarioDesigns(p.scenario_designs));
+      resetPlayerProgress();
     }
 
     // Restore-from-draft only stores the id->url map (fetched content is
@@ -6642,7 +6867,8 @@ Write your scene description here.
       fileInput.value.click();
     }
 
-    // Layout YAML: { version: 1, nodes: { "<scene title>": { x, y, color, annotation } } }.
+    // Layout YAML: { nodes: { "<scene title>": { x, y, color, annotation } } }
+    // — no version: the zip's manifest gives the version of everything in it.
     // Keyed by scene title — the same identity diverts already resolve by —
     // so the file stays readable and round-trips even if scenes are reordered.
     // Each entry only includes the keys actually set on that node.
@@ -6659,19 +6885,52 @@ Write your scene description here.
         if (m.annotation) entry.annotation = m.annotation;
         if (Object.keys(entry).length) nodes[title] = entry;
       });
-      return jsyaml.dump({ version: 1, nodes }, { lineWidth: -1 });
+      return jsyaml.dump({ nodes }, { lineWidth: -1 });
     }
 
-    function applyLayoutYaml(text) {
-      clearNodeMeta();
-      let data;
+    // Reads a layout YAML into the decoded package's `layout`.
+    function decodeLayoutYaml(text) {
       try {
-        data = jsyaml.load(text);
+        const data = jsyaml.load(text);
+        return (data && data.nodes) || {};
       } catch (err) {
         alert('Could not parse layout YAML: ' + err.message);
-        return;
+        return {};
       }
-      Object.assign(nodeMeta, sanitizeNodeMeta(data && data.nodes));
+    }
+
+    // Opening a zip: its manifest says the language version (none: version 1);
+    // the files the manifest names (else found by their suffix) are decoded
+    // into a package, which converters bring up to the current version.
+    async function readZipPackage(file) {
+      const zip = await JSZip.loadAsync(file);
+      let files = {};
+      for (const entry of Object.values(zip.files)) {
+        if (!entry.dir) files[entry.name] = await entry.async('string');
+      }
+      let manifest = null;
+      if (typeof files[MANIFEST_FILE] === 'string') {
+        try { manifest = JSON.parse(files[MANIFEST_FILE]); } catch (e) { throw new Error(`${MANIFEST_FILE} is not valid JSON.`); }
+      }
+      const version = manifestVersion(manifest);
+      const up = upgradeFiles(files, version);
+      files = up.files;
+      const names = Object.keys(files);
+      const named = key => (manifest && typeof manifest[key] === 'string' && typeof files[manifest[key]] === 'string' ? manifest[key] : null);
+      const narrativePath = named('narrative') || names.find(n => /\.(gno|md|txt)$/i.test(n));
+      if (!narrativePath) throw new Error('No .gno/.md/.txt file found inside the zip.');
+      const presentationPath = named('presentation') || names.find(n => /_presentation\.ya?ml$/i.test(n));
+      // "_graph.yaml" is the current name; a bare "<name>.yaml" (not
+      // "_presentation.yaml") is the pre-rename graph-layout file of early
+      // version 1 zips.
+      const graphPath = named('graph') || names.find(n => /_graph\.ya?ml$/i.test(n))
+        || names.find(n => /\.ya?ml$/i.test(n) && !/_presentation\.ya?ml$/i.test(n));
+      const bundle = {
+        source: files[narrativePath],
+        layout: graphPath ? decodeLayoutYaml(files[graphPath]) : {},
+        presentation: presentationPath ? decodePresentationYaml(files[presentationPath], files) : {},
+      };
+      return { name: narrativePath.split('/').pop(), ...upgradeBundle(bundle, version, up.notes) };
     }
 
     async function onFileUpload(e) {
@@ -6679,63 +6938,40 @@ Write your scene description here.
       if (!file) return;
       if (/\.zip$/i.test(file.name)) {
         try {
-          const zip = await JSZip.loadAsync(file);
-          const gnoEntries = zip.file(/\.(gno|md|txt)$/i);
-          if (!gnoEntries.length) throw new Error('No .gno/.md/.txt file found inside the zip.');
-          source.value = await gnoEntries[0].async('string');
-          filename.value = gnoEntries[0].name.split('/').pop();
-
-          const presentationEntries = zip.file(/_presentation\.ya?ml$/i);
-          if (presentationEntries.length) {
-            await applyPresentationYaml(await presentationEntries[0].async('string'), zip);
-          } else {
-            clearImageLibraries();
-            clearEntitySetup();
-            clearScenarioDesigns();
-          }
-
-          // "_graph.yaml" is the current name; a bare "<name>.yaml" (not
-          // "_presentation.yaml") is the pre-rename graph-layout file, kept
-          // readable for zips downloaded before this split existed.
-          let graphEntries = zip.file(/_graph\.ya?ml$/i);
-          if (!graphEntries.length) {
-            graphEntries = zip.file(/\.ya?ml$/i).filter(f => !/_presentation\.ya?ml$/i.test(f.name));
-          }
-          if (graphEntries.length) {
-            applyLayoutYaml(await graphEntries[0].async('string'));
-          } else {
-            clearNodeMeta();
-          }
-
+          const { name, bundle, report } = await readZipPackage(file);
+          applyBundle(bundle);
+          filename.value = name;
           loadedNarrativeName.value = null; // came from disk, not from browser storage
-          resetPlayerProgress();
+          showVersionReport(report, `"${file.name}"`);
         } catch (err) {
           alert('Could not read zip file: ' + err.message);
         }
       } else {
-        filename.value = file.name;
-        loadedNarrativeName.value = null;
-        clearNodeMeta();
-        clearImageLibraries();
-        clearEntitySetup();
-        clearScenarioDesigns();
+        // A bare narrative file has no manifest: it is version 1.
         const reader = new FileReader();
-        reader.onload = ev => { source.value = ev.target.result; };
+        reader.onload = ev => {
+          const { bundle, report } = upgradeBundle({ source: ev.target.result, layout: {}, presentation: {} }, GNO_FIRST_VERSION);
+          applyBundle(bundle);
+          filename.value = file.name;
+          loadedNarrativeName.value = null;
+          showVersionReport(report, `"${file.name}"`);
+        };
         reader.readAsText(file, 'UTF-8');
-        resetPlayerProgress();
       }
       e.target.value = '';
     }
 
     // Downloads the narrative together with its graph layout, presentation
     // setup, and one SVG per scenario design as a zip:
-    // <name>.gno + <name>_graph.yaml + <name>_presentation.yaml + scene/*.svg.
+    // manifest.json + <name>.gno + <name>_graph.yaml + <name>_presentation.yaml + scene/*.svg.
     async function downloadFile() {
       const base = filename.value.replace(/\.(gno|md|txt|zip)$/i, '').trim() || 'untitled';
       const zip = new JSZip();
-      zip.file(base + '.gno', source.value);
-      zip.file(base + '_graph.yaml', layoutToYaml());
-      zip.file(base + '_presentation.yaml', presentationToYaml());
+      const paths = { narrative: base + '.gno', graph: base + '_graph.yaml', presentation: base + '_presentation.yaml' };
+      zip.file(MANIFEST_FILE, JSON.stringify(makeManifest(paths), null, 2) + '\n');
+      zip.file(paths.narrative, source.value);
+      zip.file(paths.graph, layoutToYaml());
+      zip.file(paths.presentation, presentationToYaml());
       const scenarioFiles = scenarioFileMap();
       Object.keys(scenarioDesigns).forEach(name => {
         zip.file(scenarioFiles[name], buildScenarioSvg(scenarioDesigns[name]));
@@ -6765,7 +7001,7 @@ Write your scene description here.
         if (!ok) return;
       }
       localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify({
-        version: 2,
+        manifest: makeManifest(),
         source: source.value,
         layout: { ...nodeMeta },
         presentation: {
@@ -6787,36 +7023,22 @@ Write your scene description here.
       playerStack.value = [];
     }
 
+    // A named save holds the decoded package and its manifest (none: saved
+    // before versions existed, so version 1).
     function loadNarrative(name) {
       const raw = localStorage.getItem(STORAGE_PREFIX + name);
       if (raw === null) return;
-      let bundle = null;
+      let saved = null;
       try {
         const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object' && typeof parsed.source === 'string') bundle = parsed;
-      } catch (e) { /* not a v2 bundle — shouldn't happen under the v2 prefix, but fall back to raw text */ }
-
-      source.value = bundle ? bundle.source : raw;
+        if (parsed && typeof parsed === 'object' && typeof parsed.source === 'string') saved = parsed;
+      } catch (e) { /* not a JSON bundle — shouldn't happen under this prefix; read it as bare narrative text */ }
+      const { bundle, report } = upgradeBundle(saved || { source: raw, layout: {}, presentation: {} }, manifestVersion(saved && saved.manifest));
+      applyBundle(bundle);
       filename.value = name + '.gno';
       loadedNarrativeName.value = name;
       loadMenuOpen.value = false;
-      clearNodeMeta();
-      clearImageLibraries();
-      clearEntitySetup();
-      clearScenarioDesigns();
-
-      if (bundle) {
-        Object.assign(nodeMeta, sanitizeNodeMeta(bundle.layout));
-        const p = bundle.presentation || {};
-        Object.entries(sanitizeImageLibraries(p.image_libraries)).forEach(([id, url]) => {
-          imageLibraries[id] = url;
-          loadLibraryCatalog(id);
-        });
-        Object.assign(entityAssociations, sanitizeEntityAssociations(p.entities));
-        extraEntities.push(...sanitizeExtraEntities(p.extra_entities));
-        Object.assign(scenarioDesigns, sanitizeScenarioDesigns(p.scenario_designs));
-      }
-      resetPlayerProgress();
+      showVersionReport(report, `The saved narrative "${name}"`);
     }
 
     function loadDemoNarrative() {
@@ -6857,6 +7079,7 @@ Write your scene description here.
     function saveCurrentDraft() {
       try {
         localStorage.setItem(CURRENT_KEY, JSON.stringify({
+          manifest: makeManifest(),
           source: source.value,
           filename: filename.value,
           loadedNarrativeName: loadedNarrativeName.value,
@@ -6882,7 +7105,7 @@ Write your scene description here.
     });
 
     return {
-      ready, source, filename, view, navTab, activeSceneId,
+      ready, source, filename, view, navTab, activeSceneId, versionNotice, gnoVersion: GNO_VERSION,
       showSceneEntities, openEntities,
       leftCollapsed, rightCollapsed, panelWidths, panelResize, startPanelResize, resetPanelWidth,
       loadedNarrativeName, loadMenuOpen, savedNarratives,
