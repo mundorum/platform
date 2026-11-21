@@ -1,0 +1,71 @@
+# GitHub Pages (Jekyll) site for the Mundorum platform.
+# Served from the gh-pages branch: Settings → Pages → Deploy from a branch →
+# gh-pages, / (root). The repository itself is the site source, so the docs
+# keep their repo-relative links (jekyll-relative-links turns *.md into *.html).
+#
+# Pages:  index.html            — the three subprojects
+#         gno/index.md          — gnō- page (+ gno/authoring/, the editor online)
+#         noid/index.md         — noid page
+#         vp/index.md           — VP Studio page
+title: Mundorum
+description: Authoring and playing interactive compositions — gnō-, noid and VP Studio.
+url: https://mundorum.github.io
+baseurl: /platform
+repository: mundorum/platform
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+  syntax_highlighter: rouge
+
+# README files are skipped by jekyll-optional-front-matter unless listed here;
+# gno/README.md is the narrative format reference, so it gets a page.
+include:
+  - gno/README.md
+optional_front_matter:
+  remove_originals: true
+
+defaults:
+  - scope: { path: "" }
+    values: { layout: default }
+
+# Only the pages and the docs are published: code, deployment material and
+# agent notes stay out of the site.
+exclude:
+  - README.md
+  - LICENSE
+  - CLAUDE.md
+  - mkdocs.yml
+  - docker-compose.yml
+  - .env.example
+  - .dockerignore
+  - dbms
+  - memory
+  - run-a
+  - run-b
+  - run-c
+  - secrets
+  - server
+  - tools
+  - update
+  - build
+  - site
+  - docs/index.md
+  - docs/stylesheets
+  - gno/CLAUDE.md
+  - gno/design
+  - gno/temp
+  - noid/CLAUDE.md
+  - noid/authoring
+  - noid/processing
+  - noid/runner
+  - noid/playground
+  - noid/storage
+  - noid/temp
+  - noid/docs/internal
+  - noid/collections.yaml
+  - noid/noid-namespaces.yaml
+  - vp/CLAUDE.md
+  - vp/server
+  - vp/web

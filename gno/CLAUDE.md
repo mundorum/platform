@@ -1,6 +1,6 @@
 # gnō — CLAUDE.md
 
-`gno/` is a standalone client-side app: everything is in `index.html` (see
+`gno/` is a standalone client-side app: everything is in `authoring/index.html` (see
 `docs/architecture.md`). The narrative format and the Player are described in
 `README.md`, and the changes between language versions in the versions
 journal, `docs/versions.md`. It shares nothing with the rest of the platform.
@@ -8,7 +8,7 @@ journal, `docs/versions.md`. It shares nothing with the rest of the platform.
 ## Language versions: always follow this protocol
 
 The gnō language is versioned. **Every change to `gno/` must follow these
-rules.** The current version is in `GNO_VERSION` (`index.html`, section
+rules.** The current version is in `GNO_VERSION` (`authoring/index.html`, section
 "LANGUAGE VERSIONS AND CONVERTERS"); what changed in each version is in the
 versions journal, `docs/versions.md`.
 
@@ -128,7 +128,7 @@ both.
 ### Testing
 
 Test each converter change in a headless browser (Chromium can load
-`index.html` with a test script appended; keep harnesses outside the repo,
+`authoring/index.html` with a test script appended; keep harnesses outside the repo,
 in the scratchpad). Cover a package of the previous version opened in each
 way: a zip without a manifest, a zip with one, a bare `.gno`, a named
 browser save and the autosave draft. Check the converted text, the notes,

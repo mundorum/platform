@@ -1,7 +1,7 @@
 # gnō- Architecture
 
 `gno/` is a **single-file, single-page application**: everything — markup, CSS,
-and application code — lives in [`index.html`](../index.html). There is no
+and application code — lives in [`authoring/index.html`](../authoring/index.html). There is no
 build step, no bundler, and no package.json; the file is opened directly in a
 browser. This is a deliberate scope choice, not a placeholder: `gno/` is
 isolated from the rest of the platform (see the root `CLAUDE.md`) and doesn't
@@ -346,7 +346,7 @@ All three carry the gnō language version in a manifest
 (which also names the zip's `narrative`, `graph` and `presentation` files),
 the `manifest` field of a named save and of the draft. The YAML and SVG files
 hold no version. The protocol for changing versions is in
-[`../CLAUDE.md`](../CLAUDE.md); what changed in each version is in
+[`gno/CLAUDE.md`](https://github.com/mundorum/platform/blob/main/gno/CLAUDE.md); what changed in each version is in
 [`versions.md`](versions.md).
 
 Every way in goes through one path: decode into a *package*

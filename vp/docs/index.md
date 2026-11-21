@@ -1,4 +1,5 @@
 # VP Studio
+<!-- Keeps the double-brace fields below verbatim on GitHub Pages (Jekyll Liquid). {% raw %} -->
 
 VP Studio lets educators author **virtual patient (VP) activities**: a
 scripted sequence of steps in which an LLM tutor (and optionally an LLM
@@ -196,3 +197,5 @@ API (all require the sign-in token):
 A session action runs all its LLM calls first and saves only if they
 all succeed. On a provider error the session is unchanged, and the message
 can be sent again.
+
+<!-- {% endraw %} -->

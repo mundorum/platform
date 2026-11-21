@@ -1,4 +1,5 @@
 # Writing a VP Studio case with an LLM
+<!-- Keeps the double-brace fields below verbatim on GitHub Pages (Jekyll Liquid). {% raw %} -->
 
 This page is meant to be **given to an LLM** (pasted or uploaded into any
 chat assistant) together with a request such as *"Help me build a virtual
@@ -693,3 +694,5 @@ Quality:
 After the file, tell the educator to import it (*New case → Import a
 case*), check the clinical content, use **Preview** and **Try it**, and then
 **Publish**.
+
+<!-- {% endraw %} -->

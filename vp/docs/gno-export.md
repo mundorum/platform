@@ -1,4 +1,5 @@
 # Export as gnō-
+<!-- Keeps the double-brace fields below verbatim on GitHub Pages (Jekyll Liquid). {% raw %} -->
 
 *Export gnō-* (in Case settings) downloads the case as a `.gno` file: the
 activity written as a **gnō- narrative**, meant for people to read, review
@@ -138,3 +139,5 @@ _Expert explanation of case 1: the hidden evaluator compares the student’s ans
 
 The exporter is `vp/server/vp_studio/gnoexport.py`, a pure Python module
 with no Django imports.
+
+<!-- {% endraw %} -->
