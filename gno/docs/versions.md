@@ -53,8 +53,8 @@ Newest version first.
   options use its first member as written. *Items already named so are
   listed to check.*
 - **Player settings** (new `player` key in the presentation YAML):
-  `entity_options: click | hover`, how the reader opens an entity's options;
-  `click` when absent. *Nothing to convert.*
+  `entity_options: hover | click`, how the reader opens an entity's options;
+  `hover` when absent. *Nothing to convert.*
 - **Text area IDs always end in `_text`** in the scenario designs. Version 1
   also read text areas named without it (`speech`, `action_N_label`) and
   renamed them as it opened them; 1.1 reads only the suffixed form.

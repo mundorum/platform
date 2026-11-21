@@ -239,8 +239,8 @@ all persisted together as `_presentation.yaml`:
     still shown at 1:1, so a large background scrolls inside it.
 - **Player** — narrative-wide Player settings (`player:` in
   `_presentation.yaml`). For now one: `entityOptionsMode`
-  (`entity_options: click | hover`, `sanitizeEntityOptionsMode`), how the
-  reader opens an entity's options.
+  (`entity_options: hover | click`, `sanitizeEntityOptionsMode`), how the
+  reader opens an entity's options; `hover` when absent.
 
 ### Player
 Steps through the narrative as a reader would. `buildScenePlayback` splits

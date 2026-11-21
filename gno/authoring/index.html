@@ -717,7 +717,22 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 .player-stage-wrap { margin: 0 auto 1em; }
 .player-stage { display: block; width: 100%; height: auto; max-height: 72vh; margin: 0 auto; }
 .player-stage .stage-click { cursor: pointer; }
-.player-stage .stage-click:hover { opacity: 0.85; }
+.player-stage .stage-click:not(.stage-entity):hover { opacity: 0.85; }
+/* an entity carrying a divert or options: a soft accent contour that
+   breathes while it is on stage, and a firm one under the pointer; the
+   drop-shadows follow the image's silhouette, not its box */
+.player-stage .stage-entity { animation: stage-entity-breathe 2.4s ease-in-out infinite; }
+.player-stage .stage-entity:hover {
+  animation: none;
+  filter: drop-shadow(0 0 1.5px var(--c-accent)) drop-shadow(0 0 1.5px var(--c-accent)) drop-shadow(0 0 8px var(--c-accent));
+}
+@keyframes stage-entity-breathe {
+  0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+  50%      { filter: drop-shadow(0 0 1.5px var(--c-accent)) drop-shadow(0 0 6px var(--c-accent)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .player-stage .stage-entity { animation: none; filter: drop-shadow(0 0 1.5px var(--c-accent)); }
+}
 .player-stage .stage-static { pointer-events: none; }
 /* a subscene: the frames below it are dimmed and take no clicks */
 .player-stage .stage-inert { pointer-events: none; }
@@ -2237,10 +2252,10 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
               An entity's options are the choices indented under its line (<code>@door</code> then <code>&nbsp;&nbsp;* Open it -&gt; Garden</code>). In graphic play they are shown by <code>door.action_1</code>, <code>door.action_2</code>… The reader opens them:
             </div>
             <label class="pres-setting-choice">
-              <input type="radio" value="click" v-model="entityOptionsMode"> by clicking the entity
+              <input type="radio" value="hover" v-model="entityOptionsMode"> by passing the pointer over the entity (default)
             </label>
             <label class="pres-setting-choice">
-              <input type="radio" value="hover" v-model="entityOptionsMode"> by passing the pointer over the entity
+              <input type="radio" value="click" v-model="entityOptionsMode"> by clicking the entity
             </label>
             <div class="pres-setting-hint">On a touch screen, which has no pointer to pass over, a tap opens them either way.</div>
           </div>
@@ -2839,7 +2854,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                         v-if="layer.type === 'image'"
                         :x="layer.x" :y="layer.y" :width="layer.w" :height="layer.h"
                         :href="layer.url" preserveAspectRatio="xMidYMid meet"
-                        :class="{'stage-click': layer.click}"
+                        :class="{'stage-click': layer.click, 'stage-entity': layer.click && layer.entityId}"
                         @click="onStageClick(layer.click)"
                         @mouseenter="onStageLayerEnter(layer)" @mouseleave="onStageLayerLeave(layer)"
                       />
@@ -5062,11 +5077,11 @@ function sanitizeExtraEntities(raw) {
   return out;
 }
 
-// How the Player opens an entity's options: 'click' (the default) or
-// 'hover'. Persisted as `player: { entity_options: … }` in the presentation.
-const ENTITY_OPTIONS_MODES = ['click', 'hover'];
+// How the Player opens an entity's options: 'hover' (the default) or
+// 'click'. Persisted as `player: { entity_options: … }` in the presentation.
+const ENTITY_OPTIONS_MODES = ['hover', 'click'];
 function sanitizeEntityOptionsMode(raw) {
-  return ENTITY_OPTIONS_MODES.includes(raw) ? raw : 'click';
+  return ENTITY_OPTIONS_MODES.includes(raw) ? raw : 'hover';
 }
 
 // Rebuilds one placed item from stored data, or returns null to drop it.
@@ -5422,7 +5437,7 @@ createApp({
       return { entity_options: entityOptionsMode.value };
     }
     function clearPlayerSettings() {
-      entityOptionsMode.value = 'click';
+      entityOptionsMode.value = 'hover';
     }
 
     const imageLibraryIds = computed(() => Object.keys(imageLibraries));

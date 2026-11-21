@@ -349,9 +349,9 @@ name.
 - An entity's options are numbered under it, in the order written, as the
   choices are in the scene: `Lucinda.action_1` is the first option of
   `@Lucinda`. The choices' `action_N` don't count them.
-- The reader opens an entity's options by clicking the entity, or by
-  passing the pointer over it, as the narrative's presentation says
-  (**Presentation → Player**). One entity's options are open at a time, and
+- The reader opens an entity's options by passing the pointer over the
+  entity (the default), or by clicking it, as the narrative's presentation
+  says (**Presentation → Player**). One entity's options are open at a time, and
   they close at the next beat.
 - In hover mode, the options stay open while the pointer moves from the
   entity onto them, and close shortly after it leaves both: place them near
