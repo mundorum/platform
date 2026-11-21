@@ -28,10 +28,15 @@ touching files.
   Compose-managed again (an empty volume would silently replace the data).
 - LLM provider keys are files in `secrets/` (mounted at `/run/secrets`),
   never env vars or database rows. See `docs/llm-gateway.md`.
-- Public docs: `docs/` (platform), `noid/docs/`, `vp/docs/`, published
-  together to GitHub Pages via `mkdocs.yml` + `tools/stage-docs.sh`. Link
-  between them with repo-relative paths (`../noid/docs/x.md`); the staging
-  script rewrites them.
+- Public site: a Jekyll site built by GitHub Pages straight from `main`
+  (root) on every push, configured in `_config.yml`. It publishes the landing
+  page (`index.html`), one page per subproject (`gno/index.md`,
+  `noid/index.md`, `vp/index.md`), the docs in `docs/` (platform),
+  `gno/docs/`, `noid/docs/`, `vp/docs/`, and the gno editor online at
+  `gno/authoring/`. Link between docs with repo-relative paths
+  (`../noid/docs/x.md`); `jekyll-relative-links` turns them into page links.
+  Jekyll publishes every file not listed in `exclude` in `_config.yml`, so
+  add any new folder of code or private material there.
 - Private material (design handoffs, real VP activity prompts, internal
   deployment notes) lives in the private sibling repo `mundorum-private`.
   Never copy it into this public repository.

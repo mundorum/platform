@@ -97,6 +97,8 @@ keeps secrets, `.env`, dev data and unrelated subprojects out of the images.
 
 ## Documentation
 
-This site is built with MkDocs from `docs/` (platform), `noid/docs/` and
-`vp/docs/`, and published to GitHub Pages by `.github/workflows/docs.yml`.
-`tools/stage-docs.sh` assembles the three folders into one tree.
+This site is built with Jekyll by GitHub Pages, straight from the `main`
+branch (repository root), on every push. `_config.yml` configures it and
+lists what stays out of it. It publishes `docs/` (platform), `gno/docs/`,
+`noid/docs/` and `vp/docs/`, one page per subproject, and the gnō- editor
+online at `gno/authoring/`.

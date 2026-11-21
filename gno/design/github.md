@@ -13,4 +13,4 @@ date: 2026-09-19T20:21:17Z
 ## Screen map
 | Screen | Built from |
 |---|---|
-| GNO Icon.dc.html | gno/README.md, gno/index.html (`:root` color variables) |
+| GNO Icon.dc.html | gno/README.md, gno/authoring/index.html (`:root` color variables) |

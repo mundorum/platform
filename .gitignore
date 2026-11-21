@@ -239,5 +239,3 @@ secrets/*
 server/server.db
 server/staticfiles/
 
-# MkDocs build output
-site/

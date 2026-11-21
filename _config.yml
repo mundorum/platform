@@ -1,6 +1,9 @@
 # GitHub Pages (Jekyll) site for the Mundorum platform.
-# Served from the gh-pages branch: Settings → Pages → Deploy from a branch →
-# gh-pages, / (root). The repository itself is the site source, so the docs
+# Served from the main branch: Settings → Pages → Deploy from a branch →
+# main, / (root). GitHub rebuilds it on every push to main. Jekyll publishes
+# every file that is not excluded below (not only Markdown), so any new
+# top-level folder of code or private material must be added to `exclude`.
+# The repository itself is the site source, so the docs
 # keep their repo-relative links (jekyll-relative-links turns *.md into *.html).
 #
 # Pages:  index.html            — the three subprojects
@@ -36,7 +39,6 @@ exclude:
   - README.md
   - LICENSE
   - CLAUDE.md
-  - mkdocs.yml
   - docker-compose.yml
   - .env.example
   - .dockerignore
@@ -47,12 +49,9 @@ exclude:
   - run-c
   - secrets
   - server
-  - tools
   - update
   - build
-  - site
   - docs/index.md
-  - docs/stylesheets
   - gno/CLAUDE.md
   - gno/design
   - gno/temp

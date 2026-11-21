@@ -102,7 +102,7 @@ Django tests use a real PostgreSQL test database (created and dropped by
 
 ## Docs site
 
-```bash
-pip install "mkdocs>=1.6,<2" "mkdocs-material>=9.5,<10"
-tools/stage-docs.sh && mkdocs serve -f build/docs-site/mkdocs.yml
-```
+The public site is built with Jekyll by GitHub Pages from the `main` branch
+on every push; there is no build step to run. `_config.yml` at the
+repository root configures it and lists the files kept out of it. See
+[Architecture](architecture.md#documentation).
