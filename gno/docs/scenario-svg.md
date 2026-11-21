@@ -322,20 +322,47 @@ Controls are the items the reader clicks to move through the narrative.
 Each can be an entity image, a text area, or both (a [pair](#pairs)).
 
 ```text
-control-id = "action_proceed" | "action_regress" | "action_" choice-number
-             ▸ action_2
+control-id    = "action_proceed" | "action_regress" | "action_" choice-number
+                | option-id
+                ▸ action_2
 choice-number = <a whole number from 1>
-             ▸ 2
+                ▸ 2
+option-id     = owner ".action_" choice-number
+                ▸ Lucinda.action_1
+owner         = <an entity's name, without "@">
+                ▸ Lucinda
 ```
+
+Controls come in the same two kinds as the narrative's diverts (see the
+[syntax reference](syntax.md#diverts)). The scene-centric ones belong to the
+scene: continue, back and its choices. The entity-centric ones belong to an
+entity: its [options](syntax.md#entity-options), prefixed with the entity's
+name.
 
 | ID | Shown | Does |
 |---|---|---|
 | `action_proceed` | while the scene is paused | continues to the next beat; a text area shows its own text ("Continue") |
 | `action_regress` | once past the first beat; always in a subscene | goes back one beat; in a subscene, closes it; a text area shows its own text ("Back") |
 | `action_N` | while choice N is on offer | takes the Nth choice of the scene (`* Label -> Target`); a text area shows the choice's label |
+| `<owner>.action_N` | while the reader has the options of that entity open | takes the entity's Nth option (`  * Label -> Target` under the entity's line); a text area shows the option's label |
+
+- An entity's options are numbered under it, in the order written, as the
+  choices are in the scene: `Lucinda.action_1` is the first option of
+  `@Lucinda`. The choices' `action_N` don't count them.
+- The reader opens an entity's options by clicking the entity, or by
+  passing the pointer over it, as the narrative's presentation says
+  (**Presentation → Player**). One entity's options are open at a time, and
+  they close at the next beat.
+- In hover mode, the options stay open while the pointer moves from the
+  entity onto them, and close shortly after it leaves both: place them near
+  the entity.
+- A group's options are shown by its first member as written: those of
+  `@Lucinda + @Jacinto` by `Lucinda.action_N`.
 
 When the design lacks a control, the Player shows its own button in its
-place, so a scene can never get stuck.
+place, so a scene can never get stuck. For options, that is a button for
+each option without a `<owner>.action_N` item, below the stage, while they
+are open.
 
 ### Speech
 
@@ -393,12 +420,20 @@ unique, the text area's `id` carries the suffix `_text`:
 | Role | Entity image `id` | Text area `id` |
 |---|---|---|
 | choice 1 | `action_1` | `action_1_text` |
+| option 1 of `@Lucinda` | `Lucinda.action_1` | `Lucinda.action_1_text` |
 | continue | `action_proceed` | `action_proceed_text` |
 | speech | `speech` | `speech_text` |
 | a subscene box and its frame | `subscene.radiology` | `subscene.radiology_text` |
 
 A text area without a partner still carries the suffix: an area named
 `title` in the editor is `title_text` in the file.
+
+The role comes from the IDs alone. Both items of a pair are shown and
+hidden together, and both are clickable. Putting them in a [group](#group),
+as the scenario tutorial does (`group_action_1`), gives them no role: the
+group's own ID means nothing to the Player. It only keeps the two together,
+so that they move as one in a [stack](#stack), and the group, hidden with
+them, takes no room there.
 
 ## What is hidden
 
@@ -410,6 +445,7 @@ to do at that moment. A hidden item takes no room in a stack.
 | speech area | it has no text at this beat |
 | speech bubble (entity image with a speech ID) | its speech area has no text |
 | `action_N` | choice N is not on offer |
+| `<owner>.action_N` | that entity's options are not open, or it has no option N |
 | `action_proceed` | the scene is not paused (its choices are on offer, or it ended) |
 | `action_regress` | at the scene's first beat, outside a subscene |
 | anchor | no entity stands on it |
@@ -486,7 +522,10 @@ role-or-name  = role-id | item-id
 item-id       = <a name without spaces, unique in the file>
 anchor-id     = <a name without spaces>
 control-id    = "action_proceed" | "action_regress" | "action_" choice-number
+                | option-id
 choice-number = <a whole number from 1>
+option-id     = owner ".action_" choice-number
+owner         = <an entity's name, without "@">
 speech-id     = [ speaker "." ] "speech"
 speaker       = "_" | <an entity's name, without "@">
 subscene-id   = "subscene" [ "." scenario-name ]

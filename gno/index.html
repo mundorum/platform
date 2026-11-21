@@ -636,6 +636,13 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 .divert-label {
   color: var(--c-text);
 }
+/* an entity's options, listed under its entity line */
+.entity-options {
+  margin: -0.2em 0 0.6em 22px;
+  padding-left: 10px;
+  border-left: 0.5px solid var(--c-border-strong);
+}
+.entity-options .divert-line { margin: 0.25em 0; }
 .divert-arrow {
   display: inline-flex;
   align-items: center;
@@ -756,6 +763,20 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   gap: 8px;
   max-width: 420px;
   margin: -1.4em auto 2.4em;
+}
+/* an entity's options: its button, and the options under it once opened */
+.player-entity-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.player-entity-options .player-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 18px;
+  padding-left: 10px;
+  border-left: 0.5px solid var(--c-border-strong);
 }
 .player-stage-text {
   width: 100%;
@@ -1274,6 +1295,18 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   overflow-y: auto;
   padding: 24px 32px 40px;
 }
+.pres-setting {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--c-text);
+}
+.pres-setting-label { font-weight: 600; }
+.pres-setting-hint { color: var(--c-muted); font-size: 12.5px; line-height: 1.5; }
+.pres-setting-choice { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .pres-subtab-placeholder {
   max-width: 480px;
   margin: 40px auto 0;
@@ -2021,7 +2054,7 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
             <div class="node-body">{{ node.excerpt }}</div>
             <div class="node-annotation" v-if="node.annotation"><i class="ti ti-note"></i> {{ node.annotation }}</div>
             <div class="node-diverts" v-if="node.diverts.length">
-              <span v-for="(d, i) in node.diverts" :key="i" class="node-divert-chip" :title="d.overlay ? 'Opens as a subscene' : ''"><i class="ti" :class="d.overlay ? 'ti-picture-in-picture' : 'ti-arrow-right'"></i> {{ d.target }}</span>
+              <span v-for="(d, i) in node.diverts" :key="i" class="node-divert-chip" :title="d.overlay ? 'Opens as a subscene' : (d.carry ? 'Takes ' + d.entity + ' along' : '')"><i class="ti" :class="d.overlay ? 'ti-picture-in-picture' : (d.carry ? 'ti-walk' : 'ti-arrow-right')"></i> {{ d.target }}</span>
             </div>
           </div>
         </div>
@@ -2112,6 +2145,9 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
         <button class="pres-subtab" :class="{active: presentationTab === 'scenarios'}" @click="presentationTab = 'scenarios'">
           <i class="ti ti-map"></i> Scenarios
         </button>
+        <button class="pres-subtab" :class="{active: presentationTab === 'player'}" @click="presentationTab = 'player'">
+          <i class="ti ti-player-play"></i> Player
+        </button>
       </div>
 
       <div class="pres-subtab-body">
@@ -2184,6 +2220,22 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
           </div>
           <div class="pres-subtab-placeholder" v-else>
             No image libraries yet. Add one above by pasting a metadata file URL or an images directory URL.
+          </div>
+        </template>
+
+        <template v-else-if="presentationTab === 'player'">
+          <div class="pres-setting">
+            <div class="pres-setting-label">Entity options</div>
+            <div class="pres-setting-hint">
+              An entity's options are the choices indented under its line (<code>@door</code> then <code>&nbsp;&nbsp;* Open it -&gt; Garden</code>). In graphic play they are shown by <code>door.action_1</code>, <code>door.action_2</code>… The reader opens them:
+            </div>
+            <label class="pres-setting-choice">
+              <input type="radio" value="click" v-model="entityOptionsMode"> by clicking the entity
+            </label>
+            <label class="pres-setting-choice">
+              <input type="radio" value="hover" v-model="entityOptionsMode"> by passing the pointer over the entity
+            </label>
+            <div class="pres-setting-hint">On a touch screen, which has no pointer to pass over, a tap opens them either way.</div>
           </div>
         </template>
 
@@ -2782,12 +2834,14 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                         :href="layer.url" preserveAspectRatio="xMidYMid meet"
                         :class="{'stage-click': layer.click}"
                         @click="onStageClick(layer.click)"
+                        @mouseenter="onStageLayerEnter(layer)" @mouseleave="onStageLayerLeave(layer)"
                       />
                       <foreignObject
                         v-else
                         :x="layer.x" :y="layer.y" :width="layer.w" :height="layer.h"
                         :class="{'stage-click': layer.click, 'stage-static': !layer.click && !layer.live}"
                         @click="onStageClick(layer.click)"
+                        @mouseenter="onStageLayerEnter(layer)" @mouseleave="onStageLayerLeave(layer)"
                       >
                         <div class="player-stage-text" :class="{pre: layer.pre}" :style="layer.style" v-html="layer.html"></div>
                       </foreignObject>
@@ -2857,6 +2911,43 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
                 <span>{{ d.target }} <i class="ti" :class="d.overlay ? 'ti-picture-in-picture' : 'ti-arrow-right'"></i></span>
               </button>
             </div>
+            <!-- entities with options and nothing on the stage to click: a button each, its options under it once opened -->
+            <div class="player-entity-diverts" v-if="playerEntityOptionButtons.length || playerStageOptionFallbacks.length">
+              <div
+                v-for="e in playerEntityOptionButtons"
+                :key="e.entityId"
+                class="player-entity-options"
+                @mouseenter="onOptionsHoverEnter(e.entityId, e.options)"
+                @mouseleave="onOptionsHoverLeave"
+              >
+                <button
+                  class="player-choice-btn"
+                  :title="entityOptionsMode === 'hover' ? 'Point at it to see its options' : 'Click to see its options'"
+                  @click="toggleEntityOptions(e.entityId, e.options)"
+                >
+                  <span class="pill-entity">{{ e.written }}</span>
+                  <i class="ti" :class="playerActiveOptions && playerActiveOptions.entityId === e.entityId ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+                </button>
+                <div class="player-option-list" v-if="playerActiveOptions && playerActiveOptions.entityId === e.entityId">
+                  <button v-for="o in e.options" :key="o.n" class="player-choice-btn" @click="playerDivert(o)">
+                    {{ o.label }} <i class="ti" :class="o.overlay ? 'ti-picture-in-picture' : (o.carry ? 'ti-walk' : 'ti-arrow-right')"></i>
+                  </button>
+                </div>
+              </div>
+              <div
+                v-if="playerStageOptionFallbacks.length"
+                class="player-entity-options"
+                @mouseenter="onOptionsHoverEnter(null, null)"
+                @mouseleave="onOptionsHoverLeave"
+              >
+                <div class="player-option-list">
+                  <button v-for="o in playerStageOptionFallbacks" :key="o.n" class="player-choice-btn" @click="playerDivert(o)">
+                    <span class="pill-entity">{{ o.entity }}</span>
+                    <span>{{ o.label }} <i class="ti" :class="o.overlay ? 'ti-picture-in-picture' : (o.carry ? 'ti-walk' : 'ti-arrow-right')"></i></span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </template>
         </div>
       </div>
@@ -2902,7 +2993,9 @@ const DEMO_MARKER = '__demo__';
 // (*)/(**) start and end markers, the Player's pause triggers ("--" and a
 // dialog or dialog set), an entity leaving the scene (`@guard =>`) partway
 // through, so it drops out of the entities-on-stage panel, an entity divert
-// (`@old_map ~> ...`) and a subscene choice (`* ... ~> ...`).
+// (`@old_map ~> ...`), a subscene choice (`* ... ~> ...`) and entity options
+// (indented under `@princess right worried`), one of them taking the
+// princess along (`=>`).
 const DEMO_SOURCE = `# The Council Chamber: Castle (*)
 
 The @king paces before the tall windows, restless.
@@ -2940,6 +3033,8 @@ The @princess kneels beside the fountain, sketching the koi beneath the surface.
 @guard =>
 
 @princess right worried
+  * Walk back with the princess => The Council Chamber
+  * Look at her sketches ~> The Sketchbook
 
 * Return to the council chamber -> The Council Chamber
 
@@ -2963,6 +3058,10 @@ The map is older than the castle. Past the last village, the ink fades into a si
 # The Scouts' Report: Castle
 
 *Third day. The road is empty. No smoke from the chimneys. We go on.*
+
+# The Sketchbook: Castle
+
+Page after page of koi. On the last one, their eyes are drawn in red ink.
 
 # The Old Forest: Wilderness
 
@@ -3041,6 +3140,9 @@ function manifestVersion(manifest) {
 //   - in the scenario designs, every text area's id gets the "_text" suffix,
 //     and an anchor saved with only a `label` gets it as its id (the anchor
 //     written without an id in an SVG file is the `files` stage's, below).
+// Entity options (indented choices under a standalone entity line) and their
+// `<entity>.action_N` items are new in 1.1: what version 1 read as text or as
+// plain items is listed to check.
 // Lines that version 1 read one way and 1.1 reads another, but that can't be
 // rewritten to keep their old meaning, are listed for the author to check.
 function convert_1_to_1_1(bundle) {
@@ -3052,11 +3154,23 @@ function convert_1_to_1_1(bundle) {
   const NOW_EXIT = new RegExp(`^${REF}\\s+=>$`, 'u');
   const NOW_DIVERT = new RegExp(`^${REF}(?:\\s+[^\\s:@]+)*?\\s+(?:->|~>)\\s*\\S`, 'u');
   const DIALOG = new RegExp(`^--\\s*${REF}`, 'u');
+  const ENTITY_LINE = new RegExp(`^(${REF})(?:\\s+[^\\s:@]+)*$`, 'u');
+  const OPTION = /^(?:\t| {2,})[ \t]*\*\s+.+?\s*(?:->|=>|~>)\s*\S/;
   let markers = 0, exits = 0;
   const check = [];
   let inDialog = false; // a dialog's text runs from its "-- @who" cue to a blank line
+  let optionsOwner = null; // the entity of the standalone line the lines right after are under
   const lines = String(bundle.source || '').split('\n').map((line, i) => {
     const t = line.trim();
+    const owner = optionsOwner;
+    optionsOwner = null;
+    // an indented choice right under a standalone entity line was text in
+    // version 1 (a nested list item); in 1.1 it is an option of that entity
+    if (owner && !inDialog && OPTION.test(line)) {
+      check.push(`line ${i + 1}: "${t}" was text; it is now an option of ${owner}.`);
+      optionsOwner = owner;
+      return line;
+    }
     const hm = line.match(HEADING);
     if (hm) {
       markers++;
@@ -3074,6 +3188,10 @@ function convert_1_to_1_1(bundle) {
     if (em) { exits++; return `${em[1]}${em[2]}=>${em[3]}`; }
     if (NOW_EXIT.test(t)) check.push(`line ${i + 1}: "${t}" gave the entity the state "=>"; it now makes the entity leave.`);
     else if (NOW_DIVERT.test(t)) check.push(`line ${i + 1}: "${t}" gave the entity state words; it is now an entity divert.`);
+    else {
+      const lm = t.match(ENTITY_LINE);
+      if (lm) optionsOwner = lm[1].replace(/\s+/g, ' ');
+    }
     return line;
   });
   if (markers) notes.push(`${markers} start/end marker(s) rewritten: (Start) → (*), (End) → (**).`);
@@ -3122,6 +3240,8 @@ function convert_1_to_1_1(bundle) {
       const id = String((it && it.svgId) || '').replace(/_text$/, '').toLowerCase();
       if (id === 'subscene' || id.startsWith('subscene.')) {
         check.push(`scenario "${name}": the item "${id}" now marks where subscenes open.`);
+      } else if (/^.+\.action_\d+$/.test(id)) {
+        check.push(`scenario "${name}": the item "${id}" now shows an option of the entity "${id.replace(/\.action_\d+$/, '')}".`);
       }
     });
   });
@@ -3155,7 +3275,7 @@ function convert_1_to_1_1_files(files) {
 // The converters, in order. Each takes a package from `from` to `to`:
 //   bundle(bundle) -> { bundle, notes } — on the decoded package { source,
 //     layout, presentation: { image_libraries, entities, extra_entities,
-//     scenario_designs } }, the shape every way of opening a narrative
+//     player, scenario_designs } }, the shape every way of opening a narrative
 //     arrives at; this is where changes of meaning are converted;
 //   files(files) -> { files, notes } — optional, on a zip's raw files
 //     ({ path: text }), run before they are decoded; only for a version that
@@ -3243,22 +3363,38 @@ function sceneMarker(raw) {
 const DIVERT_RE = /^\*\s+(.+?)\s*(->|~>)\s*(.+)$/;
 const SUBSCENE_ARROW = '~>';
 
-// Every divert leaving a scene — its choices, then its entity diverts
-// (`@door -> Target`) — as the Graph draws them.
+// An entity option: a choice indented (two spaces or more, or a tab) on the
+// lines right after a standalone entity line, offered by that entity while it
+// is on stage instead of at the scene's end. Besides "->" and "~>", an option
+// can use "=>": it goes to Target and takes the entity along, on stage from
+// the target's start. Groups: 1 the label, 2 the arrow, 3 the target.
+const OPTION_RE = /^(?:\t| {2,})[ \t]*\*\s+(.+?)\s*(->|=>|~>)\s*(\S.*)$/;
+const CARRY_ARROW = '=>';
+
+function optionFromMatch(m) {
+  return { label: m[1].trim(), target: m[3].trim(), overlay: m[2] === SUBSCENE_ARROW, carry: m[2] === CARRY_ARROW };
+}
+
+// Every divert leaving a scene — its choices, its entity diverts
+// (`@door -> Target`), then its entity options — as the Graph draws them.
 function sceneDiverts(scene) {
-  return [...scene.diverts, ...(scene.entityDiverts || [])];
+  return [...scene.diverts, ...(scene.entityDiverts || []), ...(scene.entityOptions || [])];
 }
 
 function parseGno(source) {
   // Returns: { scenes: [{id, title, scenario, marker, body, lineStart,
   //   diverts: [{label, target, overlay}],          — the "* Label -> Target" choices
-  //   entityDiverts: [{label, target, overlay, entityId}] }] — "@door -> Target" lines
-  // `overlay` is true for a subscene ("~>"). Choices and entity diverts are
-  // kept apart because `action_N` numbers the choices only.
+  //   entityDiverts: [{label, target, overlay, entityId}] — "@door -> Target" lines
+  //   entityOptions: [{label, target, overlay, carry, entityId, entity}] }]
+  //     — "  * Label -> Target" lines under a standalone entity line
+  // `overlay` is true for a subscene ("~>"), `carry` for an option taking its
+  // entity along ("=>"). Choices, entity diverts and entity options are kept
+  // apart because `action_N` numbers the choices only.
   const lines = source.split('\n');
   const scenes = [];
   let current = null;
   let inDialog = false; // lines after a "-- @who:" cue, up to a blank line, are its text
+  let optionsOwner = null; // the entity whose standalone line the current option lines are under
 
   lines.forEach((line, idx) => {
     const sm = line.match(SCENE_RE);
@@ -3268,12 +3404,20 @@ function parseGno(source) {
       const scenario = sm[3].trim();
       const marker = sceneMarker(sm[4]);
       const id = slugify(title + '-' + scenario + '-' + idx);
-      current = { id, title, scenario, marker, body: [], diverts: [], entityDiverts: [], lineStart: idx };
+      current = { id, title, scenario, marker, body: [], diverts: [], entityDiverts: [], entityOptions: [], lineStart: idx };
       inDialog = false;
+      optionsOwner = null;
       return;
     }
     if (current) {
       const trimmed = line.trim();
+      const om = optionsOwner && line.match(OPTION_RE);
+      if (om) {
+        current.entityOptions.push({ ...optionFromMatch(om), entityId: optionsOwner.entityId, entity: optionsOwner.written });
+        current.body.push(line);
+        return;
+      }
+      optionsOwner = null;
       const dm = line.match(DIVERT_RE);
       if (dm) {
         current.diverts.push({ label: dm[1].trim(), target: dm[3].trim(), overlay: dm[2] === SUBSCENE_ARROW });
@@ -3286,6 +3430,9 @@ function parseGno(source) {
         if (em) {
           const ref = parseEntityRef(em[1]);
           current.entityDiverts.push({ label: ref.written, target: em[4].trim(), overlay: em[3] === SUBSCENE_ARROW, entityId: ref.entityId });
+        } else {
+          const lm = trimmed.match(ENTITY_LINE_RE);
+          if (lm && !isExitState(lm[2] || '')) optionsOwner = parseEntityRef(lm[1]);
         }
       }
       current.body.push(line);
@@ -3313,6 +3460,12 @@ const ENTITY_REF_SRC = `${ENTITY_ID_SRC}(?:\\s*\\+\\s*${ENTITY_ID_SRC})*`;
 // before it, since "-" may be part of an id.
 // Groups: 1 the entity (or group), 2 its state words, 3 the arrow, 4 the target.
 const ENTITY_DIVERT_RE = new RegExp(`^(${ENTITY_REF_SRC})((?:\\s+[^\\s:@]+)*?)\\s+(->|~>)\\s*(\\S.*)$`, 'u');
+
+// A standalone entity line: "@prince right sad" (the whole line, optional
+// state words). Unless it is an exit, the option lines right after it
+// (OPTION_RE) are its entity's options.
+// Groups: 1 the entity (or group), 2 its state words.
+const ENTITY_LINE_RE = new RegExp(`^(${ENTITY_REF_SRC})((?:\\s+[^\\s:@]+)*)$`, 'u');
 
 // "@guard =>": the entity leaves the scene.
 const isExitState = state => String(state).trim() === '=>';
@@ -3353,7 +3506,7 @@ function analyzeEntities(source) {
   const DIALOG_RE = /^--\s*(.+)$/;
   // \p{L}/\p{N} (Unicode letter/number) instead of \w so accented identifiers
   // (e.g. "@príncipe") are recognized in full, not just their ASCII prefix.
-  const FORM1_RE  = new RegExp(`^(${ENTITY_REF_SRC})((?:\\s+[^\\s:@]+)*)$`, 'u');
+  const FORM1_RE  = ENTITY_LINE_RE;
   const ID_RE     = new RegExp(`^${ENTITY_REF_SRC}`, 'u');
   const INLINE_RE = new RegExp(ENTITY_REF_SRC, 'gu');
 
@@ -3363,7 +3516,7 @@ function analyzeEntities(source) {
   function register(refText, type, extra) {
     const n = occurrences.length;
     const { entityId, members, written } = parseEntityRef(refText);
-    const occ = Object.assign({ n, entityId, members, written, type, state: '', divert: null, dialogLines: [], context: '', scene: currentScene }, extra);
+    const occ = Object.assign({ n, entityId, members, written, type, state: '', divert: null, options: null, dialogLines: [], context: '', scene: currentScene }, extra);
     occurrences.push(occ);
     [entityId, ...(members || [])].forEach(id => {
       if (!entityIndex.has(id)) entityIndex.set(id, { states: [], occurrenceIdx: [] });
@@ -3412,7 +3565,16 @@ function analyzeEntities(source) {
 
     const wm = trimmed.match(FORM1_RE);
     if (wm) {
-      register(wm[1], 'state', { state: (wm[2] || '').trim(), lineStart: i, lineEnd: i });
+      // the option lines right under it are its options; a new block
+      // replaces the entity's earlier options (see buildScenePlayback)
+      const state = (wm[2] || '').trim();
+      const options = [];
+      let j = i + 1, om;
+      if (!isExitState(state)) {
+        while (j < lines.length && (om = lines[j].match(OPTION_RE))) { options.push(optionFromMatch(om)); j++; }
+      }
+      register(wm[1], 'state', { state, options: options.length ? options : null, lineStart: i, lineEnd: j - 1 });
+      i = j - 1;
       continue;
     }
 
@@ -3428,9 +3590,21 @@ function analyzeEntities(source) {
 
 /* ── MARKDOWN RENDERER ── */
 // The arrow a divert is shown with: a plain arrow for "->", the
-// picture-in-picture icon for a subscene ("~>").
-function divertIconHtml(overlay) {
-  return overlay ? '<i class="ti ti-picture-in-picture" title="Subscene"></i>' : '→';
+// picture-in-picture icon for a subscene ("~>"), a walking figure for an
+// option taking its entity along ("=>").
+function divertIconHtml(overlay, carry) {
+  if (overlay) return '<i class="ti ti-picture-in-picture" title="Subscene"></i>';
+  return carry ? '<i class="ti ti-walk" title="The entity goes along"></i> →' : '→';
+}
+
+// The options of an entity line, as the preview lists them under it.
+function entityOptionsHtml(options, titleToId) {
+  const rows = options.map(o => {
+    const targetId = titleToId[o.target.toLowerCase()];
+    return `<div class="divert-line"><span class="divert-label">${escH(o.label)}</span>`
+      + `<a class="divert-arrow" href="${targetId ? '#' + escH(targetId) : '#'}">${divertIconHtml(o.overlay, o.carry)} ${escH(o.target)}</a></div>`;
+  });
+  return `<div class="entity-options">${rows.join('')}</div>`;
 }
 
 function entityBlockHtml(occ) {
@@ -3517,6 +3691,7 @@ function renderGno(source, scenes, entities) {
       const occ = blockByLine.get(idx);
       out.push('');
       out.push(entityBlockHtml(occ));
+      if (occ.options) out.push(entityOptionsHtml(occ.options, titleToId));
       out.push('');
       idx = occ.lineEnd;
       continue;
@@ -3567,6 +3742,19 @@ function restIsOnlyDiverts(lines, fromIdx, toIdx) {
 // while it stays on stage; `entityDiverts` lists, per beat, the diverts of the
 // entities on stage as { label, target, overlay, entityId }.
 //
+// Likewise an entity given options (the "  * Label -> Target" lines under its
+// standalone line) keeps them while on stage; `entityOptions` lists them per
+// beat as { entityId, written, options: [{ label, target, overlay, carry, n,
+// entityId, entity }] }. An entity has either a divert or options: the
+// latest line giving one replaces both, so a second options block replaces
+// the first.
+//
+// `carried` lists entities brought in by an option with "=>" from the scene
+// before, as `stages` gave them there: they are on stage from the first beat,
+// with the states they had. `stages` gives, per beat, every entity on stage
+// as { entityId, members, written, states } — the states given to it since
+// it entered, in order — which is what an "=>" option takes along.
+//
 // For the graphic Player, each beat additionally carries:
 //   - events: the entity mentions made in that beat, in order, as
 //     { entityId, labels, exit, divert } — the raw material `foldStageFrames` replays;
@@ -3574,7 +3762,7 @@ function restIsOnlyDiverts(lines, fromIdx, toIdx) {
 //     { kind: 'free', html } (prose outside any dialog) or
 //     { kind: 'dialog', entityId, html } — routed to text areas by
 //     `routeSpeech`.
-function buildScenePlayback(scene, bodyEnd, source, entities) {
+function buildScenePlayback(scene, bodyEnd, source, entities, carried = []) {
   const lines = source.split('\n');
   const bodyStart = scene.lineStart + 1;
 
@@ -3595,12 +3783,16 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
   const events = [];
   const speeches = [];
   const entityDiverts = [];
+  const entityOptions = [];
+  const stages = [];
   let current = [];
   let currentEvents = [];
   let currentSpeech = [];
   let freeLines = []; // raw prose lines since the last dialog / beat boundary
   const roster = new Map(); // entityId -> latest known state ('' = present, no known state)
   const activeDiverts = new Map(); // entityId -> its divert, while on stage
+  const activeOptions = new Map(); // entityId -> its options, while on stage
+  const stage = new Map(); // entityId -> { entityId, members, written, states }, while on stage
 
   // The text roster lists a group's members one by one, in the order written;
   // the graphic Player gets the group as a whole (`members`), since it may
@@ -3609,18 +3801,40 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
     const ids = occ.members ? occ.written.split(' + ') : [occ.entityId];
     if (occ.type === 'state' && !occ.divert && isExitState(occ.state)) {
       ids.forEach(id => roster.delete(id));
-      [occ.entityId, ...(occ.members || [])].forEach(id => activeDiverts.delete(id));
-      currentEvents.push({ entityId: occ.entityId, members: occ.members, labels: [], exit: true, divert: null });
+      [occ.entityId, ...(occ.members || [])].forEach(id => {
+        activeDiverts.delete(id);
+        activeOptions.delete(id);
+        stage.delete(id);
+      });
+      currentEvents.push({ entityId: occ.entityId, members: occ.members, labels: [], exit: true, divert: null, options: null });
       return;
     }
     ids.forEach(id => {
       if (occ.state) roster.set(id, occ.state);
       else if (!roster.has(id)) roster.set(id, '');
     });
+    if (!stage.has(occ.entityId)) stage.set(occ.entityId, { entityId: occ.entityId, members: occ.members, written: occ.written || occ.entityId, states: [] });
+    if (occ.state) stage.get(occ.entityId).states.push(occ.state);
     const divert = occ.divert ? { label: occ.written || occ.entityId, target: occ.divert.target, overlay: occ.divert.overlay, entityId: occ.entityId } : null;
+    const options = occ.options
+      ? occ.options.map((o, i) => ({ ...o, n: i + 1, entityId: occ.entityId, entity: occ.written || occ.entityId }))
+      : null;
+    if (divert || options) {
+      activeDiverts.delete(occ.entityId);
+      activeOptions.delete(occ.entityId);
+    }
     if (divert) activeDiverts.set(occ.entityId, divert);
-    currentEvents.push({ entityId: occ.entityId, members: occ.members, labels: occ.state.split(/\s+/).filter(Boolean), exit: false, divert });
+    if (options) activeOptions.set(occ.entityId, { entityId: occ.entityId, written: occ.written || occ.entityId, options });
+    currentEvents.push({ entityId: occ.entityId, members: occ.members, labels: occ.state.split(/\s+/).filter(Boolean), exit: false, divert, options });
   }
+
+  // Entities taken along from the scene before ("=>") enter first, replaying
+  // the states they were given there, so they keep their image and, where
+  // this scenario has the same anchor, their place.
+  (carried || []).forEach(c => {
+    const states = c.states && c.states.length ? c.states : [''];
+    states.forEach(state => applyEntityOccurrence({ type: 'state', entityId: c.entityId, members: c.members || null, written: c.written, state, divert: null, options: null }));
+  });
 
   // Prose becomes one speech item per uninterrupted run, so its position
   // relative to the dialogs around it survives (they may share a text area).
@@ -3637,6 +3851,8 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
     events.push(currentEvents);
     speeches.push(currentSpeech);
     entityDiverts.push([...activeDiverts.values()]);
+    entityOptions.push([...activeOptions.values()]);
+    stages.push(new Map([...stage].map(([id, e]) => [id, { ...e, states: [...e.states] }])));
     current = [];
     currentEvents = [];
     currentSpeech = [];
@@ -3684,6 +3900,8 @@ function buildScenePlayback(scene, bodyEnd, source, entities) {
     events,
     speeches,
     entityDiverts,
+    entityOptions,
+    stages,
   };
 }
 
@@ -3746,8 +3964,9 @@ function pickEntityImage(assocs, labels) {
 }
 
 // Replays a scene's entity events beat by beat and returns, for each beat, who
-// is on stage: [{ entityId, members, assoc, anchorId, divert }] in order of
-// entry. A divert, once given, stays with the entity until it leaves. An
+// is on stage: [{ entityId, members, assoc, anchorId, divert, options }] in
+// order of entry. A divert or options, once given, stay with the entity until
+// it leaves or is given new ones. An
 // entity's labels are read as a state first (its image) and, of what remains,
 // the first one naming an anchor of the SVG says where it stands. A later
 // mention that says nothing about one of the two keeps what it had —
@@ -3786,6 +4005,7 @@ function foldStageFrames(eventsByBeat, associations, anchorKeys) {
           anchorId: (own && own.anchorId) || g.anchorId,
           labels: g.labels,
           divert: own ? own.divert : null,
+          options: own ? own.options : null,
         });
       });
     });
@@ -3799,7 +4019,7 @@ function foldStageFrames(eventsByBeat, associations, anchorKeys) {
       if (members) members.forEach(m => onStage.delete(m));
       return;
     }
-    const prev = onStage.get(ev.entityId) || { entityId: ev.entityId, members, assoc: null, anchorId: null, labels: [], divert: null };
+    const prev = onStage.get(ev.entityId) || { entityId: ev.entityId, members, assoc: null, anchorId: null, labels: [], divert: null, options: null };
     const pick = pickEntityImage(associations[ev.entityId] || [], ev.labels);
     const restate = !!pick && (pick.score > 0 || !prev.assoc);
     const rest = ev.labels.filter((_, i) => !(restate && pick.used.has(i)));
@@ -3815,14 +4035,16 @@ function foldStageFrames(eventsByBeat, associations, anchorKeys) {
       assoc: restate ? pick.assoc : prev.assoc,
       anchorId,
       labels: restate ? ev.labels : prev.labels, // the labels its image was picked by
-      divert: ev.divert || prev.divert,
+      // a divert or options replace both; a line giving neither keeps them
+      divert: ev.divert || ev.options ? ev.divert : prev.divert,
+      options: ev.divert || ev.options ? ev.options : prev.options,
     });
   }
 
   return eventsByBeat.map(events => {
     events.forEach(ev => {
       if (ev.members && !(associations[ev.entityId] || []).length) {
-        ev.members.forEach(m => apply({ entityId: m, labels: ev.labels, exit: ev.exit, divert: ev.divert }));
+        ev.members.forEach(m => apply({ entityId: m, labels: ev.labels, exit: ev.exit, divert: ev.divert, options: ev.options }));
       } else {
         apply(ev);
       }
@@ -3856,7 +4078,9 @@ function roleSvgId(kind, id) {
 
 // Which special role, if any, a scenario item plays — the same for both items
 // of a pair. `action_proceed` / `action_regress` / `action_N` are buttons; the
-// text area of `action_N` carries the label of choice N.
+// text area of `action_N` carries the label of choice N. `<entity>.action_N`
+// (`Lucinda.action_1`: the entity's name without "@") is the Nth option of
+// that entity, shown while its options are open.
 function actionRole(item) {
   if (item.kind !== 'entity' && item.kind !== 'text') return null;
   const key = idKey(itemRoleId(item));
@@ -3864,18 +4088,30 @@ function actionRole(item) {
   if (key === 'action_regress') return { kind: 'regress' };
   const m = /^action_(\d+)$/.exec(key);
   if (m) return { kind: 'choice', n: parseInt(m[1], 10) };
+  const om = /^(.+)\.action_(\d+)$/.exec(key);
+  if (om) return { kind: 'option', owner: om[1], n: parseInt(om[2], 10) };
   return null;
+}
+
+// The name an entity's options are shown by in a design (`<owner>.action_N`),
+// compared as idKey: the entity without "@", or for a group its first member
+// as written ("@Lucinda + @Jacinto" -> "lucinda"), as group speech falls
+// back to its first member's area.
+function optionOwnerKey(written) {
+  return idKey(String(written).split('+')[0].trim().replace(/^@/, ''));
 }
 
 // Which of the graphic controls a design actually provides, so the Player can
 // fall back to its plain buttons for the ones it lacks (a design without
-// `action_proceed` would otherwise leave nothing to click).
+// `action_proceed` would otherwise leave nothing to click). `options` holds
+// "<owner>.action_N" keys.
 function scenarioActionSlots(design) {
-  const slots = { proceed: false, regress: false, choices: new Set() };
+  const slots = { proceed: false, regress: false, choices: new Set(), options: new Set() };
   design.items.forEach(item => {
     const role = actionRole(item);
     if (!role) return;
     if (role.kind === 'choice') slots.choices.add(role.n);
+    else if (role.kind === 'option') slots.options.add(role.owner + '.action_' + role.n);
     else slots[role.kind] = true;
   });
   return slots;
@@ -4080,16 +4316,20 @@ function layoutBoxes(design, isVisible, keepEmpty = false) {
 // Draws one moment of a scene onto a scenario design, as layers in the
 // design's own z-order. An entity image is drawn where its anchor sits, so it
 // stacks like the anchor does. `ctx`:
-//   frame    [{ entityId, anchorId, url, divert }] — who is on stage now
+//   frame    [{ entityId, anchorId, url, divert, options }] — who is on stage now
 //   speech   Map(svgId -> html) from routeSpeech
 //   diverts  [{ label, target, overlay }] — offered choices, once `atMenu`
 //   canProceed / canRegress / atMenu — which controls are live right now
 //   subscene the scenario of a subscene open over this frame, or null
+//   openOptions { entityId, owner, options } — the entity whose options the
+//            reader opened (clicking or hovering it), or null
 // Returns { layers, subsceneBox } — `subsceneBox` being where that subscene
 // goes (see subsceneBox), or null when the design names no place for it.
 // A layer is { key, type: 'image'|'text', x, y, w, h, ... } with `click`
-// ({ type: 'proceed'|'regress' } or { type: 'divert', divert }) when it is a
-// button: a control, a choice, or an entity carrying a divert.
+// ({ type: 'proceed'|'regress' }, { type: 'divert', divert } or
+// { type: 'options', entityId, options }) when it is a button: a control, a
+// choice, an entity carrying a divert or options, or one of those options
+// (which also has `option: true`).
 // What is shown is settled first, so the layouts can close up around what
 // isn't before anything gets a position.
 function buildPlayerStage(design, ctx) {
@@ -4106,7 +4346,11 @@ function buildPlayerStage(design, ctx) {
     }
     if (item.kind === 'anchor') {
       const here = ctx.frame.filter(f => f.anchorId === item.svgId && f.url)
-        .map(f => ({ key: 'stage:' + f.entityId, type: 'image', url: f.url, entityId: f.entityId, click: f.divert ? { type: 'divert', divert: f.divert } : null }));
+        .map(f => ({
+          key: 'stage:' + f.entityId, type: 'image', url: f.url, entityId: f.entityId,
+          click: f.divert ? { type: 'divert', divert: f.divert }
+            : (f.options && f.options.length ? { type: 'options', entityId: f.entityId, options: f.options } : null),
+        }));
       if (here.length) shown.set(item.svgId, here);
       return;
     }
@@ -4115,6 +4359,12 @@ function buildPlayerStage(design, ctx) {
     if (role) {
       if (role.kind === 'proceed') { if (!ctx.canProceed) return; click = { type: 'proceed' }; }
       else if (role.kind === 'regress') { if (!ctx.canRegress) return; click = { type: 'regress' }; }
+      else if (role.kind === 'option') {
+        const open = ctx.openOptions;
+        choice = open && open.owner === role.owner ? open.options[role.n - 1] : null;
+        if (!choice) return;
+        click = { type: 'divert', divert: choice };
+      }
       else {
         choice = ctx.atMenu ? ctx.diverts[role.n - 1] : null;
         if (!choice) return;
@@ -4128,7 +4378,7 @@ function buildPlayerStage(design, ctx) {
         const area = design.items.find(it => isSpeechArea(it) && idKey(itemRoleId(it)) === key);
         if (!area || !ctx.speech.get(area.svgId)) return;
       }
-      shown.set(item.svgId, [{ key: item.svgId, type: 'image', url: item.url, click }]);
+      shown.set(item.svgId, [{ key: item.svgId, type: 'image', url: item.url, click, option: role && role.kind === 'option' }]);
     } else {
       const style = `font-family:${item.fontFamily};font-size:${item.fontSize}px;color:${item.color};`;
       let html, pre = false, live = false;
@@ -4142,7 +4392,7 @@ function buildPlayerStage(design, ctx) {
         live = true;
       }
       else { html = escH(item.text); pre = true; }
-      shown.set(item.svgId, [{ key: item.svgId, type: 'text', style, html, pre, live, click }]);
+      shown.set(item.svgId, [{ key: item.svgId, type: 'text', style, html, pre, live, click, option: !!role && role.kind === 'option' }]);
     }
   });
   const { boxes, hidden } = layoutBoxes(design, item => shown.has(item.svgId));
@@ -4164,10 +4414,12 @@ function highlightGno(source, entities) {
   const DIVERT_RE = /^(\*\s+)(.+?)(\s*(?:->|~>)\s*)(.+)$/;
   const ENTITY_ARROW_RE = /^(.*?)(\s+(?:->|~>)\s*)(.*)$/;
   const DIALOG_HEAD_RE = /^(\s*--\s*)(.+)$/;
+  const OPTION_HL_RE = /^(\s*\*\s+)(.+?)(\s*(?:->|=>|~>)\s*)(.+)$/;
 
   const blockByLine = new Map();
   const mentionsByLine = new Map();
   const dialogContinuation = new Set();
+  const optionLines = new Set(); // the option lines under an entity line
   entities.occurrences.forEach(occ => {
     if (occ.type === 'mention') {
       if (!mentionsByLine.has(occ.lineStart)) mentionsByLine.set(occ.lineStart, []);
@@ -4176,6 +4428,8 @@ function highlightGno(source, entities) {
       blockByLine.set(occ.lineStart, occ);
       if (occ.type === 'dialog') {
         for (let k = occ.lineStart + 1; k <= occ.lineEnd; k++) dialogContinuation.add(k);
+      } else if (occ.options) {
+        for (let k = occ.lineStart + 1; k <= occ.lineEnd; k++) optionLines.add(k);
       }
     }
   });
@@ -4207,6 +4461,10 @@ function highlightGno(source, entities) {
     }
     if (dialogContinuation.has(idx)) {
       return `<span class="hl-dialog-text">${escH(line)}</span>`;
+    }
+    const opm = optionLines.has(idx) && line.match(OPTION_HL_RE);
+    if (opm) {
+      return `<span class="hl-divert">${escH(opm[1])}${escH(opm[2])}<span class="hl-divert-arrow">${escH(opm[3])}</span>${escH(opm[4])}</span>`;
     }
     if (mentionsByLine.has(idx)) {
       let result = '';
@@ -4301,7 +4559,7 @@ function layoutGraphNodes(scenes) {
     const x = c * (NODE_W + H_GAP) + 24;
     const y = r * (NODE_H + V_GAP) + 24;
     const excerpt = s.body
-      .filter(l => l.trim() && !DIVERT_RE.test(l))
+      .filter(l => l.trim() && !DIVERT_RE.test(l) && !OPTION_RE.test(l))
       .join(' ')
       .replace(/[#*`>]/g, '')
       .trim()
@@ -4797,6 +5055,13 @@ function sanitizeExtraEntities(raw) {
   return out;
 }
 
+// How the Player opens an entity's options: 'click' (the default) or
+// 'hover'. Persisted as `player: { entity_options: … }` in the presentation.
+const ENTITY_OPTIONS_MODES = ['click', 'hover'];
+function sanitizeEntityOptionsMode(raw) {
+  return ENTITY_OPTIONS_MODES.includes(raw) ? raw : 'click';
+}
+
 // Rebuilds one placed item from stored data, or returns null to drop it.
 function sanitizeScenarioItem(it) {
   if (!it || typeof it !== 'object') return null;
@@ -5141,6 +5406,17 @@ createApp({
     // Presentation refers to them by key (entityRefKey).
     const extraEntities = reactive(sanitizeExtraEntities(draft && draft.presentation && draft.presentation.extra_entities));
     const newEntityId = ref('');
+
+    // Narrative-wide Player settings (Presentation → Player), persisted under
+    // `player:`. entityOptionsMode: whether an entity's options open when the
+    // reader clicks it or passes the pointer over it.
+    const entityOptionsMode = ref(sanitizeEntityOptionsMode(draft && draft.presentation && draft.presentation.player && draft.presentation.player.entity_options));
+    function playerSettings() {
+      return { entity_options: entityOptionsMode.value };
+    }
+    function clearPlayerSettings() {
+      entityOptionsMode.value = 'click';
+    }
 
     const imageLibraryIds = computed(() => Object.keys(imageLibraries));
 
@@ -6084,9 +6360,20 @@ createApp({
         .filter(it => it.kind === other && (actionRole(it) || isSpeechRole(it)))
         .map(itemRoleId)
         .filter(id => !used.has(id));
+      // the options of the entities in this scenario's scenes: Lucinda.action_1…
+      const optionIds = [];
+      scenes.value.filter(sc => sc.scenario === openScenario.value).forEach(sc => {
+        const count = new Map();
+        (sc.entityOptions || []).forEach(o => {
+          const owner = String(o.entity).split('+')[0].trim().replace(/^@/, '');
+          count.set(owner, (count.get(owner) || 0) + 1);
+        });
+        count.forEach((n, owner) => { for (let k = 1; k <= n; k++) optionIds.push(`${owner}.action_${k}`); });
+      });
       const list = [
         ...partners,
         nextSeqId(used, 'action_'),
+        ...optionIds,
         'action_proceed',
         'action_regress',
         'speech', '_.speech', 'entity.speech',
@@ -6298,6 +6585,7 @@ createApp({
         image_libraries: { ...imageLibraries },
         entities: { ...entityAssociations },
         extra_entities: [...extraEntities],
+        player: playerSettings(),
         scenarios: scenarioFileMap(),
       }, { lineWidth: -1 });
     }
@@ -6325,6 +6613,7 @@ createApp({
         image_libraries: data && data.image_libraries,
         entities: data && data.entities,
         extra_entities: data && data.extra_entities,
+        player: data && data.player,
         scenario_designs: designs,
       };
     }
@@ -6336,6 +6625,7 @@ createApp({
       clearNodeMeta();
       clearImageLibraries();
       clearEntitySetup();
+      clearPlayerSettings();
       clearScenarioDesigns();
       Object.assign(nodeMeta, sanitizeNodeMeta(bundle.layout));
       const p = bundle.presentation || {};
@@ -6345,6 +6635,7 @@ createApp({
       });
       Object.assign(entityAssociations, sanitizeEntityAssociations(p.entities));
       extraEntities.push(...sanitizeExtraEntities(p.extra_entities));
+      entityOptionsMode.value = sanitizeEntityOptionsMode(p.player && p.player.entity_options);
       Object.assign(scenarioDesigns, sanitizeScenarioDesigns(p.scenario_designs));
       resetPlayerProgress();
     }
@@ -6574,7 +6865,7 @@ createApp({
       playerFrameList().forEach((fr, i) => {
         const scene = scenesWithBounds.value.find(s => s.id === fr.sceneId) || (i === 0 ? startScene.value : null);
         if (!scene) return;
-        const playback = buildScenePlayback(scene, scene.bodyEnd, source.value, entities.value);
+        const playback = buildScenePlayback(scene, scene.bodyEnd, source.value, entities.value, fr.carried);
         const d = scenarioDesigns[scene.scenario];
         const design = d && (d.background || d.items.length) ? d : null;
         let stageFrames = [];
@@ -6617,7 +6908,7 @@ createApp({
 
     const playerPlayback = computed(() => (playerTopFrame.value
       ? playerTopFrame.value.playback
-      : { beatsHtml: [], rosters: [], events: [], speeches: [], entityDiverts: [] }));
+      : { beatsHtml: [], rosters: [], events: [], speeches: [], entityDiverts: [], entityOptions: [], stages: [] }));
     const playerBeats = computed(() => playerPlayback.value.beatsHtml);
 
     // Only the current beat is shown — each pause clears the screen rather
@@ -6666,11 +6957,71 @@ createApp({
       const top = playerTopFrame.value;
       return playerUseGraphic.value && top && top.design
         ? scenarioActionSlots(top.design)
-        : { proceed: false, regress: false, choices: new Set() };
+        : { proceed: false, regress: false, choices: new Set(), options: new Set() };
     });
 
-    // `subscene`: the scenario of the subscene open over this frame, if any.
-    function frameStage(fr, subscene) {
+    /* ── Player: entity options ──
+       An entity with options ("  * Label -> Target" under its line) shows
+       them when the reader clicks it or, as the narrative's presentation
+       says (Presentation → Player), passes the pointer over it. Only one
+       entity's options are open at a time, and only in the top frame; they
+       close at any move to another beat or scene. `playerOpenOptions` is
+       { key, entityId, owner, options }, `key` naming the moment it was
+       opened at, so it is ignored once that moment is gone. */
+    const playerOpenOptions = ref(null);
+    let optionsCloseTimer = null;
+    const playerMomentKey = computed(() => {
+      const top = playerTopFrame.value;
+      return top ? `${top.depth}:${top.scene.id}:${top.beat}` : '';
+    });
+    const playerActiveOptions = computed(() => {
+      const o = playerOpenOptions.value;
+      return o && o.key === playerMomentKey.value ? o : null;
+    });
+    function cancelOptionsClose() {
+      if (optionsCloseTimer) { clearTimeout(optionsCloseTimer); optionsCloseTimer = null; }
+    }
+    function closeEntityOptions() {
+      cancelOptionsClose();
+      playerOpenOptions.value = null;
+    }
+    function openEntityOptions(entityId, options) {
+      cancelOptionsClose();
+      if (!options || !options.length) return;
+      playerOpenOptions.value = { key: playerMomentKey.value, entityId, owner: optionOwnerKey(options[0].entity), options };
+    }
+    // In hover mode a click only opens (the pointer already did, and on a
+    // touch screen the tap is the only way in), so it never closes them.
+    function toggleEntityOptions(entityId, options) {
+      const open = playerActiveOptions.value;
+      if (open && open.entityId === entityId && !playerOptionsOnHover.value) closeEntityOptions();
+      else openEntityOptions(entityId, options);
+    }
+    // Hover mode: the pointer opens an entity's options on entering it, and
+    // they stay open while it moves on to them (the options, or the Player's
+    // own buttons for them); leaving both closes them after a short grace.
+    const playerOptionsOnHover = computed(() => entityOptionsMode.value === 'hover');
+    function onOptionsHoverEnter(entityId, options) {
+      if (!playerOptionsOnHover.value) return;
+      if (options) openEntityOptions(entityId, options);
+      else cancelOptionsClose();
+    }
+    function onOptionsHoverLeave() {
+      if (!playerOptionsOnHover.value) return;
+      cancelOptionsClose();
+      optionsCloseTimer = setTimeout(() => { optionsCloseTimer = null; playerOpenOptions.value = null; }, 350);
+    }
+    function onStageLayerEnter(layer) {
+      if (layer.click && layer.click.type === 'options') onOptionsHoverEnter(layer.click.entityId, layer.click.options);
+      else if (layer.option) onOptionsHoverEnter(null, null);
+    }
+    function onStageLayerLeave(layer) {
+      if ((layer.click && layer.click.type === 'options') || layer.option) onOptionsHoverLeave();
+    }
+
+    // `subscene`: the scenario of the subscene open over this frame, if any;
+    // `openOptions`: the entity options open in it (the top frame only).
+    function frameStage(fr, subscene, openOptions = null) {
       const design = fr.design;
       const frame = (fr.stageFrames[fr.beat] || []).map(f => {
         const img = f.assoc && findCatalogImage(f.assoc.library, f.assoc.image);
@@ -6684,6 +7035,7 @@ createApp({
         canProceed: !fr.atMenu,
         canRegress: fr.depth > 0 || fr.beat > 0,
         subscene,
+        openOptions,
       });
     }
 
@@ -6698,7 +7050,7 @@ createApp({
       let parent = null; // { abs: {x, y, scale}, w, h, place }
       const frames = all.map((fr, i) => {
         const next = all[i + 1];
-        const stage = fr.design ? frameStage(fr, next ? next.scene.scenario : null) : { layers: [], subsceneBox: null };
+        const stage = fr.design ? frameStage(fr, next ? next.scene.scenario : null, next ? null : playerActiveOptions.value) : { layers: [], subsceneBox: null };
         const local = parent
           ? subsceneBox(fr.design, parent.w, parent.h, parent.place)
           : { x: 0, y: 0, w: base.width, h: base.height, scale: 1 };
@@ -6746,8 +7098,37 @@ createApp({
       return list.filter(d => !drawn.has(d.entityId));
     });
 
+    // Entities of the top frame with options and nothing on the stage to
+    // click: every one in the text view, and in the graphic one those not
+    // drawn. Each is a button opening its options, listed under it.
+    const playerEntityOptionButtons = computed(() => {
+      const top = playerTopFrame.value;
+      if (!top) return [];
+      const list = top.playback.entityOptions[top.beat] || [];
+      const stage = playerStage.value;
+      if (!stage) return list;
+      const topLayers = stage.frames[stage.frames.length - 1].layers;
+      const drawn = new Set(topLayers.filter(l => l.entityId && l.click).map(l => l.entityId));
+      return list.filter(e => !drawn.has(e.entityId));
+    });
+    // The open options of an entity drawn on the stage that the design has no
+    // `<owner>.action_N` for: the Player's own buttons stand in for them.
+    const playerStageOptionFallbacks = computed(() => {
+      const open = playerActiveOptions.value;
+      const stage = playerStage.value;
+      if (!open || !stage) return [];
+      const topLayers = stage.frames[stage.frames.length - 1].layers;
+      if (!topLayers.some(l => l.entityId === open.entityId && l.click)) return [];
+      const slots = playerActionSlots.value.options;
+      return open.options.filter(o => !slots.has(open.owner + '.action_' + o.n));
+    });
+
     // Whether some entity on stage offers a way out, drawn or not.
-    const playerHasEntityDiverts = computed(() => (playerPlayback.value.entityDiverts[playerRevealCount.value - 1] || []).length > 0);
+    const playerHasEntityDiverts = computed(() => {
+      const beat = playerRevealCount.value - 1;
+      return (playerPlayback.value.entityDiverts[beat] || []).length > 0
+        || (playerPlayback.value.entityOptions[beat] || []).length > 0;
+    });
 
     function initPlayer() {
       const s = startScene.value;
@@ -6770,18 +7151,29 @@ createApp({
 
     function onStageClick(click) {
       if (!click) return;
+      if (click.type === 'options') { toggleEntityOptions(click.entityId, click.options); return; }
+      closeEntityOptions();
       if (click.type === 'proceed') playerAdvance();
       else if (click.type === 'regress') playerRegress();
       else if (click.type === 'divert') playerDivert(click.divert);
     }
 
-    // Takes a divert ({ target, overlay }): a subscene opens over the current
-    // scene; any other divert leaves for its target, closing open subscenes.
+    // Takes a divert ({ target, overlay, carry }): a subscene opens over the
+    // current scene; any other divert leaves for its target, closing open
+    // subscenes. An option with "=>" (`carry`) takes its entity along: it is
+    // on stage in the target from the start, with the states it had here.
     function playerDivert(divert) {
       const target = scenesWithBounds.value.find(s => s.title.toLowerCase() === divert.target.toLowerCase());
       if (!target) return;
+      closeEntityOptions();
+      const top = playerTopFrame.value;
       ensurePlayerStack();
       const frame = { sceneId: target.id, reveal: 1 };
+      if (divert.carry && divert.entityId) {
+        const here = top && top.playback.stages[top.beat];
+        const entry = here && here.get(divert.entityId);
+        frame.carried = [entry || { entityId: divert.entityId, members: null, written: divert.entity || divert.entityId, states: [] }];
+      }
       if (divert.overlay) playerStack.value.push(frame);
       else playerStack.value = [frame];
     }
@@ -7049,6 +7441,7 @@ Write your scene description here.
           image_libraries: { ...imageLibraries },
           entities: { ...entityAssociations },
           extra_entities: [...extraEntities],
+          player: playerSettings(),
           scenario_designs: { ...scenarioDesigns },
         },
         savedAt: Date.now(),
@@ -7090,6 +7483,7 @@ Write your scene description here.
       clearNodeMeta();
       clearImageLibraries();
       clearEntitySetup();
+      clearPlayerSettings();
       clearScenarioDesigns();
       resetPlayerProgress();
     }
@@ -7109,6 +7503,7 @@ Write your scene description here.
       clearNodeMeta();
       clearImageLibraries();
       clearEntitySetup();
+      clearPlayerSettings();
       clearScenarioDesigns();
       resetPlayerProgress();
     }
@@ -7129,6 +7524,7 @@ Write your scene description here.
             image_libraries: { ...imageLibraries },
             entities: { ...entityAssociations },
             extra_entities: [...extraEntities],
+            player: playerSettings(),
             scenario_designs: { ...scenarioDesigns },
           },
           savedAt: Date.now(),
@@ -7136,7 +7532,7 @@ Write your scene description here.
       } catch (e) { /* storage unavailable/full — draft recovery is best-effort */ }
     }
     let autosaveTimer = null;
-    watch([source, filename, loadedNarrativeName, nodeMeta, imageLibraries, entityAssociations, extraEntities, scenarioDesigns], () => {
+    watch([source, filename, loadedNarrativeName, nodeMeta, imageLibraries, entityAssociations, extraEntities, entityOptionsMode, scenarioDesigns], () => {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       autosaveTimer = setTimeout(saveCurrentDraft, 600);
     });
@@ -7164,6 +7560,8 @@ Write your scene description here.
       playerEntityRoster, playerInSubscene, playerTextFrames,
       playerGraphic, playerDesign, playerUseGraphic, playerStage, playerShowContinueButton, playerShowBackButton, playerMenuDiverts,
       playerEntityDivertButtons, playerHasEntityDiverts, onStageClick,
+      playerEntityOptionButtons, playerStageOptionFallbacks, playerActiveOptions, toggleEntityOptions,
+      onOptionsHoverEnter, onOptionsHoverLeave, onStageLayerEnter, onStageLayerLeave, entityOptionsMode,
       playerAdvance, playerRegress, playerDivert, playerRestart,
       scrollToScene, newScene, renameScene,
       onEditorScroll, onEditorInput,

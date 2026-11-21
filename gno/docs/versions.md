@@ -30,6 +30,15 @@ Newest version first.
   (`@entity ~> Scene`). Going back (`action_regress`) closes the subscene; a
   `->` divert taken inside a subscene closes every open subscene. *Choices
   with `~>` were plain text in version 1; they are listed to check.*
+- **Entity options** (new): choices indented (two spaces or more, or a tab)
+  on the lines right under a standalone entity line are that entity's
+  options, offered while it is on stage, when the reader clicks it or points
+  at it, instead of at the scene's end. Diverts are now scene-centric (the
+  choices) or entity-centric (entity diverts and options). An option can
+  also use `=>`, which goes to the target taking the entity along, on stage
+  there from the start with the states it had. A later options block, or an
+  entity divert, replaces an entity's options. *Indented choices under an
+  entity line were text in version 1; they are listed to check.*
 
 ### Presentation format
 
@@ -38,6 +47,14 @@ Newest version first.
   fitted into. A text area or an anchor is an invisible box; an entity with
   the same ID is a frame shown only while the subscene is open. *Items
   already named so are listed to check.*
+- **Entity option IDs** (new role IDs): `<entity>.action_N`, the entity's
+  name without `@` (`Lucinda.action_1`, text area `Lucinda.action_1_text`),
+  shows the entity's Nth option while its options are open; a group's
+  options use its first member as written. *Items already named so are
+  listed to check.*
+- **Player settings** (new `player` key in the presentation YAML):
+  `entity_options: click | hover`, how the reader opens an entity's options;
+  `click` when absent. *Nothing to convert.*
 - **Text area IDs always end in `_text`** in the scenario designs. Version 1
   also read text areas named without it (`speech`, `action_N_label`) and
   renamed them as it opened them; 1.1 reads only the suffixed form.

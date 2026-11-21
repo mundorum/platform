@@ -81,8 +81,9 @@ mentions substituted into styled spans first).
 A node-per-scene diagram. `layoutGraphNodes` auto-arranges scenes into
 left-to-right topological columns (BFS from root scenes, orphans handled
 separately); `layoutGraphEdges` draws cubic-bezier divert arrows between
-nodes based on their *final* rendered position (`sceneDiverts`: choices and
-entity diverts; a subscene divert, `~>`, is drawn dotted instead of dashed).
+nodes based on their *final* rendered position (`sceneDiverts`: choices,
+entity diverts and entity options; a subscene divert, `~>`, is drawn dotted
+instead of dashed).
 Nodes can be dragged anywhere, including above or left of the origin (the
 canvas and its arrow layer don't clip, so there is no lower bound); a
 dragged position, a chosen color, and a free-text annotation are stored per
@@ -97,7 +98,7 @@ keep the view usable; the toolbar's *Fit* button (`fitView`) zooms and pans
 so every node is in view, which is also how to find nodes dragged far away.
 
 ### Presentation
-Three sub-tabs building the visual/staging layer on top of the narrative,
+Four sub-tabs building the visual/staging layer on top of the narrative,
 all persisted together as `_presentation.yaml`:
 - **Image Libraries** — external image catalogs registered by URL. A
   catalog can be gnō's own simple list (`gno-catalog.yaml`, or its restricted
@@ -236,6 +237,10 @@ all persisted together as `_presentation.yaml`:
     hiding the app's top bar, navigation and the 900px page column. Esc (or
     the same button) leaves it. It is a layout switch only — the canvas is
     still shown at 1:1, so a large background scrolls inside it.
+- **Player** — narrative-wide Player settings (`player:` in
+  `_presentation.yaml`). For now one: `entityOptionsMode`
+  (`entity_options: click | hover`, `sanitizeEntityOptionsMode`), how the
+  reader opens an entity's options.
 
 ### Player
 Steps through the narrative as a reader would. `buildScenePlayback` splits
@@ -245,9 +250,22 @@ only diverts follow). Alongside beats it tracks which entities are "on
 stage" — present since first mention, carrying their last-given state,
 until an explicit `@entity =>` exit or the scene ends — rendered in a
 separate panel independent of the narrative text itself. It also lists, per
-beat, the entity diverts on stage (`entityDiverts`).
+beat, the entity diverts on stage (`entityDiverts`), the entity options on
+stage (`entityOptions`; an entity has either a divert or options, the latest
+line giving one replaces both) and, for carrying, every entity on stage with
+the states given to it since it entered (`stages`).
 
-The reader's place is a stack of frames, `playerStack` (`{ sceneId, reveal }`):
+Entity options open one entity at a time in the top frame
+(`playerOpenOptions`, keyed by the moment it was opened at, so a move to
+another beat or scene closes it; `playerActiveOptions` is the live value).
+`onStageClick` toggles them (in hover mode a click only opens), and in hover
+mode `onStageLayerEnter`/`onStageLayerLeave` open them on the entity and keep
+them open over the options, closing after a short grace. An option with `=>`
+(`carry`) makes `playerDivert` put the entity's `stages` entry in the new
+frame's `carried`; `buildScenePlayback` replays those states before the
+scene's first line, so the entity is on stage from the first beat.
+
+The reader's place is a stack of frames, `playerStack` (`{ sceneId, reveal, carried? }`):
 the scene being played at the bottom, then any subscene opened over it with
 `~>` (`playerDivert` pushes; a `->` divert replaces the whole stack;
 `playerRegress` pops a subscene, or steps back a beat at the bottom). Only the
@@ -279,7 +297,10 @@ area has speech, and both items of an `action_*` pair follow `actionRole`) →
 which items are hidden), then runs `layoutBoxes` so stacks close up around
 the hidden items, and finally emits drawable layers in the design's z-order,
 with `action_*` items, and entities carrying a divert, turned into click
-targets (`{ type: 'divert', divert }` for both kinds of divert). Entity images come
+targets (`{ type: 'divert', divert }` for both kinds of divert). An entity
+with options gets `{ type: 'options', … }`, and the `<owner>.action_N`
+items (`actionRole` kind `option`, owner by `optionOwnerKey`) are shown only
+for the entity in `ctx.openOptions`. Entity images come
 from the live library catalogs (`findCatalogImage`), not from anything stored
 in the design, so an entity is drawn only once its catalog has loaded. The
 Vue template binds the SVG's `viewBox` through `v-bind="{viewBox: …}"`
@@ -330,7 +351,7 @@ hold no version. The protocol for changing versions is in
 
 Every way in goes through one path: decode into a *package*
 `{ source, layout, presentation: { image_libraries, entities,
-extra_entities, scenario_designs } }` (a zip via `readZipPackage`,
+extra_entities, player, scenario_designs } }` (a zip via `readZipPackage`,
 `decodeLayoutYaml` and `decodePresentationYaml`; a save or the draft is
 already one), bring it to `GNO_VERSION` with `upgradeBundle`, then
 `applyBundle` swaps it into the live state. `manifestVersion` reads the
@@ -359,11 +380,14 @@ independent and re-run reactively as the user types:
    `end`), extracting each scene's body, its choices
    (`* Label -> Target`, or `~>` for a subscene) and its entity diverts
    (`@door -> Target`, matched by `ENTITY_DIVERT_RE`; lines of a dialog's
-   text are skipped). Choices and entity diverts are separate lists because
-   `action_N` numbers the choices only.
+   text are skipped), and its entity options (`OPTION_RE` lines right under a
+   standalone entity line, `ENTITY_LINE_RE`). Choices, entity diverts and
+   entity options are separate lists because `action_N` numbers the choices
+   only.
 2. `analyzeEntities(source)` — regex-based detection of the three `@entity`
    forms (standalone, dialog-leading, inline), using Unicode letter/number
-   classes so accented ids are matched in full.
+   classes so accented ids are matched in full. A standalone occurrence takes
+   the option lines under it as `options`, its `lineEnd` covering them.
 3. `renderGno(source, scenes, entities)` — produces the live preview HTML,
    substituting scene headings/diverts/entity mentions with styled spans
    before handing the rest of each line to `marked`.

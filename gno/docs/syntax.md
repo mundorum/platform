@@ -17,7 +17,7 @@ line to Markdown.
 - [Scene](#scene): [scene heading](#scene-heading), [start and end markers](#start-and-end-markers)
 - [Scene content](#scene-content): [text](#text), [pause](#pause)
 - [Entities](#entities): [entity reference](#entity-reference), [group](#group), [standalone entity](#standalone-entity), [exit](#exit), [inline mention](#inline-mention), [dialog](#dialog)
-- [Diverts](#diverts): [arrows](#arrows), [choice](#choice), [entity divert](#entity-divert)
+- [Diverts](#diverts): [arrows](#arrows), [choice](#choice), [entity divert](#entity-divert), [entity options](#entity-options)
 - [How a line is read](#how-a-line-is-read)
 - [Grammar at a glance](#grammar-at-a-glance)
 - [Complete example](#complete-example)
@@ -160,8 +160,8 @@ marker = "(*)" | "(**)"
 ## Scene content
 
 ```text
-scene-line = choice | pause | dialog | entity-divert | entity-line | exit
-           | text-line | <blank line>
+scene-line = choice | pause | dialog | entity-divert | entity-options
+           | entity-line | exit | text-line | <blank line>
              ▸ -- @Lucinda: Hey doctor, you must come here.
 ```
 
@@ -391,10 +391,18 @@ spans two lines and is shown as one paragraph.
 
 ## Diverts
 
-Diverts are transitions from the current scene to another. There are two
-kinds: [choices](#choice), offered to the reader at the end of the scene,
-and [entity diverts](#entity-divert), taken by clicking an entity while it
-is on stage. Both are written with an arrow followed by the target scene.
+Diverts are transitions from the current scene to another. They are of two
+kinds:
+
+- **Scene-centric**: the [choices](#choice), offered to the reader at the
+  end of the scene.
+- **Entity-centric**: diverts tied to an entity and offered while it is on
+  stage, at any point of the scene: an [entity divert](#entity-divert), a
+  single divert taken by clicking the entity, or the entity's
+  [options](#entity-options), several diverts the entity shows when the
+  reader clicks it or points at it.
+
+All are written with an arrow followed by the target scene.
 
 ### Arrows
 
@@ -415,7 +423,9 @@ target = <the title of a scene>
   was left. A subscene can open further subscenes.
 - The target is the title of a scene, compared ignoring case (see
   [Scene heading](#scene-heading)).
-- `=>` is not an arrow: it is an [exit](#exit).
+- [Entity options](#entity-options) have a third arrow, `=>`, which goes to
+  the target taking the entity along. After an entity, `=>` is an
+  [exit](#exit).
 
 ### Choice
 
@@ -464,6 +474,9 @@ entity-divert = entity { " " state-word } " " arrow target
 - The entity keeps its divert through later mentions, until it exits or the
   scene ends.
 - Entity diverts are not numbered among the choices.
+- An entity has either a divert or [options](#entity-options): an entity
+  divert replaces the options the entity had, and options given later
+  replace its divert.
 - Where the entity has no image to click (the text Player, or an entity not
   drawn), the Player shows a button for it.
 
@@ -473,6 +486,63 @@ entity-divert = entity { " " state-word } " " arrow target
 @door -> Corridor
 ```
 
+### Entity options
+
+Entity options are several diverts offered by an entity: choices written
+below a [standalone entity](#standalone-entity) line, indented. While the
+entity is on stage, at any point of the scene, the reader opens its
+options, by clicking the entity or by passing the pointer over it as the
+narrative's presentation says (**Presentation → Player**), and picks one.
+
+```text
+entity-options = entity-line option { option }
+                 ▸ @Lucinda left concerned
+                     * Follow Lucinda => Examination Room
+option         = indent "*" " " label option-arrow target
+                 ▸   * Ask for the chart ~> Triage Notes
+indent         = "  " { " " } | <a tab>
+                 ▸ (two spaces)
+option-arrow   = arrow | "=>"
+                 ▸ =>
+```
+
+- The options are the lines right after the entity line, each indented by
+  two spaces or more, or a tab. The first line that is not an option (a
+  blank line included) ends them.
+- Only a standalone entity line takes options, with or without state words.
+  An indented choice under an [entity divert](#entity-divert), an
+  [exit](#exit), a [dialog](#dialog) (where it is part of the speech) or any
+  other line is not an option: it is Markdown, a nested list item.
+- `->` and `~>` work as for any divert. `=>` goes to the target, as `->`
+  does, and **takes the entity along**: it is on stage in the target scene
+  from its start, with the states it had, so it keeps its image and, if the
+  target's scenario has an anchor of the same name, its place.
+- `=>` is for options only: a choice of the scene has no entity to take
+  along.
+- The entity keeps its options through later mentions, until it exits or the
+  scene ends. A later options block for the same entity replaces them, and
+  so does an entity divert (see [Entity divert](#entity-divert)).
+- The options are numbered from 1 under each entity, in the order written
+  (in graphic play, option N of `@Lucinda` is shown by `Lucinda.action_N`;
+  see the [scenario SVG reference](scenario-svg.md#controls)). They are not
+  numbered among the choices.
+- Where the entity has no image (the text Player, or an entity not drawn),
+  the Player shows a button for it, which opens its options.
+
+```gno
+@Lucinda left concerned
+  * Follow Lucinda => Examination Room
+  * Ask for the chart ~> Triage Notes
+
+@door
+  * Open it -> Corridor
+  * Knock -> Waiting Room
+```
+
+The reader can follow Lucinda, which takes her to `Examination Room`, or
+open the chart over the scene. A later `@door` block would replace the
+door's two options.
+
 ## How a line is read
 
 A line could sometimes fit more than one structure. The editor reads each
@@ -481,14 +551,18 @@ line of a scene as the first of these that fits:
 | # | The line is | Read as |
 |---|---|---|
 | 1 | a heading (`#` to `######`) with a colon | [scene heading](#scene-heading) |
-| 2 | `*`, a space, a label, an arrow and a target | [choice](#choice) |
-| 3 | blank | end of a dialog's speech; paragraph break |
-| 4 | only `--` | [pause](#pause) |
-| 5 | `--` followed by an entity | [dialog](#dialog), with the speech lines after it |
-| 6 | an entity, state words, a space, an arrow and a target | [entity divert](#entity-divert) |
-| 7 | an entity followed by `=>` | [exit](#exit) |
-| 8 | an entity followed only by words without `:` or `@` | [standalone entity](#standalone-entity) |
-| 9 | anything else | [text](#text), with its `@` entities as [inline mentions](#inline-mention) (not on lines starting with `*`) |
+| 2 | indented, then `*`, a space, a label, an arrow (or `=>`) and a target, right after a standalone entity line or one of its options | [entity option](#entity-options) |
+| 3 | `*`, a space, a label, an arrow and a target | [choice](#choice) |
+| 4 | blank | end of a dialog's speech; paragraph break |
+| 5 | only `--` | [pause](#pause) |
+| 6 | `--` followed by an entity | [dialog](#dialog), with the speech lines after it |
+| 7 | an entity, state words, a space, an arrow and a target | [entity divert](#entity-divert) |
+| 8 | an entity followed by `=>` | [exit](#exit) |
+| 9 | an entity followed only by words without `:` or `@` | [standalone entity](#standalone-entity), with the option lines after it |
+| 10 | anything else | [text](#text), with its `@` entities as [inline mentions](#inline-mention) (not on lines starting with `*`) |
+
+A line of a dialog's speech is read as speech, never as an option, even
+when it is indented and has an arrow.
 
 ## Grammar at a glance
 
@@ -502,8 +576,8 @@ title         = <text without ":">
 scenario      = <text>
 marker        = "(*)" | "(**)"
 
-scene-line    = choice | pause | dialog | entity-divert | entity-line | exit
-              | text-line | <blank line>
+scene-line    = choice | pause | dialog | entity-divert | entity-options
+              | entity-line | exit | text-line | <blank line>
 
 text-line     = <a Markdown line that is no other gnō structure>
 pause         = "--"
@@ -525,6 +599,10 @@ target        = <the title of a scene>
 choice        = "*" " " label arrow target
 label         = <text without an arrow>
 entity-divert = entity { " " state-word } " " arrow target
+entity-options = entity-line option { option }
+option        = indent "*" " " label option-arrow target
+indent        = "  " { " " } | <a tab>
+option-arrow  = arrow | "=>"
 ```
 
 | Symbol | Where | Meaning |
@@ -539,7 +617,9 @@ entity-divert = entity { " " state-word } " " arrow target
 | `=>` | after an entity | exit |
 | `->` | before a target | divert: go to the scene |
 | `~>` | before a target | divert: open the scene as a subscene |
+| `=>` | before a target, in an entity option | divert: go to the scene, taking the entity along |
 | `*` | start of a line with an arrow | choice |
+| `*` | indented, under a standalone entity line | entity option |
 
 ## Complete example
 
@@ -554,6 +634,8 @@ The waiting room is crowded and noisy. In a corner, a man,
 --
 
 @Lucinda left concerned
+  * Follow Lucinda => Examination Room
+  * Ask Lucinda for the chart ~> Triage Notes
 
 -- @Lucinda left concerned: Hey doctor, you must come here.
 -- @patient right pale: I... I don't feel well.

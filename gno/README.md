@@ -33,7 +33,12 @@ Inside a scene, one can write a Markdown text, that will be presented inside the
 
 ## Diverts
 
-Diverts are transitions from the current scene to another. A divert offered as a choice starts with a markdown bullet (asterisk) followed by a transition label, an arrow (`->`) and the target scene. Example:
+Diverts are transitions from the current scene to another. They come in two kinds:
+
+- **Scene-centric:** the scene's *choices*, offered at the end of the scene.
+- **Entity-centric:** diverts tied to an entity, offered while that entity is on stage: an *entity divert* (one divert, taken by clicking the entity) or the entity's *options* (several diverts, which the entity shows).
+
+A divert offered as a choice starts with a markdown bullet (asterisk) followed by a transition label, an arrow (`->`) and the target scene. Example:
 
 ~~~gno
 * Label -> Target Scene
@@ -49,6 +54,24 @@ An entity can carry a divert too: a standalone entity line (see [Entities](#enti
 ~~~
 
 The entity enters the scene as any standalone mention would, and from then on, while it is on stage, it can be clicked to take the divert, at any point of the scene rather than only at its end. It keeps the divert through later mentions until it leaves the scene. In the graphic Player its image becomes clickable; where there is no image to click (the text Player, or an entity not drawn), the Player shows a button for it instead. The arrow needs a space before it, since `-` may be part of an entity id.
+
+### Entity options
+
+An entity can offer several diverts, its *options*: choices written below a standalone entity line, indented by two spaces or more (or a tab), on the lines right after it:
+
+~~~gno
+@princess right worried
+  * Walk back with the princess => The Council Chamber
+  * Look at her sketches ~> The Sketchbook
+  * Leave her alone -> The Old Forest
+~~~
+
+While the entity is on stage, at any point of the scene, the reader opens its options by clicking the entity or by passing the pointer over it, as set in **Presentation → Player**, and picks one. Besides `->` and `~>`, an option can use `=>`: it goes to the target, as `->` does, and takes the entity along. The entity is on stage in the target scene from its start, with the states it had (so its image and, if the target's scenario has an anchor of the same name, its place).
+
+- The entity keeps its options through later mentions until it leaves the scene. A later options block for the same entity replaces them. An entity has either a divert or options: an entity divert given later replaces its options, and options given later replace its divert.
+- Options are numbered from 1 under each entity, in the order written (in graphic play, option N of `@princess` is shown by `princess.action_N`). They are not numbered among the scene's choices.
+- Only a standalone entity line (with or without state words) takes options; an entity divert, an exit or a dialog doesn't. An indented choice anywhere else is plain Markdown (a nested list item).
+- In the text Player, and for an entity not drawn on the stage, the Player shows a button for the entity, which opens its options below it.
 
 ### Subscenes
 
@@ -248,7 +271,7 @@ When the current scene's scenario has a design in **Presentation → Scenarios**
 1. *State → image.* The label sets defined for the entity in **Presentation → Entity** are compared with the labels written after it, and the image sharing the most labels is used. On a tie, the first one defined wins. Given `@king happy left` and images labeled `happy` and `sad`, the `happy` image is used, since `left` isn't one of its labels. A label made of several words (`very happy`) must appear as such. If no label matches (or none is written), the entity's image with no labels is used; if every image has labels, the first one defined is used.
 2. *Label → anchor.* Of the labels that weren't used as a state, the first one that names an anchor ID in the SVG says where the entity stands; its image is fitted into that anchor's box. An entity with no anchor label (and none from before) isn't drawn.
 
-Later mentions update what they say something about: `@king sad` changes the image and keeps the position, `@king right` moves the king and keeps the image. `@king =>` removes the entity. An entity carrying a divert (`@door -> The Garden`) is clickable while on stage and takes the divert. Labels, anchor IDs and text-area IDs are compared ignoring case and accents.
+Later mentions update what they say something about: `@king sad` changes the image and keeps the position, `@king right` moves the king and keeps the image. `@king =>` removes the entity. An entity carrying a divert (`@door -> The Garden`) is clickable while on stage and takes the divert. An entity with options is clickable (or, in hover mode, reacts to the pointer) and opens them. Labels, anchor IDs and text-area IDs are compared ignoring case and accents.
 
 **Groups.** Entities joined in **Presentation → Entity**, by typing them with `+` in *Add entity* (for example `@king + @queen`, or `@king + @queen + @jester` for more), can have images of their own, which are used only where the narrative writes the members joined, in any order (`@king + @queen right` or `@queen + @king right`). The Presentation tab shows a group with its members in the order they were typed. Their labels work as for a single entity. While the group is on stage, it is drawn as one image and the members' own images are hidden. The group stands at the anchor it names; if it names none, it stands where its first placed member already is. `@king + @queen =>` removes the group together with its members.
 
@@ -278,6 +301,9 @@ When dialogs share a `speech` area (and, always, for a group) they are prefixed 
 | `action_proceed` | Visible and clickable while the scene is paused; continues. A text area shows its own text ("Continue"). |
 | `action_regress` | Visible and clickable once past the first beat; steps back to the previous beat. In a subscene it is always visible and closes the subscene. A text area shows its own text. |
 | `action_N` | Choice N (the Nth `* Label -> Target` or `* Label ~> Target` of the scene); clickable while the choices are on offer, goes to its target (or opens it as a subscene). A text area is filled with the choice's label. |
+| `<entity>.action_N` | Option N of that entity (its name without `@`: `princess.action_1`); visible and clickable while the reader has the entity's options open, takes the option. A text area is filled with the option's label. A group's options use its first member as written (`@Lucinda + @Jacinto` → `Lucinda.action_N`). |
+
+The ID of a pair, not the group or stack it sits in, gives it its role: `action_1` and `action_1_text` are both choice 1, both shown only while it is on offer and both clickable. Putting a pair in an item group (see below) only keeps the two together: they move as one in a stack, and the group, hidden with them, takes no room.
 
 **Stacks.** Items can be put into *stacks*, which place them the way a CSS flexbox does: a vertical stack lines its items up top to bottom, a horizontal one left to right, and stacks can contain other stacks. Each item keeps its own size, and the stack decides its position from three settings: where the run sits along the direction (start, center, end or spread out), how each item is aligned across it, and the gap between items. Items hidden at the current pause take no room, so the rest close up. A stack with nothing visible is hidden as well. Hidden items are an empty speech area, a choice not on offer, an inactive control, or an anchor with no one on it. For example, a vertical stack aligned to the bottom, holding the `speech` text area and then the `action_N` text areas, shows the speech right at the bottom while there are no choices, and moves it up above them when the choices appear.
 
@@ -290,7 +316,7 @@ Items go into a stack or group in either of two ways in **Presentation → Scena
 
 In the hierarchy, the arrows on a row move it up or down among its neighbours: at the top level and in a group that changes the drawing order (higher rows are behind lower ones), in a stack the placing order. The trash button on a row deletes that item, and the one at the top deletes all the selected items; deleting a group or stack keeps the items it held, which take its place.
 
-Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without an `action_N` entity or text area, a button for each entity divert whose entity isn't drawn), so a scene can never get stuck; `Space` always continues.
+Controls that don't apply right now are hidden. If the design lacks a control, the Player's regular button stands in for it (a continue button without `action_proceed`, a choice button for each choice without an `action_N` entity or text area, a button for each entity divert whose entity isn't drawn, a button for each entity with options that isn't drawn, and, while an entity's options are open, a button for each option without a `<entity>.action_N` item), so a scene can never get stuck; `Space` always continues. Option buttons appear below the stage, away from the entity, so a design without `<entity>.action_N` items plays better with options opened by a click.
 
 **Subscenes.** A subscene (`~>`) is drawn on the stage of the scene it opens over, which is dimmed behind it and takes no clicks. Where it goes is set in the design of the scene it opens over, with an item named for it:
 
@@ -303,7 +329,7 @@ The subscene is fitted into that item's box, keeping its proportion, and centere
 
 To see the result while designing, pick a scenario in **Preview subscene**, in the toolbar of **Presentation → Scenarios**. It is drawn faintly where it would open: moving or resizing the box moves the preview along. The scenarios this one opens as subscenes are listed first. The preview is only for designing and is never exported. In the inspector, the ID suggestions include `subscene` and a `subscene.<scenario>` for each scenario this one opens as a subscene.
 
-The subscene's controls (`action_proceed`, `action_regress`, `action_N`) come from its own design, and its `action_regress` closes it. A subscene whose scenario has no design is shown as a text card on the stage. Whether the Player is graphic follows the scene underneath: when it plays as text, its subscenes are text too, shown as cards below the dimmed scene.
+The subscene's controls (`action_proceed`, `action_regress`, `action_N`, `<entity>.action_N`) come from its own design, and its `action_regress` closes it. A subscene whose scenario has no design is shown as a text card on the stage. Whether the Player is graphic follows the scene underneath: when it plays as text, its subscenes are text too, shown as cards below the dimmed scene.
 
 ## Side panels
 
@@ -335,7 +361,7 @@ What changed from one version to the next, in the narrative text, the presentati
 
 ## Browser Storage (Save / Load)
 
-The `Save` and `Load` buttons keep named narratives in the browser's `localStorage`, under the key prefix `gno-narrative-v2:<name>`. Each entry is a JSON bundle: the manifest (see [Versions](#versions)), the narrative source, the graph layout (`_graph.yaml` equivalent), and the presentation setup (`_presentation.yaml` equivalent — image libraries, entity/image associations, declared entities, scenario designs). Scenario SVGs aren't stored separately here; the scenario design data is what `Download` renders them from, so keeping one copy avoids the two ever drifting apart.
+The `Save` and `Load` buttons keep named narratives in the browser's `localStorage`, under the key prefix `gno-narrative-v2:<name>`. Each entry is a JSON bundle: the manifest (see [Versions](#versions)), the narrative source, the graph layout (`_graph.yaml` equivalent), and the presentation setup (`_presentation.yaml` equivalent — image libraries, entity/image associations, declared entities, Player settings, scenario designs). Scenario SVGs aren't stored separately here; the scenario design data is what `Download` renders them from, so keeping one copy avoids the two ever drifting apart.
 
 ### Migrating plain-text browser saves
 
