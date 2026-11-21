@@ -922,7 +922,7 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   overflow: visible;
 }
 
-/* floating zoom/layout toolbar over the graph canvas */
+/* floating zoom toolbar over the graph canvas */
 .graph-toolbar {
   position: absolute;
   right: 16px;
@@ -953,7 +953,6 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
   transition: background 0.12s, color 0.12s;
 }
 .graph-btn:hover { background: var(--c-accent-light); color: var(--c-accent); }
-.graph-toolbar-sep { width: 0.5px; height: 18px; background: var(--c-border-strong); margin: 0 2px; }
 
 /* ── Graph node detail/edit side panel ── */
 #graph-node-panel {
@@ -2086,8 +2085,6 @@ textarea.inspector-input { resize: vertical; font-family: var(--font-doc); line-
           <button class="graph-btn" title="Zoom out" @click="zoomOut"><i class="ti ti-zoom-out"></i></button>
           <button class="graph-btn" title="Fit all scenes in view" @click="fitView"><i class="ti ti-arrows-maximize"></i></button>
           <button class="graph-btn" title="Reset view" @click="resetView"><i class="ti ti-focus-2"></i></button>
-          <div class="graph-toolbar-sep"></div>
-          <button class="graph-btn" title="Reset manual layout" @click="resetLayout"><i class="ti ti-layout-grid"></i></button>
         </div>
       </div>
 
@@ -5386,16 +5383,6 @@ createApp({
       graphPan.x = (rect.width - (x1 - x0) * zoom) / 2 - x0 * zoom;
       graphPan.y = (rect.height - (y1 - y0) * zoom) / 2 - y0 * zoom;
     }
-    // "Reset manual layout" only clears dragged positions, not color/annotation —
-    // a user re-arranging the graph shouldn't lose their color-coding or notes.
-    function resetLayout() {
-      Object.keys(nodeMeta).forEach(title => {
-        const m = nodeMeta[title];
-        delete m.x;
-        delete m.y;
-        pruneNodeMetaIfEmpty(title);
-      });
-    }
     // Used when swapping in an entirely different narrative, where none of
     // the previous positions/colors/annotations (keyed by title) still apply.
     function clearNodeMeta() {
@@ -7573,7 +7560,7 @@ Write your scene description here.
       entitiesInScene, firstOccInScene,
       graphNodes, graphEdges, graphCanvasStyle, graphCanvasFullStyle,
       graphViewportEl, onGraphWheel, onCanvasMouseDown, onNodeMouseDown,
-      zoomIn, zoomOut, resetView, fitView, resetLayout,
+      zoomIn, zoomOut, resetView, fitView,
       selectedNodeIndex, panelScene, selectedNodeSource, panelHighlightedSource,
       panelHighlightPre, nodePanelWidth, onPanelResizeDown, onPanelScroll, openPanelInEditor,
       paletteColors, nodeColor, nodeAnnotation, nodeTint, customColorInput, triggerCustomColorPicker,
