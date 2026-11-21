@@ -7,7 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%3E%3Crect%20width=%2264%22%20height=%2264%22%20rx=%2214%22%20fill=%22%237a3e1a%22/%3E%3Cg%20fill=%22none%22%20stroke=%22%23f8f3e8%22%20stroke-width=%223.6%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20transform=%22translate%286.4%206.4%29%20scale%280.8%29%22%3E%3Cpath%20d=%22M6%2052V32A26%2026%200%200%201%2058%2032V52M3%2052H61%22/%3E%3Crect%20x=%2213%22%20y=%2228%22%20width=%2212%22%20height=%2212%22%20rx=%223.5%22/%3E%3Cpath%20d=%22M25%2034H30M30%2034C36%2034%2036%2024%2041%2024M30%2034C35%2034%2036%2043%2041%2043%22/%3E%3Cpath%20d=%22M41%2020L49%2024L41%2028ZM41%2039L49%2043L41%2047Z%22%20fill=%22%23f8f3e8%22/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1250,6 +1250,13 @@ html, body { height: 100%; font-family: var(--font-ui); background: var(--c-bg);
 /* Shared by the main editor's highlight overlay (#editor-highlight) and the
    graph side panel's (.gnp-highlight) — both render the same highlightGno()
    span markup and must color it identically. */
+/* The overlay sits under a transparent textarea whose selection must line up
+   with it glyph for glyph, so every weight/style used below must be a real
+   face of the mono font (loaded in the <head> fonts link): JetBrains Mono's
+   real weights all share one advance width, but a browser-synthesized bold
+   (e.g. Firefox's) widens each glyph and shifts the selection. Forbid
+   synthesis so a missing face falls back to an upright regular glyph instead. */
+.gno-highlight { font-synthesis: none; }
 .gno-highlight .hl-scene { color: var(--c-accent); }
 .gno-highlight .hl-scene-title { font-weight: 600; }
 .gno-highlight .hl-scene-scenario { color: var(--c-accent); opacity: 0.75; }
