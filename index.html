@@ -1,0 +1,36 @@
+---
+title: Mundorum
+---
+<h1>Mundorum</h1>
+<p class="lede">An umbrella for environments that author and play interactive
+compositions: narratives, scenes of connected components, and clinical
+activities guided by LLM agents.</p>
+
+<ul class="projects">
+  <li class="card">
+    <h2>gnō- <span class="tag">gno/</span></h2>
+    <p>A narrative language and its editor. Authors write an interactive story
+    as a Markdown-based <code>.gno</code> text: scenes grouped into scenarios,
+    entities that take the stage, dialogs, states and diverts that lead from
+    one scene to another. The editor shows the story as a graph and plays it
+    in a Player, optionally over a graphic presentation drawn as SVG.
+    It runs entirely in the browser and can be used online.</p>
+    <a class="more" href="{{ '/gno/' | relative_url }}">gnō- documentation and editor <i class="ti ti-arrow-right"></i></a>
+  </li>
+  <li class="card">
+    <h2>noid <span class="tag">noid/</span></h2>
+    <p>Composes and executes n-o-id scenes: directed graphs of Python
+    components connected by publish/subscribe edges. Scenes are authored on
+    the platform's shared server and run on a separate processing machine,
+    the two communicating over HTTPS.</p>
+    <a class="more" href="{{ '/noid/' | relative_url }}">noid documentation <i class="ti ti-arrow-right"></i></a>
+  </li>
+  <li class="card">
+    <h2>VP Studio <span class="tag">vp/</span></h2>
+    <p>Lets educators author virtual patient activities: a scripted sequence of
+    steps in which an LLM tutor, and optionally an LLM patient, guides a
+    student through clinical cases. Students play the activity in a
+    chat-style player; a case can also be exported as a gnō- narrative.</p>
+    <a class="more" href="{{ '/vp/' | relative_url }}">VP Studio documentation <i class="ti ti-arrow-right"></i></a>
+  </li>
+</ul>

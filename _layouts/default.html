@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="{{ page.lang | default: 'en' }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+{%- assign section = page.path | split: '/' | first -%}
+{%- if page.url == '/' -%}
+  {%- assign doc_title = site.title -%}
+{%- else -%}
+  {%- assign doc_title = page.title | default: site.title | append: ' · ' | append: site.title -%}
+{%- endif %}
+<title>{{ doc_title | strip_html }}</title>
+<meta name="description" content="{{ page.description | default: site.description }}">
+<link rel="icon" type="image/svg+xml" href="{{ '/assets/mundorum.svg' | relative_url }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{{ '/' | relative_url }}">
+    <img src="{{ '/assets/mundorum.svg' | relative_url }}" alt="" width="26" height="26">
+    Mundorum
+  </a>
+  <nav>
+    <a href="{{ '/gno/' | relative_url }}"{% if section == 'gno' %} class="on"{% endif %}>gnō-</a>
+    <a href="{{ '/noid/' | relative_url }}"{% if section == 'noid' %} class="on"{% endif %}>noid</a>
+    <a href="{{ '/vp/' | relative_url }}"{% if section == 'vp' %} class="on"{% endif %}>VP Studio</a>
+    <a class="gh" href="https://github.com/{{ site.repository }}" title="Source on GitHub"><i class="ti ti-brand-github"></i></a>
+  </nav>
+</header>
+
+<main class="page{% if page.wide %} wide{% endif %}">
+  {%- assign is_project_page = false -%}
+  {%- if page.url == '/gno/' or page.url == '/noid/' or page.url == '/vp/' -%}{%- assign is_project_page = true -%}{%- endif -%}
+  {%- unless page.url == '/' or is_project_page %}
+  <p class="crumbs">
+    {%- case section -%}
+      {%- when 'gno' -%}<a href="{{ '/gno/' | relative_url }}"><i class="ti ti-arrow-left"></i> gnō-</a>
+      {%- when 'noid' -%}<a href="{{ '/noid/' | relative_url }}"><i class="ti ti-arrow-left"></i> noid</a>
+      {%- when 'vp' -%}<a href="{{ '/vp/' | relative_url }}"><i class="ti ti-arrow-left"></i> VP Studio</a>
+      {%- else -%}<a href="{{ '/' | relative_url }}"><i class="ti ti-arrow-left"></i> Mundorum</a> · shared server
+    {%- endcase -%}
+  </p>
+  {%- endunless %}
+  <article class="doc">
+{{ content }}
+  </article>
+</main>
+
+<footer class="foot">
+  <a href="https://github.com/{{ site.repository }}">github.com/{{ site.repository }}</a>
+</footer>
+</body>
+</html>

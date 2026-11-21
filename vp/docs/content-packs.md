@@ -1,4 +1,5 @@
 # Content Packs
+<!-- Keeps the double-brace fields below verbatim on GitHub Pages (Jekyll Liquid). {% raw %} -->
 
 A content pack holds VP Studio's pedagogical content:
 
@@ -222,3 +223,5 @@ for everyone or for themselves (`AuthoringSettings`,
 pack. Loading a new pack keeps them. If the overridden `template` is no
 longer offered, the pack's template is used instead. Settings identical to
 what would apply anyway are not stored.
+
+<!-- {% endraw %} -->
